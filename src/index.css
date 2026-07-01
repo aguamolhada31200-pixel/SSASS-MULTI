@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #5c3d2e;
+    --secondary: #8b5e3c;
+    --accent: #f5ecd7;
+    --background: #fdf8f0;
+    --sidebar-bg: #2e1a0e;
+    --sidebar-text: #f5ecd7;
+    --text: #1a0f08;
+    --text-muted: #6b4c3b;
+    --border: #e8d5be;
+    --success: #4a7c59;
+    --danger: #9b3a2a;
+    --warning: #c17e2a;
+    --card-bg: #ffffff;
+    --gold: #c8a664;
+    --gold-soft: #e8d5a4;
+    --gold-dark: #9b7f3f;
+    --glass: rgba(253, 248, 240, 0.7);
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--text);
+    font-family: "DM Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* iOS: inputs a 16px evitam zoom */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: "Playfair Display", serif;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d8c4a8;
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* Padrão azulejo português (heroes da Comunidade) */
+  .azulejo {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23F5ECD7' stroke-width='1.2'%3E%3Cpath d='M30 6 42 18 30 30 18 18z'/%3E%3Cpath d='M30 30 42 42 30 54 18 42z'/%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3Cpath d='M0 30h12M48 30h12M30 0v12M30 48v12'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 60px 60px;
+  }
+
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .num {
+    font-family: "Playfair Display", serif;
+    font-variant-numeric: tabular-nums;
+  }
+}

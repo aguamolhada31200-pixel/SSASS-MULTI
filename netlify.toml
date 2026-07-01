@@ -1,0 +1,14 @@
+# O type-check completo (tsc) corre localmente antes de cada deploy.
+# Na Netlify corremos apenas `vite build` (esbuild) — o `tsc --noEmit` falhava
+# no ambiente Linux da Netlify apesar de passar localmente.
+[build]
+  publish = "dist"
+  command = "npx vite build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
