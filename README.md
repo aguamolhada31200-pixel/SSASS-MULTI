@@ -60,3 +60,5 @@ src/
 2. Construir as páginas placeholder por ordem de fase (Fase 1 operacional → Fase 2 Rede → Fase 3 Colaboração).
 3. Modais globais via `useModalStore` (PropertyForm, ContractForm wizard, ExpenseForm, etc.).
 4. Integrações (Stripe MB WAY, Claude via Edge Function, DocuSeal, Nuki).
+
+<!-- CI/CD verified via Vercel + GitHub -->
