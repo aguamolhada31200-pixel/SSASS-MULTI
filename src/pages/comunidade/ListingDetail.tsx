@@ -628,10 +628,21 @@ function useListingActions(listing: L) {
   const navigate = useNavigate();
   const isSaved = useSavedStore((s) => s.savedIds.includes(listing.id));
   const toggleSaved = useSavedStore((s) => s.toggle);
-  const hasInterest = useInterestsStore((s) => s.interests.some((i) => i.listingId === listing.id));
-  const addInterest = useInterestsStore((s) => s.add);
+  const hasInterest = useInterestsStore((s) =>
+    s.interests.some((i) => i.listingId === listing.id && i.userId === CURRENT_USER_ID)
+  );
+  const conversa = useConversationsStore((s) =>
+    s.conversations.find(
+      (c) =>
+        c.contextType === "listing" &&
+        c.contextId === listing.id &&
+        c.participantIds.includes(CURRENT_USER_ID) &&
+        c.participantIds.includes(listing.authorId)
+    )
+  );
   const getOrCreate = useConversationsStore((s) => s.getOrCreate);
   const incrementContacts = useListingsStore((s) => s.incrementContacts);
+  const openInterest = useModalStore((s) => s.openInterest);
 
   const contactar = () => {
     const convId = getOrCreate(listing.authorId, "listing", listing.id);
@@ -640,7 +651,13 @@ function useListingActions(listing: L) {
   };
   const guardar = () => {
     const now = toggleSaved(listing.id);
-    toast.success(now ? "Anúncio guardado" : "Removido dos guardados");
+    if (now) {
+      toast.success("Guardado nos favoritos ♥", {
+        action: { label: "Ver guardados", onClick: () => navigate("/comunidade/rede?tab=guardados") },
+      });
+    } else {
+      toast.message("Removido dos guardados");
+    }
   };
   const partilhar = async () => {
     const url = `${window.location.origin}/comunidade/rede/anuncio/${listing.id}`;
@@ -651,13 +668,12 @@ function useListingActions(listing: L) {
       toast.info(url);
     }
   };
-  const interesse = () => {
-    if (hasInterest) { toast.info("Já manifestou interesse neste anúncio"); return; }
-    addInterest(listing.id);
-    incrementContacts(listing.id);
-    toast.success("Interesse registado", { description: "O autor foi notificado." });
+  const interesse = () => openInterest(listing.id);
+  const verConversa = () => {
+    if (conversa) navigate(`/mensagens?c=${conversa.id}`);
+    else contactar();
   };
-  return { isSaved, hasInterest, contactar, guardar, partilhar, interesse };
+  return { isSaved, hasInterest, temConversa: !!conversa, contactar, guardar, partilhar, interesse, verConversa };
 }
 
 function AcoesPublicas({ listing }: { listing: L }) {
@@ -667,12 +683,30 @@ function AcoesPublicas({ listing }: { listing: L }) {
       <CardContent className="space-y-2">
         <Button variant="gold" className="w-full" onClick={a.contactar}><MessageCircle size={16} /> Contactar</Button>
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={a.guardar}><Heart size={15} className={cn(a.isSaved && "fill-danger text-danger")} /> {a.isSaved ? "Guardado" : "Guardar"}</Button>
+          <Button variant="outline" onClick={a.guardar}>
+            <Heart key={a.isSaved ? "on" : "off"} size={15} className={cn(a.isSaved && "animate-pop-in fill-gold text-gold")} />
+            {a.isSaved ? "Guardado" : "Guardar"}
+          </Button>
           <Button variant="outline" onClick={a.partilhar}><Share2 size={15} /> Partilhar</Button>
         </div>
-        <Button variant={a.hasInterest ? "ghost" : "primary"} className="w-full" onClick={a.interesse} disabled={a.hasInterest}>
-          <Sparkles size={15} /> {a.hasInterest ? "Interesse registado" : "Tenho interesse"}
-        </Button>
+        {a.hasInterest ? (
+          <>
+            <Button variant="ghost" className="w-full" disabled>
+              <ShieldCheck size={15} className="text-success" /> Interesse manifestado
+            </Button>
+            <button onClick={a.verConversa} className="block w-full text-center text-xs font-medium text-gold-dark hover:underline">
+              Ver conversa →
+            </button>
+          </>
+        ) : a.temConversa ? (
+          <Button variant="primary" className="w-full" onClick={a.verConversa}>
+            <MessageCircle size={15} /> Ver conversa →
+          </Button>
+        ) : (
+          <Button variant="primary" className="w-full" onClick={a.interesse}>
+            <Sparkles size={15} /> Tenho interesse
+          </Button>
+        )}
         <p className="flex items-center gap-1.5 pt-1 text-[11px] text-muted"><Lock size={12} /> Morada exata partilhada após contacto.</p>
       </CardContent>
     </Card>
@@ -683,9 +717,15 @@ function AcoesPublicasInline({ listing }: { listing: L }) {
   const a = useListingActions(listing);
   return (
     <div className="mx-auto flex max-w-6xl items-center gap-2">
-      <Button variant="outline" size="md" onClick={a.guardar}><Heart size={16} className={cn(a.isSaved && "fill-danger text-danger")} /></Button>
+      <Button variant="outline" size="md" onClick={a.guardar}>
+        <Heart key={a.isSaved ? "on" : "off"} size={16} className={cn(a.isSaved && "animate-pop-in fill-gold text-gold")} />
+      </Button>
       <Button variant="outline" size="md" onClick={a.partilhar}><Share2 size={16} /></Button>
-      <Button variant="gold" className="flex-1" onClick={a.contactar}><MessageCircle size={16} /> Contactar</Button>
+      {a.hasInterest || a.temConversa ? (
+        <Button variant="gold" className="flex-1" onClick={a.verConversa}><MessageCircle size={16} /> Ver conversa</Button>
+      ) : (
+        <Button variant="gold" className="flex-1" onClick={a.interesse}><Sparkles size={16} /> Tenho interesse</Button>
+      )}
     </div>
   );
 }
@@ -709,21 +749,95 @@ function AcoesAutor({ listing }: { listing: L }) {
   };
 
   return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="space-y-3">
+          <SectionHeader title="Gestão do anúncio" />
+          <Button variant="gold" className="w-full" onClick={() => openForm(listing.id)}><Pencil size={15} /> Editar</Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={pausar}>
+              {listing.status === "paused" ? <><Play size={15} /> Reativar</> : <><Pause size={15} /> Pausar</>}
+            </Button>
+            <Button variant="danger" onClick={eliminar}><Trash2 size={15} /> Eliminar</Button>
+          </div>
+        </CardContent>
+      </Card>
+      <AtividadeAnuncio listing={listing} />
+    </div>
+  );
+}
+
+/** Vista do autor: quem guardou (agregado) e quem manifestou interesse. */
+function AtividadeAnuncio({ listing }: { listing: L }) {
+  const navigate = useNavigate();
+  const interesses = useInterestsStore((s) =>
+    s.interests.filter((i) => i.listingId === listing.id && i.userId !== CURRENT_USER_ID)
+  );
+  const profiles = useProfilesStore((s) => s.profiles);
+  const getOrCreate = useConversationsStore((s) => s.getOrCreate);
+
+  const responder = (userId: string) => {
+    const convId = getOrCreate(userId, "listing", listing.id);
+    navigate(`/mensagens?c=${convId}`);
+  };
+
+  const ordenados = [...interesses].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+
+  return (
     <Card>
       <CardContent className="space-y-3">
-        <SectionHeader title="Gestão do anúncio" />
+        <SectionHeader title="Atividade do anúncio" />
         <div className="grid grid-cols-3 gap-2 text-center">
           <Mini label="Views" value={listing.viewsCount} />
-          <Mini label="Contactos" value={listing.contactsCount} />
           <Mini label="Guardados" value={listing.savedCount} />
+          <Mini label="Interesses" value={ordenados.length} />
         </div>
-        <Button variant="gold" className="w-full" onClick={() => openForm(listing.id)}><Pencil size={15} /> Editar</Button>
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={pausar}>
-            {listing.status === "paused" ? <><Play size={15} /> Reativar</> : <><Pause size={15} /> Pausar</>}
-          </Button>
-          <Button variant="danger" onClick={eliminar}><Trash2 size={15} /> Eliminar</Button>
-        </div>
+        <p className="flex items-center gap-1.5 text-[11px] text-muted">
+          <Heart size={12} className="fill-gold text-gold" /> {listing.savedCount} investidores guardaram este anúncio. Os guardados são privados — só os interesses revelam quem é.
+        </p>
+
+        {ordenados.length > 0 && (
+          <div className="space-y-2 border-t border-line/60 pt-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Interessados</p>
+            {ordenados.map((i) => {
+              const p = profiles.find((x) => x.id === i.userId);
+              return (
+                <div key={i.id} className="rounded-xl border border-line bg-bg/40 p-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full">
+                      {p?.avatarUrl ? (
+                        <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-secondary text-xs font-semibold text-white">
+                          {(p?.fullName ?? "?")[0]}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-1 text-[13px] font-medium text-ink">
+                        {p?.fullName ?? "Investidor"}
+                        {p?.isVerified && <BadgeCheck size={12} className="text-gold-dark" />}
+                      </p>
+                      <p className="text-[11px] text-muted">
+                        {p && p.projetosConcluidos > 0
+                          ? `${p.projetosConcluidos} projetos · ★ ${p.rating.toFixed(1)}`
+                          : "novo na rede"}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => responder(i.userId)}>
+                      <MessageCircle size={13} /> Responder
+                    </Button>
+                  </div>
+                  {i.message && (
+                    <p className="mt-2 line-clamp-2 rounded-lg bg-accent/50 px-2.5 py-1.5 text-[12px] italic text-secondary">
+                      "{i.message}"
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

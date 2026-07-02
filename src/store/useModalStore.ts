@@ -65,6 +65,10 @@ interface ModalState {
   marcoPayForm: { open: boolean; marcoId: string | null };
   openMarcoPay: (marcoId: string) => void;
   closeMarcoPay: () => void;
+
+  interestForm: { open: boolean; listingId: string | null };
+  openInterest: (listingId: string) => void;
+  closeInterest: () => void;
 }
 
 export const useModalStore = create<ModalState>((set) => ({
@@ -147,4 +151,8 @@ export const useModalStore = create<ModalState>((set) => ({
   marcoPayForm: { open: false, marcoId: null },
   openMarcoPay: (marcoId) => set({ marcoPayForm: { open: true, marcoId } }),
   closeMarcoPay: () => set({ marcoPayForm: { open: false, marcoId: null } }),
+
+  interestForm: { open: false, listingId: null },
+  openInterest: (listingId) => set({ interestForm: { open: true, listingId } }),
+  closeInterest: () => set({ interestForm: { open: false, listingId: null } }),
 }));

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Search, Plus, BadgeCheck, Star, Map as MapIcon, LayoutGrid, SlidersHorizontal, X } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Search, Plus, BadgeCheck, Star, Map as MapIcon, LayoutGrid, SlidersHorizontal, X, Heart } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ListingCard } from "@/components/rede/ListingCard";
 import { useExampleData } from "@/store/useExampleData";
@@ -16,6 +16,7 @@ import {
   CIDADES,
 } from "@/store/useListingsStore";
 import { useProfilesStore, CURRENT_USER_ID, type Profile } from "@/store/useProfilesStore";
+import { useSavedStore } from "@/store/useSavedStore";
 import { capitalDoAnuncio, roiDoAnuncio, yieldDoAnuncio, retornoEntradaCedencia } from "@/lib/calc/rede";
 import { eur, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -30,13 +31,19 @@ const CAPITAL_PILLS: { key: CapitalFiltro; label: string; test: (v: number) => b
   { key: "mais50", label: ">50.000€", test: (v) => v > 50000 },
 ];
 
+type RedeTab = "anuncios" | "investidores" | "guardados";
+
 export default function RedeInvestidores() {
   const { enabled } = useExampleData();
   const listings = useListingsStore((s) => s.listings);
   const profiles = useProfilesStore((s) => s.profiles);
+  const savedIds = useSavedStore((s) => s.savedIds);
   const openListingForm = useModalStore((s) => s.openListingForm);
+  const [params, setParams] = useSearchParams();
 
-  const [tab, setTab] = useState<"anuncios" | "investidores">("anuncios");
+  const tabParam = params.get("tab");
+  const tab: RedeTab = tabParam === "guardados" || tabParam === "investidores" ? tabParam : "anuncios";
+  const setTab = (t: RedeTab) => setParams(t === "anuncios" ? {} : { tab: t }, { replace: true });
   const [categoria, setCategoria] = useState<"todas" | ListingType>("todas");
   const [capital, setCapital] = useState<CapitalFiltro>("todos");
   const [distrito, setDistrito] = useState("todos");
@@ -50,6 +57,7 @@ export default function RedeInvestidores() {
   const [filtrosOpen, setFiltrosOpen] = useState(false);
 
   const baseListings = enabled ? listings.filter((l) => l.status !== "closed") : [];
+  const savedGuardados = baseListings.filter((l) => savedIds.includes(l.id));
 
   const filtered = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -156,16 +164,25 @@ export default function RedeInvestidores() {
       <div className="relative z-10 mx-auto -mt-8 max-w-6xl px-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-md">
-            {(["anuncios", "investidores"] as const).map((t) => (
+            {(["anuncios", "investidores", "guardados"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={cn(
-                  "rounded-full px-5 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors sm:px-5",
                   tab === t ? "bg-gold text-sidebar" : "text-muted hover:text-ink"
                 )}
               >
-                {t === "anuncios" ? "Anúncios" : "Investidores"}
+                {t === "anuncios" ? (
+                  "Anúncios"
+                ) : t === "investidores" ? (
+                  "Investidores"
+                ) : (
+                  <>
+                    <Heart size={13} className={cn(tab === t && "fill-sidebar")} />
+                    Guardados{savedGuardados.length > 0 ? ` (${savedGuardados.length})` : ""}
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -248,11 +265,61 @@ export default function RedeInvestidores() {
               </div>
             )}
           </>
-        ) : (
+        ) : tab === "investidores" ? (
           <InvestidoresTab profiles={directoryProfiles} />
+        ) : (
+          <GuardadosTab listings={savedGuardados} enabled={enabled} />
         )}
       </div>
     </div>
+  );
+}
+
+// ───────────────────────── Guardados ─────────────────────────
+
+function GuardadosTab({ listings, enabled }: { listings: ReturnType<typeof useListingsStore.getState>["listings"]; enabled: boolean }) {
+  const [tipo, setTipo] = useState<"todas" | ListingType>("todas");
+  const filtrados = listings.filter((l) => tipo === "todas" || l.type === tipo);
+
+  if (!enabled) {
+    return (
+      <p className="rounded-2xl border border-dashed border-line bg-card/50 px-6 py-16 text-center text-sm text-muted">
+        Ative o toggle «Dados de exemplo» para explorar os guardados.
+      </p>
+    );
+  }
+
+  if (listings.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-gold/30 bg-card/50 px-6 py-16 text-center">
+        <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gold/10 text-gold-dark">
+          <Heart size={22} />
+        </span>
+        <p className="font-display text-lg font-semibold text-ink">Ainda não guardou anúncios.</p>
+        <p className="mt-1 text-sm text-muted">Toque no ♥ para criar a sua shortlist.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Chip ativo={tipo === "todas"} onClick={() => setTipo("todas")}>Todas</Chip>
+        {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
+          <Chip key={t} ativo={tipo === t} onClick={() => setTipo(t)}>
+            {TYPE_LABEL_SHORT[t]}
+          </Chip>
+        ))}
+        <span className="ml-auto text-sm text-muted">
+          {filtrados.length} {filtrados.length === 1 ? "guardado" : "guardados"} · privado, só você vê
+        </span>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {filtrados.map((l) => (
+          <ListingCard key={l.id} listing={l} />
+        ))}
+      </div>
+    </>
   );
 }
 

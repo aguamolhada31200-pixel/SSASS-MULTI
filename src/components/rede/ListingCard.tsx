@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { MapPin, BadgeCheck, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,7 @@ const estadoTone: Record<string, string> = {
 };
 
 export function ListingCard({ listing }: { listing: Listing }) {
+  const navigate = useNavigate();
   const author = useProfilesStore((s) => s.profiles.find((p) => p.id === listing.authorId));
   const isSaved = useSavedStore((s) => s.savedIds.includes(listing.id));
   const toggleSaved = useSavedStore((s) => s.toggle);
@@ -44,7 +45,13 @@ export function ListingCard({ listing }: { listing: Listing }) {
     e.preventDefault();
     e.stopPropagation();
     const now = toggleSaved(listing.id);
-    toast.success(now ? "Anúncio guardado" : "Removido dos guardados");
+    if (now) {
+      toast.success("Guardado nos favoritos ♥", {
+        action: { label: "Ver guardados", onClick: () => navigate("/comunidade/rede?tab=guardados") },
+      });
+    } else {
+      toast.message("Removido dos guardados");
+    }
   };
 
   const metrics = buildCardMetrics(listing);
@@ -85,10 +92,14 @@ export function ListingCard({ listing }: { listing: Listing }) {
           </div>
           <button
             onClick={onSave}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-card/80 text-muted backdrop-blur-sm transition-colors hover:bg-card hover:text-danger"
-            title={isSaved ? "Remover" : "Guardar"}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-card/80 text-muted backdrop-blur-sm transition-colors hover:bg-card hover:text-gold-dark"
+            title={isSaved ? "Remover dos guardados" : "Guardar"}
           >
-            <Heart size={15} className={cn(isSaved && "fill-danger text-danger")} />
+            <Heart
+              key={isSaved ? "on" : "off"}
+              size={15}
+              className={cn(isSaved ? "animate-pop-in fill-gold text-gold" : "")}
+            />
           </button>
         </div>
 

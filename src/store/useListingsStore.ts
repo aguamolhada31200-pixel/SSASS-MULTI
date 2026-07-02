@@ -637,6 +637,39 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     split: "50 / 50",
     tempoAteVenda: "10 meses",
   },
+  // Anúncio do utilizador atual — alimenta a vista de autor (Atividade do anúncio).
+  {
+    id: "arr-campo-ourique",
+    authorId: "me-daniel",
+    type: "arrendamento",
+    title: "T2 em Campo de Ourique pronto a render",
+    description:
+      "T2 renovado em Campo de Ourique, mobilado e com inquilino interessado. Procuro parceiro de capital para fechar a aquisição — rendimento estável desde o primeiro mês.",
+    district: "Lisboa",
+    city: "Lisboa",
+    exactAddress: "Rua Ferreira Borges 55, 2.º Esq.",
+    tipologia: "T2",
+    areaUtil: 72,
+    estado: "renovado",
+    coverImageUrl: IMG("1484154218962-a197022b5858"),
+    galleryUrls: [IMG("1484154218962-a197022b5858"), IMG("1493809842364-78817add7ffb")],
+    floorPlanUrl: IMG("1556909211-36987daf7b4d"),
+    energyCertificate: "B",
+    estadoAnuncio: "ativo",
+    status: "active",
+    viewsCount: 47,
+    contactsCount: 3,
+    savedCount: 12,
+    contactPreference: "mensagem",
+    visibility: "public",
+    createdAt: "2026-06-18",
+    precoImovel: 210000,
+    capitalNecessario: 55000,
+    yieldLiquido: 4.6,
+    rentabilidadeCapital: 13.2,
+    rendaMensal: 1250,
+    roi: 13.2,
+  },
 ];
 
 const SEED: Listing[] = RAW_SEED.map((l) => ({
@@ -696,7 +729,7 @@ export const useListingsStore = create<ListingsState>()(
     }),
     {
       name: "decogest-listings",
-      version: 6,
+      version: 7,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { listings?: Listing[] } | undefined;
         if (state?.listings && version < 5) {
@@ -706,8 +739,9 @@ export const useListingsStore = create<ListingsState>()(
             galleryUrls: normalizeListingPhotos(l.galleryUrls as unknown),
           }));
         }
-        if (state?.listings && version < 6) {
-          // v6: cedência com/sem obras — refrescar os seeds (mantém anúncios do utilizador).
+        if (state?.listings && version < 7) {
+          // v6: cedência com/sem obras. v7: anúncio do utilizador (vista autor).
+          // Refresca os seeds mantendo anúncios criados pelo utilizador.
           const seedIds = new Set(SEED.map((l) => l.id));
           const userListings = state.listings.filter((l) => !seedIds.has(l.id));
           state.listings = [...SEED, ...userListings];
