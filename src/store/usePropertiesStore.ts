@@ -20,6 +20,8 @@ export function normalizePhotos(raw: unknown): PropertyPhoto[] {
 
 export interface Property {
   id: string;
+  /** userId do dono. Se omitido, assume-se o utilizador atual (retro-compat). */
+  ownerId?: string;
   // A. Aquisição
   name: string;
   address: string;

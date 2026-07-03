@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   Info,
   Pencil,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -19,6 +20,7 @@ import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { useListingsStore } from "@/store/useListingsStore";
 import { usePartnerRatingsStore } from "@/store/usePartnerRatingsStore";
 import { useConversationsStore } from "@/store/useConversationsStore";
+import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { eur, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +31,13 @@ export default function InvestorProfile() {
   const listings = useListingsStore((s) => s.listings.filter((l) => l.authorId === userId && l.status === "active"));
   const ratings = usePartnerRatingsStore((s) => s.ratings.filter((r) => r.ratedUserId === userId));
   const getOrCreate = useConversationsStore((s) => s.getOrCreate);
+  const properties = usePropertiesStore((s) => s.properties);
+
+  // "Imóveis registados" — conta em usePropertiesStore por owner (ownerId ausente = utilizador atual).
+  const imoveisRegistados = properties.filter((p) => (p.ownerId ?? CURRENT_USER_ID) === userId).length;
+  const imoveisCount = imoveisRegistados > 0
+    ? imoveisRegistados
+    : profile?.imoveisAutoDeclarados ?? 0;
 
   if (!profile)
     return (
@@ -48,53 +57,85 @@ export default function InvestorProfile() {
 
   return (
     <div className="-mx-4 -my-6 sm:-mx-6 lg:-mx-8">
-      {/* Cover */}
-      <div className="relative h-44 overflow-hidden sm:h-56">
+      {/* Cover (altura fixa ~200px, botão Rede sobreposto) */}
+      <div className="relative h-[200px] overflow-hidden">
         {profile.coverUrl ? (
           <img src={profile.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[#8B5E3C] to-[#5C3D2E]" />
         )}
         <div className="azulejo absolute inset-0 opacity-[0.06]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/50 to-transparent" />
-        <Link to="/comunidade/rede" className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-card/85 px-3 py-1.5 text-sm text-ink backdrop-blur hover:bg-card sm:left-6">
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/40 to-transparent" />
+        <Link
+          to="/comunidade/rede"
+          className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-card/85 px-3 py-1.5 text-sm text-ink backdrop-blur hover:bg-card sm:left-6"
+        >
           <ArrowLeft size={15} /> Rede
         </Link>
       </div>
 
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
-        {/* Cabeçalho do perfil */}
-        <div className="-mt-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex items-end gap-4">
-            <div className={cn("h-24 w-24 overflow-hidden rounded-full border-4 border-bg", profile.isVerified && "ring-2 ring-gold")}>
-              {profile.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-secondary text-2xl text-white">{profile.fullName[0]}</div>}
+        {/* Cabeçalho do perfil — avatar sobreposto + info + ação */}
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
+          {/* Bloco avatar + nome/tagline */}
+          <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:items-end sm:gap-5">
+            <div
+              className={cn(
+                "-mt-14 h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 border-bg bg-card shadow-md",
+                profile.isVerified && "ring-2 ring-gold ring-offset-2 ring-offset-bg"
+              )}
+            >
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-secondary text-3xl font-semibold text-white">
+                  {profile.fullName[0]}
+                </div>
+              )}
             </div>
-            <div className="pb-1">
-              <h1 className="flex items-center gap-1.5 font-display text-2xl font-bold text-ink sm:text-3xl">
+            <div className="min-w-0 flex-1 pt-2 text-center sm:pt-4 sm:text-left">
+              <h1 className="flex flex-wrap items-center justify-center gap-1.5 font-display text-2xl font-bold text-ink sm:justify-start sm:text-3xl">
                 {profile.fullName}
                 {profile.isVerified && <BadgeCheck size={20} className="text-gold-dark" />}
               </h1>
-              <p className="text-sm text-muted">{profile.tagline}</p>
-              {profile.availableForPartnership && (
-                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-success/12 px-2.5 py-0.5 text-xs font-medium text-success">Disponível para parceria</span>
-              )}
+              {profile.tagline && <p className="mt-0.5 text-sm text-muted">{profile.tagline}</p>}
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs text-muted sm:justify-start">
+                {profile.city && (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin size={12} /> {profile.city}
+                  </span>
+                )}
+                {profile.availableForPartnership && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-success/12 px-2.5 py-0.5 font-medium text-success">
+                    Disponível para parceria
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          {/* Ações */}
+          <div className="flex w-full flex-wrap gap-2 sm:mt-4 sm:w-auto">
             {isMe ? (
-              <Button variant="gold" onClick={() => navigate("/comunidade/rede/perfil/editar")}><Pencil size={15} /> Editar perfil</Button>
+              <Button variant="gold" className="w-full sm:w-auto" onClick={() => navigate("/comunidade/rede/perfil/editar")}>
+                <Pencil size={15} /> Editar perfil
+              </Button>
             ) : (
               <>
-                <Button variant="outline" onClick={mensagem}><MessageCircle size={15} /> Mensagem</Button>
-                <Button variant="gold" onClick={convidar}><Handshake size={15} /> Convidar parceria</Button>
+                <Button variant="outline" className="flex-1 sm:flex-none" onClick={mensagem}>
+                  <MessageCircle size={15} /> Mensagem
+                </Button>
+                <Button variant="gold" className="flex-1 sm:flex-none" onClick={convidar}>
+                  <Handshake size={15} /> Convidar parceria
+                </Button>
               </>
             )}
           </div>
         </div>
 
         {/* Portfólio (track record — ganho-na-plataforma) */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Stat label="Anúncios ativos" value={String(listings.length)} />
+          <Stat label="Imóveis registados" value={String(imoveisCount)} />
           <Stat label="Valor portfólio" value={profile.valorPortfolio > 0 ? eur(profile.valorPortfolio) : "—"} />
           <Stat label="Yield médio" value={profile.yieldMedio > 0 ? pct(profile.yieldMedio) : "—"} />
           <Stat label="Projetos concluídos" value={String(profile.projetosConcluidos)} />

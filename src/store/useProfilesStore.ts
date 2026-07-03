@@ -71,6 +71,7 @@ const SEED: Profile[] = [
     numAvaliacoes: 6,
     respostaHoras: 2,
     taxaResposta: 96,
+    imoveisAutoDeclarados: 6,
     interesses: ["Reabilitação", "Flip", "Centro histórico", "Porto"],
     createdAt: "2023-05-20",
   },
@@ -92,6 +93,7 @@ const SEED: Profile[] = [
     numAvaliacoes: 2,
     respostaHoras: 5,
     taxaResposta: 88,
+    imoveisAutoDeclarados: 2,
     interesses: ["Cedência de posição", "CPCV", "Lisboa"],
     createdAt: "2024-08-12",
   },
@@ -113,6 +115,7 @@ const SEED: Profile[] = [
     numAvaliacoes: 12,
     respostaHoras: 4,
     taxaResposta: 90,
+    imoveisAutoDeclarados: 7,
     interesses: ["Arrendamento", "Estudantes", "Rendimento passivo"],
     createdAt: "2022-11-30",
   },
@@ -155,6 +158,7 @@ const SEED: Profile[] = [
     numAvaliacoes: 8,
     respostaHoras: 2,
     taxaResposta: 95,
+    imoveisAutoDeclarados: 4,
     interesses: ["Reabilitação", "Gestão de obra", "Porto"],
     createdAt: "2024-02-18",
   },
@@ -176,6 +180,7 @@ const SEED: Profile[] = [
     numAvaliacoes: 5,
     respostaHoras: 6,
     taxaResposta: 90,
+    imoveisAutoDeclarados: 3,
     interesses: ["Investimento", "Flip", "Lisboa"],
     createdAt: "2024-06-05",
   },
@@ -199,14 +204,23 @@ export const useProfilesStore = create<ProfilesState>()(
     }),
     {
       name: "decogest-profiles",
-      version: 2,
-      // v2: garante os perfis dos sócios de co-gestão (pedro-alves, rita-santos).
+      version: 3,
+      // v2: sócios de co-gestão. v3: imoveisAutoDeclarados nos anunciantes.
       migrate: (persisted: unknown, version: number) => {
         const state = (persisted ?? {}) as { profiles?: Profile[] };
-        if (state.profiles && version < 2) {
+        if (state.profiles && version < 3) {
           const presentes = new Set(state.profiles.map((p) => p.id));
           SEED.forEach((s) => {
             if (!presentes.has(s.id)) state.profiles!.push(s);
+          });
+          // Preencher imoveisAutoDeclarados dos perfis existentes a partir do SEED atualizado.
+          const seedMap = new Map(SEED.map((s) => [s.id, s.imoveisAutoDeclarados] as const));
+          state.profiles = state.profiles.map((p) => {
+            const seedVal = seedMap.get(p.id);
+            if (seedVal != null && p.imoveisAutoDeclarados == null) {
+              return { ...p, imoveisAutoDeclarados: seedVal };
+            }
+            return p;
           });
         }
         return state as ProfilesState;
