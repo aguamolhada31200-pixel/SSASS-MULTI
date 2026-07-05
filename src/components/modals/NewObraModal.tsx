@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { X, Hammer, Plus, Check, Sparkles } from "lucide-react";
+import { X, Hammer, Pencil, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
 import {
@@ -57,8 +57,10 @@ const CATEGORIAS = Object.entries(CATEGORIA_LABEL) as [ObraCategoria, string][];
 
 export function NewObraModal() {
   const { obraForm, closeObraForm } = useModalStore();
-  const { open, initialProjectId, initialPropertyId } = obraForm;
+  const { open, editingId, initialProjectId, initialPropertyId } = obraForm;
   const addObra = useObrasStore((s) => s.addObra);
+  const updateObra = useObrasStore((s) => s.updateObra);
+  const editingObra = useObrasStore((s) => (editingId ? s.obras.find((o) => o.id === editingId) : undefined));
   const addFase = useObrasStore((s) => s.addFase);
   const projects = useCollabStore((s) => s.projects);
   const properties = usePropertiesStore((s) => s.properties);
@@ -69,11 +71,32 @@ export function NewObraModal() {
 
   useEffect(() => {
     if (open) {
-      setForm(emptyForm({ projectId: initialProjectId, propertyId: initialPropertyId }));
+      if (editingId && editingObra) {
+        // Pré-preencher o formulário com os dados da obra existente
+        setForm({
+          origin: editingObra.propertyId ? "property" : "project",
+          projectId: editingObra.projectId ?? "",
+          propertyId: editingObra.propertyId ?? "",
+          titulo: editingObra.titulo,
+          categoria: editingObra.categoria,
+          orcamento: editingObra.orcamento,
+          dataInicio: editingObra.dataInicio,
+          dataFimPrevista: editingObra.dataFimPrevista,
+          estado: editingObra.estado,
+          empreiteiro: editingObra.empreiteiro ?? "",
+          contactoEmpreiteiro: editingObra.contactoEmpreiteiro ?? "",
+          descricao: editingObra.notas ?? "",
+          addFases: false,
+        });
+      } else {
+        setForm(emptyForm({ projectId: initialProjectId, propertyId: initialPropertyId }));
+      }
     }
-  }, [open, initialProjectId, initialPropertyId]);
+  }, [open, editingId, editingObra, initialProjectId, initialPropertyId]);
 
   if (!open) return null;
+
+  const isEditing = !!editingId;
 
   const patch = (p: Partial<FormState>) => setForm((s) => ({ ...s, ...p }));
 
@@ -85,16 +108,33 @@ export function NewObraModal() {
       toast.error("Indique o nome da obra");
       return;
     }
-    if (form.origin === "project" && !form.projectId) {
+    if (!isEditing && form.origin === "project" && !form.projectId) {
       toast.error("Selecione um projeto");
       return;
     }
-    if (form.origin === "property" && !form.propertyId) {
+    if (!isEditing && form.origin === "property" && !form.propertyId) {
       toast.error("Selecione um imóvel");
       return;
     }
     if (form.orcamento <= 0) {
       toast.error("Orçamento tem de ser superior a 0");
+      return;
+    }
+
+    if (isEditing && editingId) {
+      updateObra(editingId, {
+        titulo: form.titulo.trim(),
+        categoria: form.categoria,
+        orcamento: form.orcamento,
+        dataInicio: form.dataInicio,
+        dataFimPrevista: form.dataFimPrevista,
+        estado: form.estado,
+        empreiteiro: form.empreiteiro.trim() || undefined,
+        contactoEmpreiteiro: form.contactoEmpreiteiro.trim() || undefined,
+        notas: form.descricao.trim(),
+      });
+      toast.success("Obra atualizada", { description: form.titulo });
+      closeObraForm();
       return;
     }
 
@@ -157,12 +197,18 @@ export function NewObraModal() {
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/15">
-              <Hammer size={18} className="text-warning" />
+              {isEditing ? <Pencil size={18} className="text-warning" /> : <Hammer size={18} className="text-warning" />}
             </span>
             <div>
-              <h2 className="font-display text-lg font-semibold text-ink">Nova obra</h2>
+              <h2 className="font-display text-lg font-semibold text-ink">
+                {isEditing ? "Editar obra" : "Nova obra"}
+              </h2>
               <p className="text-xs text-muted">
-                {preSelected ? "Projeto pré-selecionado" : "Escolha onde criar a obra"}
+                {isEditing
+                  ? "Corrija os campos e guarde"
+                  : preSelected
+                    ? "Projeto pré-selecionado"
+                    : "Escolha onde criar a obra"}
               </p>
             </div>
           </div>
@@ -173,7 +219,7 @@ export function NewObraModal() {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
-          {!preSelected && (
+          {!preSelected && !isEditing && (
             <div className="mb-5">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
                 Onde criar a obra
@@ -208,7 +254,7 @@ export function NewObraModal() {
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {!preSelected && form.origin === "project" && (
+            {!preSelected && !isEditing && form.origin === "project" && (
               <Field label="Projeto" className="sm:col-span-2">
                 <select
                   value={form.projectId}
@@ -225,7 +271,7 @@ export function NewObraModal() {
               </Field>
             )}
 
-            {!preSelected && form.origin === "property" && (
+            {!preSelected && !isEditing && form.origin === "property" && (
               <Field label="Imóvel" className="sm:col-span-2">
                 <select
                   value={form.propertyId}
@@ -333,8 +379,8 @@ export function NewObraModal() {
               />
             </Field>
 
-            {/* Sugestão de fases iniciais */}
-            <div className="sm:col-span-2">
+            {/* Sugestão de fases iniciais — só na criação */}
+            {!isEditing && <div className="sm:col-span-2">
               <button
                 type="button"
                 onClick={() => patch({ addFases: !form.addFases })}
@@ -371,7 +417,7 @@ export function NewObraModal() {
                   />
                 </div>
               </button>
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -381,7 +427,7 @@ export function NewObraModal() {
             Cancelar
           </Button>
           <Button type="button" onClick={onSubmit}>
-            <Check size={16} /> Adicionar obra
+            <Check size={16} /> {isEditing ? "Guardar alterações" : "Adicionar obra"}
           </Button>
         </div>
       </div>

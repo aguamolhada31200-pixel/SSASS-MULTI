@@ -92,6 +92,7 @@ export default function ObraDetalhe() {
   const projects = useCollabStore((s) => s.projects);
   const properties = usePropertiesStore((s) => s.properties);
   const profiles = useProfilesStore((s) => s.profiles);
+  const openObraForm = useModalStore((s) => s.openObraForm);
 
   const [tab, setTab] = useState<TabKey>("Fases");
 
@@ -198,6 +199,9 @@ export default function ObraDetalhe() {
             <div className="flex flex-wrap items-center gap-2">
               {souGestor ? (
                 <>
+                  <Button size="sm" variant="outline" onClick={() => openObraForm({ editingId: obra.id })}>
+                    <Pencil size={14} /> Editar
+                  </Button>
                   {obra.estado !== "concluida" && (
                     <Button size="sm" variant="outline" onClick={() => togglePausada(obra.id)}>
                       {obra.estado === "pausada" ? (
