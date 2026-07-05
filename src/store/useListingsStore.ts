@@ -53,12 +53,13 @@ export interface Listing {
   createdAt: string;
 
   // ── Reabilitação ──
-  valorImovel?: number;
-  orcamentoObras?: number;
-  imt?: number;
-  escritura?: number;
-  outrosCustos?: number;
-  valorVendaPrevisto?: number;
+  valorImovel?: number;           // Valor do imóvel (CPCV)
+  orcamentoObras?: number;        // Orçamento das obras previstas
+  imt?: number;                   // (legado) IMT — usado se `impostos` não estiver preenchido
+  escritura?: number;             // (legado) IS + registo — usado se `impostos` não estiver preenchido
+  outrosCustos?: number;          // Outros custos do projeto (advogado, comissões, etc.)
+  valorMercadoAtual?: number;     // Valor de mercado atual (sem obras) — reabilitação
+  valorVendaPrevisto?: number;    // (legado) — cai para valor de mercado pós-obras se este não existir
   rentabilidadePrevista?: number;
   capitalProcurado?: number;
   split?: string;
@@ -173,11 +174,16 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     visibility: "public",
     createdAt: "2026-05-30",
     valorImovel: 280000,
+    valorNegociado: 20000,
     orcamentoObras: 60000,
+    impostos: 5000,
     imt: 3500,
     escritura: 1500,
-    outrosCustos: 0,
+    outrosCustos: 2000,
+    valorMercadoAtual: 320000,
+    valorMercadoPosObras: 420000,
     valorVendaPrevisto: 420000,
+    prazoObras: "8 meses",
     rentabilidadePrevista: 21.7,
     capitalProcurado: 95000,
     split: "50 / 50",
@@ -561,10 +567,16 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     visibility: "public",
     createdAt: "2026-04-18",
     valorImovel: 220000,
+    valorNegociado: 15000,
     orcamentoObras: 90000,
+    impostos: 5800,
     imt: 4000,
     escritura: 1800,
+    outrosCustos: 3000,
+    valorMercadoAtual: 260000,
+    valorMercadoPosObras: 410000,
     valorVendaPrevisto: 410000,
+    prazoObras: "10 meses",
     rentabilidadePrevista: 29.8,
     capitalProcurado: 120000,
     split: "60 / 40",
@@ -628,10 +640,16 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     visibility: "public",
     createdAt: "2026-06-09",
     valorImovel: 95000,
+    valorNegociado: 5000,
     orcamentoObras: 35000,
+    impostos: 2200,
     imt: 1200,
     escritura: 1000,
+    outrosCustos: 800,
+    valorMercadoAtual: 115000,
+    valorMercadoPosObras: 175000,
     valorVendaPrevisto: 175000,
+    prazoObras: "6 meses",
     rentabilidadePrevista: 32.4,
     capitalProcurado: 50000,
     split: "50 / 50",
@@ -729,7 +747,7 @@ export const useListingsStore = create<ListingsState>()(
     }),
     {
       name: "decogest-listings",
-      version: 7,
+      version: 8,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { listings?: Listing[] } | undefined;
         if (state?.listings && version < 5) {
@@ -739,8 +757,9 @@ export const useListingsStore = create<ListingsState>()(
             galleryUrls: normalizeListingPhotos(l.galleryUrls as unknown),
           }));
         }
-        if (state?.listings && version < 7) {
+        if (state?.listings && version < 8) {
           // v6: cedência com/sem obras. v7: anúncio do utilizador (vista autor).
+          // v8: reabilitação — valorMercadoAtual/PosObras, impostos consolidados, prazoObras.
           // Refresca os seeds mantendo anúncios criados pelo utilizador.
           const seedIds = new Set(SEED.map((l) => l.id));
           const userListings = state.listings.filter((l) => !seedIds.has(l.id));

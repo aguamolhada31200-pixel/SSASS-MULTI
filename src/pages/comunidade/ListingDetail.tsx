@@ -33,7 +33,13 @@ import { useModalStore } from "@/store/useModalStore";
 import {
   investimentoTotalReab,
   roiReab,
+  lucroReab,
   lucroBrutoReab,
+  ctaReab,
+  impostosReab,
+  valorMercadoAtualReab,
+  valorMercadoPosObrasReab,
+  retornoEntradaReab,
   ctaCedencia,
   lucroCedencia,
   roiCedencia,
@@ -401,7 +407,16 @@ function Secao({ title, children }: { title: string; children: React.ReactNode }
 }
 
 function CorpoReab({ listing }: { listing: L }) {
+  const cta = ctaReab(listing);
   const inv = investimentoTotalReab(listing);
+  const impostos = impostosReab(listing);
+  const mercadoAtual = valorMercadoAtualReab(listing);
+  const mercadoPos = valorMercadoPosObrasReab(listing);
+  const lucro = lucroReab(listing);
+  const roi = roiReab(listing);
+  const retEntrada = retornoEntradaReab(listing);
+  const uplift = mercadoAtual > 0 ? ((mercadoPos - mercadoAtual) / mercadoAtual) * 100 : 0;
+
   return (
     <>
       <Secao title="Dados do imóvel">
@@ -412,21 +427,73 @@ function CorpoReab({ listing }: { listing: L }) {
         </div>
       </Secao>
 
+      {/* SECÇÃO 1 — Destaques do investidor (ordem de importância) */}
       <Card>
         <CardContent>
-          <SectionHeader title="Viabilidade do negócio" />
-          <p className="mb-4 text-sm text-muted">Decomposição do investimento</p>
-          <div className="grid grid-cols-3 gap-3">
-            <MetricCard label="Valor de aquisição" value={eur(listing.valorImovel ?? 0)} />
-            <MetricCard label="Orçamento de obras" value={eur(listing.orcamentoObras ?? 0)} />
-            <MetricCard label="IMT + Escritura" value={eur((listing.imt ?? 0) + (listing.escritura ?? 0))} />
-            <MetricCard label="Investimento total" value={eur(inv)} tone="gold" highlighted />
-            <MetricCard label="Valor venda previsto" value={eur(listing.valorVendaPrevisto ?? 0)} />
-            <MetricCard label="Lucro bruto previsto" value={eur(lucroBrutoReab(listing))} tone="success" highlighted />
+          <SectionHeader title="Oportunidade — o que interessa ao investidor" />
+          <p className="mb-4 text-sm text-muted">Potencial pós-obras da operação prevista.</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="Capital procurado" value={eur(listing.capitalProcurado ?? 0)} tone="gold" highlighted />
+            <MetricCard label="Lucro estimado pós-obras" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} highlighted />
+            <MetricCard label="ROI da operação prevista" value={pct(roi)} tone="gold" highlighted />
+            <MetricCard label="Retorno sobre a entrada" value={pct(retEntrada)} tone="gold" highlighted />
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <MetricCard label="ROI esperado" value={pct(roiReab(listing))} tone="gold" highlighted />
-            <MetricCard label="Capital procurado" value={eur(listing.capitalProcurado ?? 0)} tone="gold" />
+        </CardContent>
+      </Card>
+
+      {/* SECÇÃO 2 — Imóvel & Mercado */}
+      <Card>
+        <CardContent>
+          <SectionHeader title="Imóvel e mercado" />
+          <p className="mb-4 text-sm text-muted">Preço acordado, comparação com o mercado e potencial pós-reabilitação.</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="Valor do imóvel (CPCV)" value={eur(listing.valorImovel ?? 0)} />
+            <MetricCard label="Valor de mercado atual" value={eur(mercadoAtual)} />
+            <MetricCard label="Valor de mercado pós-obras" value={eur(mercadoPos)} tone="success" highlighted />
+            <MetricCard label="Desconto obtido" value={eur(listing.valorNegociado ?? 0)} tone={listing.valorNegociado ? "success" : undefined} />
+          </div>
+          {mercadoAtual > 0 && mercadoPos > mercadoAtual && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-gold/20 bg-gradient-to-r from-accent to-card px-4 py-2.5 text-sm">
+              <Sparkles size={14} className="text-gold-dark" />
+              <span className="text-muted">Uplift esperado após obras:</span>
+              <span className="num font-semibold text-gold-dark">+{pct(uplift)}</span>
+              <span className="text-muted">({eur(mercadoPos - mercadoAtual)})</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SECÇÃO 3 — Composição do investimento */}
+      <Card>
+        <CardContent>
+          <SectionHeader title="Composição do investimento" />
+          <p className="mb-4 text-sm text-muted">Decomposição do Custo Total da Aquisição (CTA) e do Investimento Total.</p>
+
+          {/* Decomposição linha a linha */}
+          <div className="space-y-1 rounded-2xl border border-line bg-bg/40 p-4">
+            <CtaRow label="Valor do imóvel (CPCV)" value={listing.valorImovel ?? 0} />
+            <CtaRow label="Impostos (IMT + IS + Registos)" value={impostos} />
+            <div className="my-2 flex items-center justify-between border-t border-line pt-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                CTA · Custo Total da Aquisição
+              </span>
+              <span className="num font-display text-lg font-bold text-gold-dark">{eur(cta)}</span>
+            </div>
+            <CtaRow label="Orçamento das obras previstas" value={listing.orcamentoObras ?? 0} />
+            {(listing.outrosCustos ?? 0) > 0 && (
+              <CtaRow label="Outros custos do projeto" value={listing.outrosCustos ?? 0} />
+            )}
+            <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Investimento Total
+              </span>
+              <span className="num font-display text-2xl font-bold text-gold-dark">{eur(inv)}</span>
+            </div>
+          </div>
+
+          {/* Prazo + Split */}
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <MetricCard label="Prazo estimado das obras" value={listing.prazoObras ?? listing.tempoAteVenda ?? "—"} />
             <MetricCard label="Split" value={listing.split ?? "—"} />
           </div>
         </CardContent>

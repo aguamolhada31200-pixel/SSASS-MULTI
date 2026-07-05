@@ -1,23 +1,74 @@
 import type { Listing } from "@/store/useListingsStore";
 
 /**
- * Investimento total (reabilitação) — AUTO:
- * valor do imóvel + obras + IMT + escritura + outros custos.
+ * Impostos consolidados (reabilitação) = IMT + IS + Registos.
+ * Prioriza o campo `impostos` (v8). Fallback: IMT + Escritura (legado).
  */
-export function investimentoTotalReab(l: Pick<Listing, "valorImovel" | "orcamentoObras" | "imt" | "escritura" | "outrosCustos">): number {
-  return (l.valorImovel ?? 0) + (l.orcamentoObras ?? 0) + (l.imt ?? 0) + (l.escritura ?? 0) + (l.outrosCustos ?? 0);
+export function impostosReab(l: Pick<Listing, "impostos" | "imt" | "escritura">): number {
+  if (l.impostos != null) return l.impostos;
+  return (l.imt ?? 0) + (l.escritura ?? 0);
 }
 
-/** Lucro bruto previsto (reabilitação) = venda prevista − investimento total. */
+/**
+ * Custo Total da Aquisição (CTA) — reabilitação:
+ * CTA = Valor do imóvel (CPCV) + Impostos (IMT + IS + Registos).
+ */
+export function ctaReab(l: Pick<Listing, "valorImovel" | "impostos" | "imt" | "escritura">): number {
+  return (l.valorImovel ?? 0) + impostosReab(l);
+}
+
+/**
+ * Investimento Total (reabilitação):
+ * CTA + Orçamento das obras + Outros custos do projeto.
+ */
+export function investimentoTotalReab(l: Pick<Listing, "valorImovel" | "orcamentoObras" | "impostos" | "imt" | "escritura" | "outrosCustos">): number {
+  return ctaReab(l) + (l.orcamentoObras ?? 0) + (l.outrosCustos ?? 0);
+}
+
+/** Valor de mercado atual (reabilitação) — antes das obras. */
+export function valorMercadoAtualReab(l: Pick<Listing, "valorMercadoAtual" | "valorImovel">): number {
+  return l.valorMercadoAtual ?? l.valorImovel ?? 0;
+}
+
+/**
+ * Valor de mercado pós-obras (reabilitação):
+ * usa `valorMercadoPosObras` quando disponível, fallback ao (legado) `valorVendaPrevisto`.
+ */
+export function valorMercadoPosObrasReab(l: Pick<Listing, "valorMercadoPosObras" | "valorVendaPrevisto">): number {
+  return l.valorMercadoPosObras ?? l.valorVendaPrevisto ?? 0;
+}
+
+/**
+ * Lucro estimado pós-obras (reabilitação):
+ * Lucro = Valor de mercado pós-obras − Investimento Total.
+ */
+export function lucroReab(l: Listing): number {
+  return valorMercadoPosObrasReab(l) - investimentoTotalReab(l);
+}
+
+/** Alias legado — mantém compat com componentes antigos (simulador). */
 export function lucroBrutoReab(l: Listing): number {
-  return (l.valorVendaPrevisto ?? 0) - investimentoTotalReab(l);
+  return lucroReab(l);
 }
 
-/** ROI esperado (reabilitação) — AUTO = lucro bruto / investimento total. */
+/**
+ * ROI da operação prevista (reabilitação):
+ * ROI = Lucro / Investimento Total × 100.
+ */
 export function roiReab(l: Listing): number {
   const inv = investimentoTotalReab(l);
   if (inv <= 0) return 0;
-  return (lucroBrutoReab(l) / inv) * 100;
+  return (lucroReab(l) / inv) * 100;
+}
+
+/**
+ * Retorno sobre a entrada (reabilitação):
+ * Lucro / Capital próprio investido (capital procurado) × 100.
+ */
+export function retornoEntradaReab(l: Listing): number {
+  const cap = l.capitalProcurado ?? 0;
+  if (cap <= 0) return 0;
+  return (lucroReab(l) / cap) * 100;
 }
 
 /**
