@@ -70,6 +70,9 @@ import {
   ImovelDocumentosTab,
 } from "@/pages/imoveis/ImovelDetail";
 import { FinancasTab } from "@/pages/imoveis/FinancasTab";
+import { SociosTab } from "@/components/collab/SociosTab";
+import { DecisoesTab } from "@/components/collab/DecisoesTab";
+import { AtividadeTab } from "@/components/collab/AtividadeTab";
 import { eur, pct, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
@@ -315,7 +318,9 @@ function ReabRoom({ project: p }: { project: CollabProject }) {
       {tab === "Obras" && <ObrasTab project={p} />}
       {tab === "Documentos" && <ProjectPropertyTab project={p} render={(pid) => <ImovelDocumentosTab propertyId={pid} />} />}
       {tab === "Sócios" && <SociosTab project={p} />}
-      {(tab === "Decisões" || tab === "Galeria" || tab === "Atividade") && <Placeholder name={tab} />}
+      {tab === "Decisões" && <DecisoesTab project={p} />}
+      {tab === "Atividade" && <AtividadeTab project={p} />}
+      {tab === "Galeria" && <Placeholder name={tab} />}
     </>
   );
 }
@@ -714,7 +719,8 @@ function ArrRoom({ project: p }: { project: CollabProject }) {
       {tab === "Obras" && <ObrasTab project={p} />}
       {tab === "Documentos" && <ProjectPropertyTab project={p} render={(pid) => <ImovelDocumentosTab propertyId={pid} />} />}
       {tab === "Sócios" && <SociosTab project={p} />}
-      {(tab === "Decisões" || tab === "Atividade") && <Placeholder name={tab} />}
+      {tab === "Decisões" && <DecisoesTab project={p} />}
+      {tab === "Atividade" && <AtividadeTab project={p} />}
     </>
   );
 }
@@ -790,49 +796,7 @@ function FinancasComSocios({ project: p }: { project: CollabProject }) {
   );
 }
 
-/* ───────────────────────── Sócios tab ───────────────────────── */
-
-function SociosTab({ project: p }: { project: CollabProject }) {
-  const openCollabForm = useModalStore((s) => s.openCollabForm);
-  const profiles = useProfilesStore((s) => s.profiles);
-  const gestor = podeGerir(p, CURRENT_USER_ID);
-  const capitalTotal = p.partners.reduce((s, x) => s + (x.capitalInvestido ?? 0), 0);
-
-  return (
-    <div className="mt-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted">{p.partners.length} sócio(s) · capital total {eur(capitalTotal)}</p>
-        {gestor && (
-          <Button size="sm" variant="gold" onClick={() => openCollabForm(p.id)}>
-            <UserPlus size={14} /> Gerir sócios
-          </Button>
-        )}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {p.partners.map((s) => {
-          const prof = profiles.find((x) => x.id === s.id);
-          const avatar = s.avatarUrl ?? prof?.avatarUrl;
-          return (
-            <Card key={s.id}>
-              <CardContent className="flex items-center gap-3">
-                <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-offset-1" style={{ ["--tw-ring-color" as any]: s.color }}>
-                  {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-secondary text-sm font-semibold text-white">{s.name[0]}</div>}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 font-medium text-ink">
-                    {s.name}
-                    <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-secondary">{SOCIO_ROLE_LABEL[s.role ?? "investidor"]}</span>
-                  </p>
-                  <p className="text-xs text-muted">{s.pct}% · {eur(s.capitalInvestido ?? 0)} investido</p>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+/* Tab Sócios agora vive em components/collab/SociosTab (donut + convites + gestão). */
 
 function ArrVisaoGeral({ p, cashflowMensal, cashflowAnual }: { p: CollabProject; cashflowMensal: number; cashflowAnual: number }) {
   const prestacao = p.prestacaoBancaria ?? 0;

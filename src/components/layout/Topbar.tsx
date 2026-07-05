@@ -4,8 +4,10 @@ import { Menu, Search, Bell, MessageSquare, User, Settings, CreditCard, LogOut, 
 import { toast } from "sonner";
 import { NAV } from "./nav";
 import { useConversationsStore } from "@/store/useConversationsStore";
-import { CURRENT_USER_ID, useCurrentUser } from "@/store/useProfilesStore";
+import { CURRENT_USER_ID, useCurrentUser, useProfilesStore } from "@/store/useProfilesStore";
 import { useAccountStore, PLANOS } from "@/store/useAccountStore";
+import { useNotificationsStore } from "@/store/useNotificationsStore";
+import { relativaTempo } from "@/store/useObrasStore";
 import { cn } from "@/lib/utils";
 
 function useBreadcrumb() {
@@ -63,10 +65,94 @@ export function Topbar({ onMenu, onSearch }: TopbarProps) {
 
       <div className="ml-auto flex items-center gap-1 sm:ml-2">
         <IconButton icon={MessageSquare} count={unread} title="Mensagens" onClick={() => navigate("/mensagens")} />
-        <IconButton icon={Bell} count={3} title="Notificações" />
+        <NotificationsBell />
         <AvatarMenu />
       </div>
     </header>
+  );
+}
+
+/* ───────────────────── Sino de notificações ───────────────────── */
+
+function NotificationsBell() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const profiles = useProfilesStore((s) => s.profiles);
+  const notificacoes = useNotificationsStore((s) =>
+    s.notificacoes.filter((n) => n.userId === CURRENT_USER_ID)
+  );
+  const markRead = useNotificationsStore((s) => s.markRead);
+  const markAllRead = useNotificationsStore((s) => s.markAllRead);
+  const naoLidas = notificacoes.filter((n) => !n.lida).length;
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const abrir = (id: string, link?: string) => {
+    markRead(id);
+    setOpen(false);
+    if (link) navigate(link);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <IconButton icon={Bell} count={naoLidas} title="Notificações" onClick={() => setOpen((v) => !v)} />
+      {open && (
+        <div className="absolute right-0 top-11 z-40 w-80 rounded-xl border border-line bg-card shadow-2xl">
+          <div className="flex items-center justify-between border-b border-line px-3.5 py-2.5">
+            <p className="font-display text-sm font-semibold text-ink">Notificações</p>
+            {naoLidas > 0 && (
+              <button onClick={markAllRead} className="text-[11px] font-medium text-secondary hover:underline">
+                Marcar todas como lidas
+              </button>
+            )}
+          </div>
+          <div className="max-h-96 overflow-y-auto p-1.5">
+            {notificacoes.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted">Sem notificações.</p>
+            ) : (
+              notificacoes.slice(0, 20).map((n) => {
+                const actor = profiles.find((x) => x.id === n.actorId);
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => abrir(n.id, n.link)}
+                    className={cn(
+                      "flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent/60",
+                      !n.lida && "bg-accent/40"
+                    )}
+                  >
+                    <span className="mt-0.5 h-8 w-8 shrink-0 overflow-hidden rounded-full bg-secondary">
+                      {actor?.avatarUrl ? (
+                        <img src={actor.avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-xs font-semibold text-white">
+                          {(actor?.fullName ?? "•")[0]}
+                        </span>
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={cn("block text-[13px] leading-snug", n.lida ? "text-muted" : "font-medium text-ink")}>
+                        {n.titulo}
+                      </span>
+                      {n.descricao && <span className="block truncate text-[11px] text-muted">{n.descricao}</span>}
+                      <span className="block text-[10px] text-muted/80">{relativaTempo(n.createdAt)}</span>
+                    </span>
+                    {!n.lida && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gold" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

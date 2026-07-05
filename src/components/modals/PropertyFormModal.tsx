@@ -509,7 +509,8 @@ function Num({
   );
 }
 
-function PhotoStep({
+/** Gestor de fotografias (URL + upload + legenda + ordenação + capa) — partilhado com o wizard colaborativo. */
+export function PhotoStep({
   photos,
   onAddUrl,
   onFile,

@@ -25,8 +25,9 @@ import {
   type SocioRole,
   type Partner,
 } from "@/store/useCollabStore";
-import { usePropertiesStore } from "@/store/usePropertiesStore";
+import { usePropertiesStore, type PropertyPhoto } from "@/store/usePropertiesStore";
 import { useProfilesStore, CURRENT_USER_ID, useCurrentUser } from "@/store/useProfilesStore";
+import { PhotoStep } from "@/components/modals/PropertyFormModal";
 import { eur } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,7 @@ interface WizardState {
   cidade: string;
   distrito: string;
   cover: string;
+  photos: PropertyPhoto[];
   // arrendamento
   preco: string;
   entrada: string;
@@ -78,6 +80,7 @@ function emptyState(nome: string): WizardState {
     cidade: "",
     distrito: "",
     cover: "",
+    photos: [],
     preco: "",
     entrada: "",
     renda: "",
@@ -207,7 +210,7 @@ export function CollabFormModal() {
       seguroAnual: 0,
       condominioMensal: 0,
       outrasMensais: num(form.despesas),
-      photos: form.cover.trim() ? [{ url: form.cover.trim() }] : [],
+      photos: form.photos.length > 0 ? form.photos : form.cover.trim() ? [{ url: form.cover.trim() }] : [],
       status: isReab ? "em_obras" : renda > 0 ? "ocupado" : "disponivel",
     });
     return id;
@@ -219,6 +222,7 @@ export function CollabFormModal() {
   };
 
   const coverFinal = (): string => {
+    if (form.photos[0]?.url) return form.photos[0].url;
     if (form.cover.trim()) return form.cover.trim();
     if (form.imovelMode === "existente") {
       const p = properties.find((x) => x.id === form.propertyId);
@@ -489,12 +493,44 @@ function StepImovel({
           </select>
         </Field>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Nome do imóvel *"><input value={form.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Ex.: T2 Príncipe Real" className={inputCls} /></Field>
-          <Field label="Cidade *"><input value={form.cidade} onChange={(e) => set("cidade", e.target.value)} placeholder="Lisboa" className={inputCls} /></Field>
-          <Field label="Distrito"><input value={form.distrito} onChange={(e) => set("distrito", e.target.value)} placeholder="Lisboa" className={inputCls} /></Field>
-          <Field label="Foto de capa (URL)"><input value={form.cover} onChange={(e) => set("cover", e.target.value)} placeholder="https://…" className={inputCls} /></Field>
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nome do imóvel *"><input value={form.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Ex.: T2 Príncipe Real" className={inputCls} /></Field>
+            <Field label="Cidade *"><input value={form.cidade} onChange={(e) => set("cidade", e.target.value)} placeholder="Lisboa" className={inputCls} /></Field>
+            <Field label="Distrito"><input value={form.distrito} onChange={(e) => set("distrito", e.target.value)} placeholder="Lisboa" className={inputCls} /></Field>
+          </div>
+
+          {/* Fotos — mesmo gestor de fotografias dos imóveis (a 1.ª é a capa) */}
+          <div className="rounded-xl border border-line/60 bg-bg/40 p-4">
+            <PhotoStep
+              photos={form.photos}
+              onAddUrl={(url) => {
+                if (!url.trim()) return;
+                set("photos", [...form.photos, { url: url.trim(), legenda: undefined }]);
+              }}
+              onFile={(f) => {
+                const r = new FileReader();
+                r.onload = () => set("photos", [...form.photos, { url: String(r.result), legenda: undefined }]);
+                r.readAsDataURL(f);
+              }}
+              onRemove={(i) => set("photos", form.photos.filter((_, idx) => idx !== i))}
+              onLegenda={(i, legenda) => set("photos", form.photos.map((p, idx) => (idx === i ? { ...p, legenda } : p)))}
+              onMove={(from, to) => {
+                if (to < 0 || to >= form.photos.length) return;
+                const next = [...form.photos];
+                const [moved] = next.splice(from, 1);
+                next.splice(to, 0, moved);
+                set("photos", next);
+              }}
+              onCapa={(i) => {
+                const next = [...form.photos];
+                const [moved] = next.splice(i, 1);
+                next.unshift(moved);
+                set("photos", next);
+              }}
+            />
+          </div>
+        </>
       )}
 
       {/* Nome do projeto quando usa imóvel existente */}
