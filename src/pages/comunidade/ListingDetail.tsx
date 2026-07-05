@@ -34,7 +34,6 @@ import {
   investimentoTotalReab,
   roiReab,
   lucroReab,
-  lucroBrutoReab,
   ctaReab,
   impostosReab,
   valorMercadoAtualReab,
@@ -499,8 +498,6 @@ function CorpoReab({ listing }: { listing: L }) {
           </div>
         </CardContent>
       </Card>
-
-      <SimuladorParticipacao listing={listing} />
     </>
   );
 }
@@ -682,35 +679,6 @@ function CorpoArrendamento({ listing }: { listing: L }) {
         </CardContent>
       </Card>
     </>
-  );
-}
-
-function SimuladorParticipacao({ listing }: { listing: L }) {
-  const [pctPart, setPctPart] = useState(50);
-  const splitPartner = (() => {
-    const m = (listing.split ?? "50 / 50").match(/(\d+)\s*\/\s*(\d+)/);
-    return m ? Number(m[2]) / 100 : 0.5;
-  })();
-  const capital = listing.capitalProcurado ?? 0;
-  const lucro = lucroBrutoReab(listing);
-  const investAmount = capital * (pctPart / 100);
-  const ganho = lucro * splitPartner * (pctPart / 100);
-  const roi = investAmount > 0 ? (ganho / investAmount) * 100 : 0;
-
-  return (
-    <Card>
-      <CardContent>
-        <SectionHeader title="Simulador de participação" />
-        <p className="mb-4 text-sm text-muted">Arraste para simular a sua quota no capital procurado.</p>
-        <input type="range" min={5} max={100} step={5} value={pctPart} onChange={(e) => setPctPart(Number(e.target.value))} className="w-full accent-[#C8A664]" />
-        <div className="mt-1 flex justify-between text-xs text-muted"><span>5%</span><span className="font-bold text-gold-dark">{pctPart}%</span><span>100%</span></div>
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <MetricCard label="Investe" value={eur(investAmount)} />
-          <MetricCard label="Ganho estimado" value={eur(ganho)} tone="success" highlighted />
-          <MetricCard label="ROI" value={pct(roi)} tone="gold" highlighted />
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
