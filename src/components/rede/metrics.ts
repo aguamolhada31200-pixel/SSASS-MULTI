@@ -6,6 +6,7 @@ import {
   ctaCedencia,
   lucroCedencia,
   roiCedencia,
+  roiLabelCedencia,
   retornoEntradaCedencia,
   capitalNecessarioCedencia,
 } from "@/lib/calc/rede";
@@ -35,7 +36,7 @@ export function metricasCard(l: Listing): Metrica[] {
       { k: "Valor da cedência", v: eur(l.valorCedencia ?? 0) },
       { k: "CTA", v: eur(ctaCedencia(l)) },
       { k: "Lucro estimado", v: eur(lucroCedencia(l)) },
-      { k: "ROI", v: pct(roiCedencia(l)), hero: true, tone: "gold" },
+      { k: roiLabelCedencia(l), v: pct(roiCedencia(l)), hero: true, tone: "gold" },
       { k: "Retorno s/ entrada", v: pct(retornoEntradaCedencia(l)), tone: "gold" },
     ];
   }

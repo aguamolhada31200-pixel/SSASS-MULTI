@@ -19,6 +19,7 @@ import {
   ctaCedencia,
   lucroCedencia,
   roiCedencia,
+  roiLabelCedencia,
   retornoEntradaCedencia,
   capitalNecessarioCedencia,
 } from "@/lib/calc/rede";
@@ -206,7 +207,7 @@ function buildCardMetrics(l: Listing): CMetric[] {
       { k: "Valor do imóvel", v: eur(l.valorImovel ?? 0), dot: "bg-secondary", color: "text-ink" },
       { k: "Valor da cedência", v: eur(l.valorCedencia ?? 0), dot: "bg-secondary", color: "text-ink" },
       { k: "Lucro estimado", v: eur(lucro), dot: "bg-success", color: lucro >= 0 ? "text-success" : "text-danger" },
-      { k: "ROI", v: pct(roiCedencia(l)), dot: "bg-gold", color: "text-gold-dark" },
+      { k: roiLabelCedencia(l), v: pct(roiCedencia(l)), dot: "bg-gold", color: "text-gold-dark" },
       { k: "Retorno s/ entrada", v: pct(retornoEntradaCedencia(l)), dot: "bg-gold", color: "text-gold-dark" },
     ];
   }

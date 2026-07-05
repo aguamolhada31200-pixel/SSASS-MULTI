@@ -47,6 +47,7 @@ import {
   restanteAoPromitenteVendedor,
   capitalNecessarioCedencia,
   comObrasCedencia,
+  investimentoTotalCedencia,
 } from "@/lib/calc/rede";
 import { metricasHero } from "@/components/rede/metrics";
 import { eur, pct, dataPT } from "@/lib/format";
@@ -563,7 +564,7 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
               <>
                 <MetricCard label="Lucro Estimado" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} highlighted />
                 <MetricCard label="Retorno s/ Entrada" value={pct(retEntrada)} tone="gold" highlighted />
-                <MetricCard label="ROI" value={pct(roi)} tone="gold" highlighted />
+                <MetricCard label="ROI da operação" value={pct(roi)} tone="gold" highlighted />
               </>
             )}
           </div>
@@ -591,8 +592,32 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
         <Card>
           <CardContent>
             <SectionHeader title="Situação Após Reabilitação" />
-            <p className="mb-4 text-sm text-muted">Indicadores estimados após a conclusão das obras.</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <p className="mb-4 text-sm text-muted">
+              Investimento Total = CTA + Valor previsto das obras. ROI pós-obras = Lucro pós-obras / Investimento Total.
+            </p>
+
+            {/* Decomposição do Investimento Total */}
+            <div className="space-y-1 rounded-2xl border border-line bg-bg/40 p-4">
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-sm text-muted">CTA · Custo Total da Aquisição</span>
+                <span className="num text-sm font-semibold text-ink">{eur(cta)}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-sm text-muted">Valor previsto das obras</span>
+                <span className="num text-sm font-semibold text-ink">{eur(obra)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between border-t border-line pt-3">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  Investimento Total
+                </span>
+                <span className="num font-display text-2xl font-bold text-gold-dark">
+                  {eur(investimentoTotalCedencia(listing))}
+                </span>
+              </div>
+            </div>
+
+            {/* Indicadores pós-obras */}
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <MetricCard label="Valor de mercado pós-obras" value={eur(posObras)} tone="success" highlighted />
               <MetricCard label="Lucro estimado pós-obras" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} highlighted />
               <MetricCard label="ROI pós-obras" value={pct(roi)} tone="gold" highlighted />

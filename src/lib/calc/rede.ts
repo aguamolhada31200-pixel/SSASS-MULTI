@@ -121,6 +121,19 @@ export function capitalNecessarioCedencia(l: Listing): number {
 }
 
 /**
+ * Investimento Total (cedência):
+ * Sem obras: CTA.  Com obras: CTA + Valor previsto das obras.
+ */
+export function investimentoTotalCedencia(l: Listing): number {
+  return comObrasCedencia(l) ? ctaCedencia(l) + (l.obra ?? 0) : ctaCedencia(l);
+}
+
+/** Label do ROI em cedência — muda consoante o cenário. */
+export function roiLabelCedencia(l: Pick<Listing, "estado">): string {
+  return comObrasCedencia(l) ? "ROI pós-obras" : "ROI da operação";
+}
+
+/**
  * Lucro Estimado.
  * Sem obras: Valor de Mercado Atual − CTA.
  * Com obras: Valor de Mercado Pós-Obras − (CTA + Valor previsto das obras).
