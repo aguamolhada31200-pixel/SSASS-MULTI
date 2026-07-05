@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   UserPlus,
@@ -15,6 +16,9 @@ import {
   Wallet,
   Receipt,
   FileText,
+  Pencil,
+  Trash2,
+  Building2,
 } from "lucide-react";
 import {
   BarChart,
@@ -39,6 +43,8 @@ import {
   useCollabStore,
   STATUS_LABEL,
   STATUS_TONE,
+  SOCIO_ROLE_LABEL,
+  podeGerir,
   type CollabProject,
   type ObraItem,
 } from "@/store/useCollabStore";
@@ -54,7 +60,16 @@ import {
   type Obra,
   type ObraEstado,
 } from "@/store/useObrasStore";
+import { usePropertiesStore } from "@/store/usePropertiesStore";
+import { useTransactionsStore } from "@/store/useTransactionsStore";
+import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { useModalStore } from "@/store/useModalStore";
+import {
+  ImovelInquilinosTab,
+  ImovelContratosTab,
+  ImovelDocumentosTab,
+} from "@/pages/imoveis/ImovelDetail";
+import { FinancasTab } from "@/pages/imoveis/FinancasTab";
 import { eur, pct, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
@@ -118,11 +133,22 @@ function BigKpi({ label, value, tone }: { label: string; value: string; tone?: "
 }
 
 function HeroProject({ project: p }: { project: CollabProject }) {
+  const navigate = useNavigate();
+  const openCollabForm = useModalStore((s) => s.openCollabForm);
+  const removeProject = useCollabStore((s) => s.remove);
   const isReab = p.type === "reabilitacao";
+  const gestor = podeGerir(p, CURRENT_USER_ID);
   const inv = isReab ? (p.precoAquisicao ?? 0) + (p.custosAquisicao ?? 0) + (p.orcamentoObras ?? 0) : (p.capitalInvestido ?? 0);
   const lucro = isReab
     ? (() => { const v = (p.valorVendaPrevisto ?? 0) - inv; return v - v * ((p.taxaImpostos ?? 0) / 100); })()
     : ((p.rendaMensal ?? 0) - (p.despesasMensais ?? 0)) * 12;
+
+  const eliminar = () => {
+    if (!confirm(`Eliminar o projeto "${p.title}"? Esta ação não pode ser anulada.`)) return;
+    removeProject(p.id);
+    toast.success("Projeto eliminado");
+    navigate("/comunidade/colaborativa");
+  };
 
   return (
     <>
@@ -145,12 +171,18 @@ function HeroProject({ project: p }: { project: CollabProject }) {
             <h1 className="mt-1 font-display text-2xl font-bold text-white sm:text-3xl">{p.title}</h1>
             <p className="text-sm text-white/70">{p.city} · {p.partners.length} sócios</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="mr-2 text-right">
               <p className="text-xs text-white/50">{isReab ? "Lucro líquido est." : "Cashflow anual"}</p>
               <p className="num text-2xl font-bold text-success">{eur(lucro)}</p>
             </div>
-            <Button variant="gold"><UserPlus size={15} /> Convidar sócio</Button>
+            {gestor && (
+              <>
+                <Button variant="gold" onClick={() => openCollabForm(p.id)}><UserPlus size={15} /> Convidar sócio</Button>
+                <Button variant="outline" className="bg-card/90" onClick={() => openCollabForm(p.id)}><Pencil size={15} /> Editar</Button>
+                <Button variant="danger" onClick={eliminar}><Trash2 size={15} /> Eliminar</Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -281,7 +313,9 @@ function ReabRoom({ project: p }: { project: CollabProject }) {
       {tab === "Visão geral" && <ReabVisaoGeral p={p} inv={inv} totalGasto={totalGasto} saldo={saldo} venda={venda} maisValia={maisValia} impostos={impostos} lucro={lucro} roi={roi} obraPct={obraPct} />}
       {tab === "Cronograma" && <CronogramaTab project={p} />}
       {tab === "Obras" && <ObrasTab project={p} />}
-      {tab !== "Visão geral" && tab !== "Cronograma" && tab !== "Obras" && <Placeholder name={tab} />}
+      {tab === "Documentos" && <ProjectPropertyTab project={p} render={(pid) => <ImovelDocumentosTab propertyId={pid} />} />}
+      {tab === "Sócios" && <SociosTab project={p} />}
+      {(tab === "Decisões" || tab === "Galeria" || tab === "Atividade") && <Placeholder name={tab} />}
     </>
   );
 }
@@ -674,10 +708,129 @@ function ArrRoom({ project: p }: { project: CollabProject }) {
       </div>
 
       {tab === "Visão geral" && <ArrVisaoGeral p={p} cashflowMensal={cashflowMensal} cashflowAnual={cashflowAnual} />}
-      {tab === "Inquilinos" && <InquilinoTab project={p} />}
+      {tab === "Inquilinos" && <ProjectPropertyTab project={p} render={(pid) => <ImovelInquilinosTab propertyId={pid} />} />}
+      {tab === "Contratos" && <ProjectPropertyTab project={p} render={(pid) => <ImovelContratosTab propertyId={pid} />} />}
+      {tab === "Finanças" && <FinancasComSocios project={p} />}
       {tab === "Obras" && <ObrasTab project={p} />}
-      {tab !== "Visão geral" && tab !== "Inquilinos" && tab !== "Obras" && <Placeholder name={tab} />}
+      {tab === "Documentos" && <ProjectPropertyTab project={p} render={(pid) => <ImovelDocumentosTab propertyId={pid} />} />}
+      {tab === "Sócios" && <SociosTab project={p} />}
+      {(tab === "Decisões" || tab === "Atividade") && <Placeholder name={tab} />}
     </>
+  );
+}
+
+/* ───────────────────────── Reuso das tabs do imóvel ───────────────────────── */
+
+/** Envolve uma tab operacional do imóvel; mostra estado vazio quando o projeto não tem imóvel associado. */
+function ProjectPropertyTab({ project: p, render }: { project: CollabProject; render: (propertyId: string) => React.ReactNode }) {
+  const property = usePropertiesStore((s) => (p.propertyId ? s.properties.find((x) => x.id === p.propertyId) : undefined));
+  if (!p.propertyId || !property) {
+    return (
+      <Card className="mt-5"><CardContent className="py-12 text-center text-muted">
+        <Building2 size={28} className="mx-auto mb-2" />
+        <p className="text-sm">Este projeto ainda não tem um imóvel associado.</p>
+        <p className="mt-1 text-xs">Edite o projeto e associe um imóvel para ativar esta secção.</p>
+      </CardContent></Card>
+    );
+  }
+  return <div className="mt-5">{render(p.propertyId)}</div>;
+}
+
+/** Finanças do imóvel (reutilizado) + distribuição do resultado por sócios. */
+function FinancasComSocios({ project: p }: { project: CollabProject }) {
+  const property = usePropertiesStore((s) => (p.propertyId ? s.properties.find((x) => x.id === p.propertyId) : undefined));
+  const txs = useTransactionsStore((s) => s.transactions);
+
+  const resultado = useMemo(() => {
+    if (!p.propertyId) return 0;
+    return txs
+      .filter((t) => t.propertyId === p.propertyId)
+      .reduce((acc, t) => acc + (t.tipo === "receita" ? t.valor : -t.valor), 0);
+  }, [txs, p.propertyId]);
+
+  if (!p.propertyId || !property) {
+    return (
+      <Card className="mt-5"><CardContent className="py-12 text-center text-muted">
+        <Building2 size={28} className="mx-auto mb-2" />
+        <p className="text-sm">Associe um imóvel ao projeto para acompanhar as finanças.</p>
+      </CardContent></Card>
+    );
+  }
+
+  return (
+    <div className="mt-5 space-y-5">
+      {/* Distribuição por sócios */}
+      <Card>
+        <CardContent>
+          <SH title="Distribuição por sócios" />
+          <p className="mb-3 text-xs text-muted">
+            Resultado acumulado do imóvel (receitas − despesas) repartido pela percentagem de cada sócio.
+          </p>
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {p.partners.map((s) => (
+              <div key={s.id} className="rounded-xl border border-line bg-bg/40 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full" style={{ background: s.color }} />
+                  <p className="truncate text-sm font-medium text-ink">{s.name}</p>
+                </div>
+                <p className="text-[10px] uppercase tracking-wider text-muted">{s.pct}% do capital</p>
+                <p className={cn("num mt-1 text-base font-bold", resultado >= 0 ? "text-success" : "text-danger")}>
+                  {eur(resultado * (s.pct / 100))}
+                </p>
+              </div>
+            ))}
+          </div>
+          <PartnerBars partners={p.partners} valuePerPct={resultado} />
+        </CardContent>
+      </Card>
+
+      {/* Deep dive financeiro do imóvel (reutilizado dos imóveis solo) */}
+      <FinancasTab property={property} />
+    </div>
+  );
+}
+
+/* ───────────────────────── Sócios tab ───────────────────────── */
+
+function SociosTab({ project: p }: { project: CollabProject }) {
+  const openCollabForm = useModalStore((s) => s.openCollabForm);
+  const profiles = useProfilesStore((s) => s.profiles);
+  const gestor = podeGerir(p, CURRENT_USER_ID);
+  const capitalTotal = p.partners.reduce((s, x) => s + (x.capitalInvestido ?? 0), 0);
+
+  return (
+    <div className="mt-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted">{p.partners.length} sócio(s) · capital total {eur(capitalTotal)}</p>
+        {gestor && (
+          <Button size="sm" variant="gold" onClick={() => openCollabForm(p.id)}>
+            <UserPlus size={14} /> Gerir sócios
+          </Button>
+        )}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {p.partners.map((s) => {
+          const prof = profiles.find((x) => x.id === s.id);
+          const avatar = s.avatarUrl ?? prof?.avatarUrl;
+          return (
+            <Card key={s.id}>
+              <CardContent className="flex items-center gap-3">
+                <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full ring-2 ring-offset-1" style={{ ["--tw-ring-color" as any]: s.color }}>
+                  {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center bg-secondary text-sm font-semibold text-white">{s.name[0]}</div>}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2 font-medium text-ink">
+                    {s.name}
+                    <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-secondary">{SOCIO_ROLE_LABEL[s.role ?? "investidor"]}</span>
+                  </p>
+                  <p className="text-xs text-muted">{s.pct}% · {eur(s.capitalInvestido ?? 0)} investido</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -836,36 +989,6 @@ function ArrVisaoGeral({ p, cashflowMensal, cashflowAnual }: { p: CollabProject;
             ))}
           </div>
           <PartnerBars partners={p.partners} valuePerPct={cashflowMensal} suffix="/mês" />
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-/* ───────────────────────── Inquilino tab ───────────────────────── */
-
-function InquilinoTab({ project: p }: { project: CollabProject }) {
-  if (!p.inquilino)
-    return (
-      <Card className="mt-5"><CardContent className="py-12 text-center text-muted">
-        <Users2 size={28} className="mx-auto mb-2" />
-        <p className="text-sm">Nenhum inquilino associado a este projeto.</p>
-      </CardContent></Card>
-    );
-
-  return (
-    <div className="mt-5 space-y-4">
-      <Card>
-        <CardContent>
-          <SH title="Inquilino atual" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <MC label="Nome" value={p.inquilino} />
-            <MC label="Contrato" value={p.contratoTipo ?? "—"} />
-            <MC label="Renda" value={eur(p.rendaMensal ?? 0)} tone="success" />
-            {p.contratoInicio && <MC label="Início" value={dataPT(p.contratoInicio)} />}
-            {p.contratoFim && <MC label="Fim" value={dataPT(p.contratoFim)} tone="warning" />}
-            <MC label="Recibos emitidos" value={String(p.recibosEmitidos ?? 0)} tone="gold" />
-          </div>
         </CardContent>
       </Card>
     </div>

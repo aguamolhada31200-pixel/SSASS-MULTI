@@ -160,6 +160,36 @@ const SEED: Property[] = [
     status: "em_obras",
     createdAt: "2026-04-15T00:00:00.000Z",
   },
+  // Imóvel subjacente ao projeto colaborativo "Príncipe Real partilhado" (#003).
+  {
+    id: "seed-principe-real",
+    ownerId: "me-daniel",
+    name: "Apartamento Príncipe Real",
+    address: "Rua da Escola Politécnica 20, 2.º Esq.",
+    city: "Lisboa",
+    type: "tradicional",
+    dataCompra: "2026-03-05",
+    valorCompra: 380000,
+    entrada: 114000,
+    financiado: 266000,
+    prazoAnos: 35,
+    taxaJuro: 3.5,
+    prestacaoMensal: 580,
+    rendaMensal: 1850,
+    dataInicioArrendamento: "2026-02-01",
+    irsPct: 28,
+    imiAnual: 420,
+    seguroAnual: 220,
+    condominioMensal: 80,
+    outrasMensais: 0,
+    photos: [
+      { url: "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=70", legenda: "Sala" },
+      { url: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=70", legenda: "Cozinha" },
+      { url: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=70", legenda: "Quarto" },
+    ],
+    status: "ocupado",
+    createdAt: "2026-03-05T00:00:00.000Z",
+  },
 ];
 
 interface PropertiesState {
@@ -211,7 +241,7 @@ export const usePropertiesStore = create<PropertiesState>()(
     }),
     {
       name: "decogest-properties",
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { properties?: Property[] } | undefined;
         if (state?.properties && version < 2) {
@@ -220,6 +250,11 @@ export const usePropertiesStore = create<PropertiesState>()(
             ...p,
             photos: normalizePhotos(p.photos as unknown),
           }));
+        }
+        if (state?.properties && version < 3) {
+          // v3: imóvel subjacente ao projeto colaborativo Príncipe Real.
+          const ids = new Set(state.properties.map((p) => p.id));
+          SEED.forEach((s) => { if (!ids.has(s.id)) state.properties!.push(s); });
         }
         return state as PropertiesState;
       },

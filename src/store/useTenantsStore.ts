@@ -143,6 +143,27 @@ const SEED: Tenant[] = [
     createdAt: "2025-08-25T11:00:00.000Z",
   },
   {
+    id: "tenant-sofia-rocha",
+    nomeCompleto: "Sofia Rocha",
+    nif: "245678123",
+    email: "sofia.rocha@email.pt",
+    telefone: "913 555 210",
+    nacionalidade: "Portuguesa",
+    docIdentificacao: { tipo: "CC", numero: "55667788", validade: "2030-05-18" },
+    entidadePatronal: "Consultora Vieira & Associados",
+    rendimentoMensal: 2600,
+    tipoInquilino: "regular",
+    propertyId: "seed-principe-real",
+    contractId: "contrato-principe-real",
+    status: "ativo",
+    rendaMensal: 1850,
+    dataInicioContrato: "2026-02-01",
+    dataFimContrato: "2029-01-31",
+    fotoUrl: "https://i.pravatar.cc/200?img=32",
+    notas: "Apartamento Príncipe Real partilhado — projeto colaborativo #003.",
+    createdAt: "2026-01-20T10:00:00.000Z",
+  },
+  {
     id: "tenant-rita-soares",
     nomeCompleto: "Rita Soares",
     nif: "612345789",
@@ -203,8 +224,8 @@ export const useTenantsStore = create<TenantsState>()(
     }),
     {
       name: "decogest-tenants",
-      version: 2,
-      // v2: limpa entradas de exemplo vazias/stray (ex.: "ana" sem dados) e garante os seeds.
+      version: 3,
+      // v2: limpa entradas de exemplo vazias/stray. v3: inquilino do Príncipe Real.
       migrate: (persisted: unknown, version: number) => {
         const state = (persisted ?? {}) as { tenants?: Tenant[] };
         if (state.tenants && version < 2) {
@@ -215,6 +236,10 @@ export const useTenantsStore = create<TenantsState>()(
             const semDados = nome.length < 3 || (!t.email && !t.telefone && !t.nif && !t.rendaMensal);
             return !semDados; // remove os vazios/stray
           });
+          const presentes = new Set(state.tenants.map((t) => t.id));
+          SEED.forEach((s) => { if (!presentes.has(s.id)) state.tenants!.unshift(s); });
+        }
+        if (state.tenants && version < 3) {
           const presentes = new Set(state.tenants.map((t) => t.id));
           SEED.forEach((s) => { if (!presentes.has(s.id)) state.tenants!.unshift(s); });
         }

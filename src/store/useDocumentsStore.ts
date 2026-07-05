@@ -136,6 +136,20 @@ const SEED: PropertyDocument[] = [
     uploadedBy: CURRENT_USER_ID,
   },
   {
+    id: "seed-doc-contrato-principe",
+    nome: "Contrato de arrendamento — Sofia Rocha (Príncipe Real).pdf",
+    ficheiroUrl: "#",
+    mimeType: PDF,
+    uploadedAt: "2026-02-01",
+    categoria: "Contratos",
+    propertyId: "seed-principe-real",
+    projectId: "principe-real",
+    tenantId: "tenant-sofia-rocha",
+    contractId: "contrato-principe-real",
+    tamanho: 176_400,
+    uploadedBy: CURRENT_USER_ID,
+  },
+  {
     id: "seed-doc-contrato-anterior",
     nome: "Contrato anterior T2 Arroios (2021) — expirado.pdf",
     ficheiroUrl: "#",
@@ -230,7 +244,8 @@ const SEED: PropertyDocument[] = [
     mimeType: PDF,
     uploadedAt: "2026-06-02",
     categoria: "Faturas",
-    projectId: "proj-principe",
+    propertyId: "seed-principe-real",
+    projectId: "principe-real",
     tamanho: 71_900,
     notas: "2.800 € · obra de pintura interior.",
     uploadedBy: CURRENT_USER_ID,
@@ -243,6 +258,7 @@ const SEED: PropertyDocument[] = [
     mimeType: PDF,
     uploadedAt: "2026-05-18",
     categoria: "Faturas",
+    propertyId: "seed-principe-real",
     projectId: "principe-real",
     obraId: "o-principe-1",
     tamanho: 41_200,
@@ -256,6 +272,7 @@ const SEED: PropertyDocument[] = [
     mimeType: PDF,
     uploadedAt: "2026-05-25",
     categoria: "Faturas",
+    propertyId: "seed-principe-real",
     projectId: "principe-real",
     obraId: "o-principe-1",
     tamanho: 48_700,
@@ -269,6 +286,7 @@ const SEED: PropertyDocument[] = [
     mimeType: PDF,
     uploadedAt: "2026-04-12",
     categoria: "Faturas",
+    propertyId: "seed-principe-real",
     projectId: "principe-real",
     obraId: "o-principe-3",
     tamanho: 62_400,
@@ -282,6 +300,7 @@ const SEED: PropertyDocument[] = [
     mimeType: PDF,
     uploadedAt: "2026-04-18",
     categoria: "Faturas",
+    propertyId: "seed-principe-real",
     projectId: "principe-real",
     obraId: "o-principe-3",
     tamanho: 33_900,
@@ -295,6 +314,7 @@ const SEED: PropertyDocument[] = [
     mimeType: PDF,
     uploadedAt: "2026-05-05",
     categoria: "Faturas",
+    propertyId: "seed-principe-real",
     projectId: "principe-real",
     obraId: "o-principe-3",
     tamanho: 28_500,
@@ -516,10 +536,11 @@ export const useDocumentsStore = create<DocumentsState>()(
     }),
     {
       name: "decogest-documents",
-      version: 4,
+      version: 5,
+      // v5: contrato + faturas do Príncipe Real ganham propertyId (surgem na Pasta do imóvel).
       migrate: (persisted: unknown, version: number) => {
         const state = (persisted ?? {}) as Partial<DocumentsState>;
-        if (version < 4) {
+        if (version < 5) {
           // Mantém documentos do utilizador; substitui os seeds (antigos e atuais) pelos atualizados.
           const userDocs = (state.documents ?? []).filter(
             (d) => !d.id.startsWith(OLD_SEED_PREFIX) && !d.id.startsWith("seed-doc-")

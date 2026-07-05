@@ -248,6 +248,25 @@ const SEED: Contract[] = [
     documentId: "seed-doc-contrato-anterior",
   }),
   build({
+    id: "contrato-principe-real",
+    tipo: "tradicional",
+    status: "active",
+    propertyId: "seed-principe-real",
+    primaryTenantId: "tenant-sofia-rocha",
+    monthlyRent: 1850,
+    paymentDay: 8,
+    startDate: "2026-02-01",
+    endDate: "2029-01-31",
+    durationMonths: 36,
+    autoRenewal: true,
+    annualUpdate: true,
+    depositAmount: 3700,
+    furnished: true,
+    pdfUrl: "#",
+    fileName: "contrato-principe-real-sofia-rocha.pdf",
+    documentId: "seed-doc-contrato-principe",
+  }),
+  build({
     id: "contrato-braga-comercial",
     tipo: "comercial",
     status: "active",
@@ -318,6 +337,18 @@ export const useContractsStore = create<ContractsState>()(
         })),
       resetSeed: () => set({ contracts: SEED }),
     }),
-    { name: "decogest-contracts", version: 2 }
+    {
+      name: "decogest-contracts",
+      version: 3,
+      // v3: contrato do Príncipe Real (projeto colaborativo #003).
+      migrate: (persisted: unknown, version: number) => {
+        const state = (persisted ?? {}) as { contracts?: Contract[] };
+        if (state.contracts && version < 3) {
+          const presentes = new Set(state.contracts.map((c) => c.id));
+          SEED.forEach((s) => { if (!presentes.has(s.id)) state.contracts!.unshift(s); });
+        }
+        return state as ContractsState;
+      },
+    }
   )
 );

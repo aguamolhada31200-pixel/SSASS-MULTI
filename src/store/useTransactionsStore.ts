@@ -200,6 +200,68 @@ function buildSeed(): Transaction[] {
     })
   );
 
+  // Apartamento Príncipe Real — projeto colaborativo #003, arrendado (renda 1.850)
+  for (const m of MESES) {
+    out.push(
+      tx({
+        tipo: "receita",
+        propertyId: "seed-principe-real",
+        categoria: "Renda",
+        valor: 1850,
+        data: `2026-${m}-08`,
+        descricao: "Renda mensal · Sofia Rocha",
+        recorrente: true,
+        periodicidade: "mensal",
+      })
+    );
+    out.push(
+      tx({
+        tipo: "despesa",
+        propertyId: "seed-principe-real",
+        categoria: "Condomínio",
+        valor: 80,
+        data: `2026-${m}-10`,
+        descricao: "Quota de condomínio",
+        recorrente: true,
+        periodicidade: "mensal",
+        deduzivelIrs: true,
+      })
+    );
+  }
+  out.push(
+    tx({
+      tipo: "despesa",
+      propertyId: "seed-principe-real",
+      categoria: "IMI",
+      valor: 420,
+      data: "2026-05-31",
+      descricao: "IMI 2025 · 1.ª prestação",
+      deduzivelIrs: true,
+    })
+  );
+  out.push(
+    tx({
+      tipo: "despesa",
+      propertyId: "seed-principe-real",
+      categoria: "Seguro",
+      valor: 220,
+      data: "2026-03-14",
+      descricao: "Seguro multirriscos · anual",
+      deduzivelIrs: true,
+    })
+  );
+  out.push(
+    tx({
+      tipo: "despesa",
+      propertyId: "seed-principe-real",
+      categoria: "Obras",
+      valor: 2800,
+      data: "2026-06-02",
+      descricao: "Pintura interior — obra partilhada",
+      deduzivelIrs: true,
+    })
+  );
+
   // T3 Coimbra — vago
   for (const m of MESES) {
     out.push(
@@ -275,6 +337,18 @@ export const useTransactionsStore = create<TransactionsState>()(
       getById: (id) => get().transactions.find((t) => t.id === id),
       resetSeed: () => set({ transactions: SEED }),
     }),
-    { name: "decogest-transactions", version: 1 }
+    {
+      name: "decogest-transactions",
+      version: 2,
+      // v2: movimentos do Príncipe Real (rendas + despesas). Ids determinísticos → merge idempotente.
+      migrate: (persisted: unknown, version: number) => {
+        const state = (persisted ?? {}) as { transactions?: Transaction[] };
+        if (state.transactions && version < 2) {
+          const presentes = new Set(state.transactions.map((t) => t.id));
+          SEED.forEach((s) => { if (!presentes.has(s.id)) state.transactions!.push(s); });
+        }
+        return state as TransactionsState;
+      },
+    }
   )
 );

@@ -643,7 +643,7 @@ function FimContratoInline({ dataFim }: { dataFim?: string }) {
 
 // ───────────────────────── Inquilinos ─────────────────────────
 
-function ImovelInquilinosTab({ propertyId }: { propertyId: string }) {
+export function ImovelInquilinosTab({ propertyId }: { propertyId: string }) {
   const tenants = useTenantsStore((s) => s.tenants.filter((t) => t.propertyId === propertyId));
   const semImovel = useTenantsStore((s) => s.tenants.filter((t) => t.propertyId !== propertyId));
   const update = useTenantsStore((s) => s.update);
@@ -752,7 +752,7 @@ function ImovelInquilinosTab({ propertyId }: { propertyId: string }) {
 
 // ───────────────────────── Contratos ─────────────────────────
 
-function ImovelContratosTab({ propertyId }: { propertyId: string }) {
+export function ImovelContratosTab({ propertyId }: { propertyId: string }) {
   const contracts = useContractsStore((s) => s.contracts.filter((c) => c.propertyId === propertyId));
   const tenants = useTenantsStore((s) => s.tenants);
   const openContractDoc = useModalStore((s) => s.openContractDoc);
@@ -819,7 +819,7 @@ function ImovelContratosTab({ propertyId }: { propertyId: string }) {
 
 // ───────────────────────── Documentos ─────────────────────────
 
-function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
+export function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
   const docs = useDocumentsStore((s) => s.documents.filter((d) => d.propertyId === propertyId));
   const add = useDocumentsStore((s) => s.add);
   const remove = useDocumentsStore((s) => s.remove);

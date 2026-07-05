@@ -13,6 +13,7 @@ import { ContractDocModal } from "@/components/modals/ContractDocModal";
 import { ObraExpenseModal } from "@/components/modals/ObraExpenseModal";
 import { MarcoPayModal } from "@/components/modals/MarcoPayModal";
 import { InterestModal } from "@/components/modals/InterestModal";
+import { CollabFormModal } from "@/components/modals/CollabFormModal";
 import { cn } from "@/lib/utils";
 
 export function AppLayout() {
@@ -77,6 +78,7 @@ export function AppLayout() {
       <ObraExpenseModal />
       <MarcoPayModal />
       <InterestModal />
+      <CollabFormModal />
       <Toaster richColors position="top-center" toastOptions={{ style: { fontFamily: "DM Sans" } }} />
     </div>
   );

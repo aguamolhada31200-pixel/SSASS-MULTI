@@ -40,13 +40,37 @@ export const TYPE_LABEL: Record<CollabType, string> = {
   arrendamento: "Arrendamento",
 };
 
+export type SocioRole = "gestor" | "investidor" | "observador";
+export type SocioStatus = "ativo" | "pendente" | "recusado";
+
+export const SOCIO_ROLE_LABEL: Record<SocioRole, string> = {
+  gestor: "Gestor",
+  investidor: "Investidor",
+  observador: "Observador",
+};
+
+export const SOCIO_STATUS_LABEL: Record<SocioStatus, string> = {
+  ativo: "Ativo",
+  pendente: "Pendente",
+  recusado: "Recusado",
+};
+
+/** Sócio do projeto colaborativo (o campo continua a chamar-se `partners` por retro-compat). */
 export interface Partner {
-  id: string;
-  name: string;
-  pct: number;
+  id: string;            // = userId
+  name: string;          // = nome
+  pct: number;           // = percentagem
   color: string;
   avatarUrl?: string;
+  email?: string;
+  role?: SocioRole;
+  capitalInvestido?: number;
+  status?: SocioStatus;
+  convidadoEm?: string;  // ISO date
 }
+
+/** Paleta para atribuir cores a novos sócios pela ordem de entrada. */
+export const SOCIO_COLORS = ["#5C3D2E", "#C8A664", "#4A7C59", "#8B5E3C", "#9B3A2A", "#3a6ea5"];
 
 export interface ObraItem {
   id: string;
@@ -84,6 +108,8 @@ export interface CollabProject {
   status: ProjectStatus;
   createdAt: string;
   partners: Partner[];
+  /** Imóvel subjacente — as tabs operacionais (inquilinos, contratos, finanças, docs) filtram por este id. */
+  propertyId?: string;
 
   // ── Reabilitação (flip) ──
   precoAquisicao?: number;
@@ -148,9 +174,9 @@ const SEED: CollabProject[] = [
     status: "obras",
     createdAt: "2026-02-15",
     partners: [
-      { id: "jose-felix", name: "José Félix", pct: 40, color: "#5C3D2E" },
-      { id: "pedro-alves", name: "Pedro Alves", pct: 35, color: "#C8A664" },
-      { id: "rita-santos", name: "Rita Santos", pct: 25, color: "#4A7C59" },
+      { id: "jose-felix", name: "José Félix", pct: 40, color: "#5C3D2E", role: "gestor", status: "ativo", capitalInvestido: 168000, convidadoEm: "2026-02-15" },
+      { id: "pedro-alves", name: "Pedro Alves", pct: 35, color: "#C8A664", role: "investidor", status: "ativo", capitalInvestido: 147000, convidadoEm: "2026-02-15" },
+      { id: "rita-santos", name: "Rita Santos", pct: 25, color: "#4A7C59", role: "investidor", status: "ativo", capitalInvestido: 105000, convidadoEm: "2026-02-16" },
     ],
     precoAquisicao: 310000,
     custosAquisicao: 22000,
@@ -207,12 +233,13 @@ const SEED: CollabProject[] = [
     city: "Lisboa",
     district: "Lisboa",
     coverImageUrl: IMG("1505691938895-1758d7feb511"),
-    status: "obras",
+    status: "arrendado",
     createdAt: "2026-03-05",
+    propertyId: "seed-principe-real",
     partners: [
-      { id: "me-daniel", name: "Daniel Silva", pct: 50, color: "#5C3D2E" },
-      { id: "mariana-sousa", name: "Mariana Sousa", pct: 30, color: "#C8A664" },
-      { id: "carlos-monteiro", name: "Carlos Monteiro", pct: 20, color: "#4A7C59" },
+      { id: "me-daniel", name: "Daniel Silva", pct: 50, color: "#5C3D2E", role: "gestor", status: "ativo", capitalInvestido: 57000, convidadoEm: "2026-03-05" },
+      { id: "mariana-sousa", name: "Mariana Sousa", pct: 30, color: "#C8A664", role: "investidor", status: "ativo", capitalInvestido: 34200, convidadoEm: "2026-03-05" },
+      { id: "carlos-monteiro", name: "Carlos Monteiro", pct: 20, color: "#4A7C59", role: "investidor", status: "ativo", capitalInvestido: 22800, convidadoEm: "2026-03-06" },
     ],
     precoImovel: 380000,
     capitalInvestido: 114000,
@@ -222,8 +249,10 @@ const SEED: CollabProject[] = [
     yieldBruto: 5.8,
     yieldLiquido: 4.3,
     contratoTipo: "NRAU Tradicional",
-    contratoInicio: "2026-09-01",
-    contratoFim: "2031-08-31",
+    contratoInicio: "2026-02-01",
+    contratoFim: "2029-01-31",
+    inquilino: "Sofia Rocha",
+    recibosEmitidos: 5,
     prestacaoBancaria: 580,
     imiAnual: 420,
     seguroAnual: 220,
@@ -241,8 +270,8 @@ const SEED: CollabProject[] = [
     status: "arrendado",
     createdAt: "2025-09-20",
     partners: [
-      { id: "me-daniel", name: "Daniel Silva", pct: 60, color: "#5C3D2E" },
-      { id: "mariana-sousa", name: "Ana Ferreira", pct: 40, color: "#C8A664" },
+      { id: "me-daniel", name: "Daniel Silva", pct: 60, color: "#5C3D2E", role: "gestor", status: "ativo", capitalInvestido: 31200, convidadoEm: "2025-09-20" },
+      { id: "ana-ferreira", name: "Ana Ferreira", pct: 40, color: "#C8A664", role: "investidor", status: "ativo", capitalInvestido: 20800, convidadoEm: "2025-09-21" },
     ],
     precoImovel: 195000,
     capitalInvestido: 52000,
@@ -314,6 +343,42 @@ export const useCollabStore = create<CollabState>()(
         set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
       resetSeed: () => set({ projects: SEED }),
     }),
-    { name: "decogest-collab", version: 1 }
+    {
+      name: "decogest-collab",
+      version: 2,
+      // v2: propertyId + sócios estendidos (role/capital/status). Mantém projetos do utilizador.
+      migrate: (persisted: unknown, version: number) => {
+        const state = (persisted ?? {}) as { projects?: CollabProject[] };
+        if (state.projects && version < 2) {
+          const seedIds = new Set(SEED.map((p) => p.id));
+          const userProjects = state.projects.filter((p) => !seedIds.has(p.id));
+          state.projects = [...SEED, ...userProjects];
+        }
+        return state as CollabState;
+      },
+    }
   )
 );
+
+// ───────────────────────── Helpers de sócios ─────────────────────────
+
+/** Sócio correspondente ao utilizador atual (ou undefined se não pertence ao projeto). */
+export function socioDe(project: CollabProject, userId: string): Partner | undefined {
+  return project.partners.find((s) => s.id === userId);
+}
+
+/** O utilizador atual pode gerir o projeto? (é gestor, ou — retro-compat — o 1.º sócio sem roles definidas) */
+export function podeGerir(project: CollabProject, userId: string): boolean {
+  const eu = socioDe(project, userId);
+  if (!eu) return false;
+  if (eu.role) return eu.role === "gestor";
+  // Projetos antigos sem roles: o primeiro sócio é o gestor por convenção.
+  return project.partners[0]?.id === userId;
+}
+
+/** Soma das percentagens dos sócios ativos (para validação = 100). */
+export function somaPercentagens(partners: Partner[]): number {
+  return partners
+    .filter((s) => (s.status ?? "ativo") !== "recusado")
+    .reduce((acc, s) => acc + (s.pct || 0), 0);
+}
