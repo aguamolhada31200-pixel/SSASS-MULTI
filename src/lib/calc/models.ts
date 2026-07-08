@@ -13,7 +13,7 @@ export interface ArrendamentoInput {
   rendaMensal: number;
   prestacaoMensal: number;
   despesasFixasMensais: number; // IMI mensalizado, seguro, condomínio, etc.
-  taxaIRS?: number; // fração (default 0,28)
+  taxaIRS?: number; // fração (default 0,25 — taxa especial cat. F)
 }
 
 export interface ArrendamentoResult {
@@ -30,11 +30,13 @@ export interface ArrendamentoResult {
 }
 
 export function calcArrendamento(i: ArrendamentoInput): ArrendamentoResult {
-  const taxa = i.taxaIRS ?? 0.28;
+  const taxa = i.taxaIRS ?? 0.25;
   const rendBrutoAnual = i.rendaMensal * 12;
+  const despesasOperAnuais = i.despesasFixasMensais * 12;
   const despesasAnuais = (i.prestacaoMensal + i.despesasFixasMensais) * 12;
   const rendLiquidoAImp = rendBrutoAnual - despesasAnuais;
-  const impostos = Math.max(0, rendLiquidoAImp) * taxa;
+  // Base fiscal cat. F = rendas − despesas dedutíveis (a prestação NÃO deduz)
+  const impostos = Math.max(0, rendBrutoAnual - despesasOperAnuais) * taxa;
   const rendLiquidoFinal = rendLiquidoAImp - impostos;
   return {
     rendBrutoAnual,
@@ -46,7 +48,9 @@ export function calcArrendamento(i: ArrendamentoInput): ArrendamentoResult {
     cashflowAnual: rendLiquidoFinal,
     rentabEntradaPct: i.entrada > 0 ? (rendLiquidoFinal / i.entrada) * 100 : 0,
     yieldBrutoPct: i.preco > 0 ? (rendBrutoAnual / i.preco) * 100 : 0,
-    yieldLiquidoPct: i.preco > 0 ? (rendLiquidoAImp / i.preco) * 100 : 0,
+    // Definição canónica da app: (renda − despesas operacionais) / preço,
+    // antes de IRS e de financiamento — igual a lib/calc/imovel.ts
+    yieldLiquidoPct: i.preco > 0 ? ((rendBrutoAnual - despesasOperAnuais) / i.preco) * 100 : 0,
   };
 }
 
@@ -177,7 +181,8 @@ export function calcCedencia(i: CedenciaInput): CedenciaResult {
     lucroBruto,
     impostos,
     lucroAposImp,
-    retornoTotalPct: capitais > 0 ? (lucroBruto / capitais) * 100 : 0,
+    // Retorno coerente com o KPI principal (lucro LÍQUIDO / capital empatado)
+    retornoTotalPct: capitais > 0 ? (lucroAposImp / capitais) * 100 : 0,
   };
 }
 
@@ -190,7 +195,7 @@ export interface InvestidoresInput {
   custosAssociados: number;
   ativoPct: number; // fração para o parceiro ativo (quem tem o negócio)
   passivoPct: number; // fração para o parceiro passivo (quem tem o capital)
-  comEmpresaMenos1Ano?: boolean; // true → ×0,81 ; false → ×0,72
+  comEmpresaMenos1Ano?: boolean; // true → ×0,81 (IRC 19%) ; false → ×0,76 (particular)
 }
 
 export interface InvestidoresResult {
@@ -202,8 +207,10 @@ export interface InvestidoresResult {
 
 export function calcInvestidores(i: InvestidoresInput): InvestidoresResult {
   const lucroBruto = i.venda - i.compra - i.custosAssociados;
-  const factor = i.comEmpresaMenos1Ano ? 0.81 : 0.72;
-  const lucroAposImp = lucroBruto * factor;
+  // Mesmos regimes do modo Flip: empresa = IRC 19% (×0,81);
+  // particular = mais-valias 50% × 48% ⇒ 24% efetivo (×0,76).
+  const factor = i.comEmpresaMenos1Ano ? 0.81 : 0.76;
+  const lucroAposImp = lucroBruto > 0 ? lucroBruto * factor : lucroBruto;
   return {
     lucroBruto,
     lucroAposImp,

@@ -17,7 +17,9 @@ export const CATEGORIAS_DESPESA = [
   "Outros",
 ] as const;
 
-export const CATEGORIAS_RECEITA = ["Renda", "Caução", "Outros"] as const;
+// "Receita AL" separada de "Renda": alojamento local é categoria B (atividade),
+// não rendimento predial cat. F — não podem ir ao mesmo saco no IRS.
+export const CATEGORIAS_RECEITA = ["Renda", "Receita AL", "Caução", "Outros"] as const;
 
 export type CategoriaDespesa = (typeof CATEGORIAS_DESPESA)[number];
 export type CategoriaReceita = (typeof CATEGORIAS_RECEITA)[number];
@@ -155,7 +157,7 @@ function buildSeed(): Transaction[] {
       tx({
         tipo: "receita",
         propertyId: "seed-porto-al",
-        categoria: "Renda",
+        categoria: "Receita AL",
         valor: 1100,
         data: `2026-${m}-05`,
         descricao: "Receita AL · mensal",
@@ -339,13 +341,21 @@ export const useTransactionsStore = create<TransactionsState>()(
     }),
     {
       name: "decogest-transactions",
-      version: 2,
+      version: 3,
       // v2: movimentos do Príncipe Real (rendas + despesas). Ids determinísticos → merge idempotente.
+      // v3: receitas do Studio AL passam de "Renda" para "Receita AL" (cat. B ≠ cat. F).
       migrate: (persisted: unknown, version: number) => {
         const state = (persisted ?? {}) as { transactions?: Transaction[] };
         if (state.transactions && version < 2) {
           const presentes = new Set(state.transactions.map((t) => t.id));
           SEED.forEach((s) => { if (!presentes.has(s.id)) state.transactions!.push(s); });
+        }
+        if (state.transactions && version < 3) {
+          state.transactions = state.transactions.map((t) =>
+            t.propertyId === "seed-porto-al" && t.tipo === "receita" && t.categoria === "Renda"
+              ? { ...t, categoria: "Receita AL" }
+              : t
+          );
         }
         return state as TransactionsState;
       },

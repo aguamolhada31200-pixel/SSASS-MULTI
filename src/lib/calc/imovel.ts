@@ -27,7 +27,17 @@ export interface ImovelKPIs {
   tempoRecuperacao: number | null; // anos; null = não recupera
 }
 
-/** Painel financeiro do imóvel — todas as fórmulas do documento (em tempo real). */
+/**
+ * Painel financeiro do imóvel — definições canónicas usadas em TODA a app:
+ *
+ * · IRS (cat. F): taxa × (rendas − despesas dedutíveis). A prestação do crédito
+ *   NÃO é dedutível — só IMI, condomínio, seguro e manutenção/outras.
+ * · Yield líquida: (renda anual − despesas operacionais) / preço de compra —
+ *   antes de IRS e de financiamento (padrão de mercado; financiamento e taxa
+ *   de IRS variam com o investidor, não com o imóvel).
+ * · Cashflow: o que sobra depois de TUDO — prestação, despesas e IRS.
+ * · Rentabilidade s/ entrada (cash-on-cash): cashflow anual / capital próprio.
+ */
 export function computeImovel(p: Property): ImovelKPIs {
   const receitaAnual = p.rendaMensal * 12;
   const despesasOperAnuais =
@@ -36,12 +46,15 @@ export function computeImovel(p: Property): ImovelKPIs {
   const totalDespesasMensais = despesasOperAnuais / 12 + p.prestacaoMensal;
   const totalDespesasAnuais = despesasOperAnuais + prestacaoAnual;
   const rendimentoAntesImpostos = receitaAnual - totalDespesasAnuais;
-  const irsEstimado = (p.irsPct / 100) * Math.max(rendimentoAntesImpostos, 0);
+  // Base fiscal cat. F = rendas − despesas dedutíveis (SEM a prestação do crédito)
+  const baseFiscal = Math.max(receitaAnual - despesasOperAnuais, 0);
+  const irsEstimado = (p.irsPct / 100) * baseFiscal;
   const rendimentoLiquidoFinal = rendimentoAntesImpostos - irsEstimado;
   const cashflowAnual = rendimentoLiquidoFinal;
   const cashflowMensal = rendimentoLiquidoFinal / 12;
   const yieldBruta = p.valorCompra > 0 ? (receitaAnual / p.valorCompra) * 100 : 0;
-  const yieldLiquida = p.valorCompra > 0 ? (rendimentoLiquidoFinal / p.valorCompra) * 100 : 0;
+  const yieldLiquida =
+    p.valorCompra > 0 ? ((receitaAnual - despesasOperAnuais) / p.valorCompra) * 100 : 0;
   const rentabEntrada = p.entrada > 0 ? (rendimentoLiquidoFinal / p.entrada) * 100 : 0;
   const tempoRecuperacao =
     rendimentoLiquidoFinal > 0 ? p.entrada / rendimentoLiquidoFinal : null;
@@ -77,31 +90,53 @@ export interface Alerta {
   texto: string;
 }
 
-/** Alertas automáticos gerados a partir dos indicadores (regras do documento). */
+/**
+ * Alertas automáticos — UMA mensagem por dimensão (yield, cashflow, retorno,
+ * despesas, IRS, recuperação), para nunca haver alertas contraditórios.
+ */
 export function gerarAlertas(p: Property, k: ImovelKPIs): Alerta[] {
   const out: Alerta[] = [];
   const pos = (texto: string) => out.push({ nivel: "positivo", emoji: "🟢", texto });
   const ate = (texto: string) => out.push({ nivel: "atencao", emoji: "🟡", texto });
   const cri = (texto: string) => out.push({ nivel: "critico", emoji: "🔴", texto });
 
-  const despesasRatio = k.receitaAnual > 0 ? k.despesasOperAnuais / k.receitaAnual : Infinity;
+  const temRenda = k.receitaAnual > 0;
+  const despesasRatio = temRenda ? k.despesasOperAnuais / k.receitaAnual : 0;
 
-  // 🔴 Críticos
-  if (k.cashflowMensal < 0) cri("Cashflow negativo");
-  if (k.totalDespesasAnuais > k.receitaAnual) cri("Despesas superiores às receitas");
-  if (k.rentabEntrada < 0) cri("Risco de prejuízo");
+  // Yield líquida (uma só mensagem)
+  if (temRenda) {
+    if (k.yieldLiquida >= 6) pos("Yield líquida acima da média");
+    else if (k.yieldLiquida >= 4) pos("Yield líquida saudável");
+    else if (k.yieldLiquida >= 2) ate("Yield líquida baixa");
+    else cri("Yield líquida muito baixa");
+  }
 
-  // 🟡 Atenção
-  if (k.yieldLiquida >= 2 && k.yieldLiquida <= 4) ate("Rentabilidade baixa");
-  if (k.receitaAnual > 0 && despesasRatio > 0.4) ate("Despesas elevadas");
-  if (p.irsPct >= 28 && k.rendimentoAntesImpostos > 0) ate("IRS elevado");
-  if (k.cashflowMensal > 0 && k.cashflowMensal < 100) ate("Cashflow reduzido");
+  // Cashflow (uma só mensagem)
+  if (temRenda) {
+    if (k.cashflowMensal < 0) cri("Cashflow negativo");
+    else if (k.cashflowMensal < 100) ate("Cashflow reduzido");
+    else pos("Cashflow positivo");
+  }
 
-  // 🟢 Positivos
-  if (k.yieldLiquida > 4) pos("Yield acima da média");
-  if (k.cashflowMensal > 0) pos("Cashflow positivo");
-  if (k.rentabEntrada > 8) pos("Excelente rentabilidade");
-  if (k.tempoRecuperacao !== null && k.tempoRecuperacao < 12) pos("Recuperação rápida");
+  // Retorno sobre o capital próprio (dimensão distinta da yield)
+  if (temRenda && k.entrada > 0) {
+    if (k.rentabEntrada < 0) cri("Risco de prejuízo sobre o capital investido");
+    else if (k.rentabEntrada > 8) pos("Retorno s/ capital próprio excelente");
+  }
+
+  // Estrutura de despesas
+  if (temRenda && despesasRatio > 0.4) ate("Despesas operacionais elevadas");
+  if (temRenda && k.totalDespesasAnuais > k.receitaAnual) cri("Despesas totais superiores às receitas");
+
+  // IRS
+  if (p.irsPct >= 28 && temRenda) ate("Taxa de IRS elevada — a taxa especial atual é 25%");
+
+  // Recuperação da entrada (uma só mensagem)
+  if (temRenda && k.entrada > 0) {
+    if (k.tempoRecuperacao === null) cri("Não recupera a entrada com o cashflow atual");
+    else if (k.tempoRecuperacao < 12) pos("Recuperação rápida da entrada");
+    else if (k.tempoRecuperacao > 20) ate("Recuperação lenta da entrada");
+  }
 
   return out;
 }

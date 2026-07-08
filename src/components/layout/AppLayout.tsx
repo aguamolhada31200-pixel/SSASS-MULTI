@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { CommandPalette } from "./CommandPalette";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PropertyFormModal } from "@/components/modals/PropertyFormModal";
 import { ExpenseFormModal } from "@/components/modals/ExpenseFormModal";
 import { PublishListingModal } from "@/components/modals/PublishListingModal";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const { pathname } = useLocation();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -63,7 +65,10 @@ export function AppLayout() {
         <Topbar onMenu={() => setDrawerOpen(true)} onSearch={() => setPaletteOpen(true)} />
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl animate-fade-in">
-            <Outlet />
+            {/* key por rota: um erro numa página não persiste ao navegar para outra */}
+            <ErrorBoundary key={pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>

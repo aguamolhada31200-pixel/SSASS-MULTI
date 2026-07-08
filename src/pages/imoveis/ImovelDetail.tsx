@@ -38,7 +38,7 @@ import { computeImovel, gerarAlertas, type AlertaNivel } from "@/lib/calc/imovel
 import { FinancasTab } from "./FinancasTab";
 import { PropertyGallery } from "./PropertyGallery";
 import { situacaoImovel } from "@/lib/property";
-import { eur, eurSigned, pct, dataPT } from "@/lib/format";
+import { eur, eurSigned, pct, n1, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   Users2,
@@ -167,7 +167,7 @@ function VisaoGeral({
   onEdit: () => void;
 }) {
   const tempo =
-    k.tempoRecuperacao === null ? "Não recupera" : `${k.tempoRecuperacao.toFixed(1)} anos`;
+    k.tempoRecuperacao === null ? "Não recupera" : `${n1(k.tempoRecuperacao)} anos`;
 
   const receitasVsDespesas = [
     { periodo: "Mensal", Receita: Math.round(k.receitaMensal), Despesas: Math.round(k.totalDespesasMensais) },

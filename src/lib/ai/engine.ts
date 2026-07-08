@@ -8,7 +8,7 @@ import type { Tenant } from "@/store/useTenantsStore";
 import type { Contract } from "@/store/useContractsStore";
 import { statusEfetivo, diasAteFim, TIPO_LABEL } from "@/store/useContractsStore";
 import { calcularIMT, calcularIS, type Finalidade } from "@/lib/calc/imt";
-import { eur, pct, dataPTShort } from "@/lib/format";
+import { eur, pct, dataPTShort, mesPT } from "@/lib/format";
 import { KNOWLEDGE, DISCLAIMER, procurarTopico } from "./knowledge";
 
 export interface AiContext {
@@ -109,7 +109,7 @@ function respRendas(ctx: AiContext): AiResponse {
   const tenantDe = (pid: string) => ctx.tenants.find((t) => t.propertyId === pid)?.nomeCompleto ?? "—";
   return {
     content: [
-      `⚠️ **${atrasos.length} renda(s) por regularizar** em ${mesAtual}:`,
+      `⚠️ **${atrasos.length} renda(s) por regularizar** em ${mesPT(mesAtual)}:`,
       "",
       "| Inquilino | Imóvel | Valor |",
       "| --- | --- | --- |",

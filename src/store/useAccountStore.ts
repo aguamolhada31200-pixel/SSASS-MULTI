@@ -212,7 +212,8 @@ function emDias(n: number): string {
 // Os campos sensíveis (NIF/CC/IBAN/morada fiscal) ficam vazios e são pedidos só quando
 // uma feature precisa deles (ver UnlockGate).
 const PRIVADO_SEED: Privado = {
-  nomeCompleto: "José Felix",
+  // Mesmo utilizador em toda a app: CURRENT_USER_ID "me-daniel" (useProfilesStore)
+  nomeCompleto: "Daniel Silva",
   dataNascimento: "",
   nif: "",
   cc: "",
@@ -237,7 +238,7 @@ const PLANO_SEED: Plano = {
   proximoPagamento: "2026-07-15",
   metodoPagamento: { tipo: "Visa", ultimosDigitos: "4321", validade: "08/27" },
   dadosFaturacao: {
-    nome: "José Felix",
+    nome: "Daniel Silva",
     nif: "",
     morada: "",
     codigoPostal: "",
@@ -381,8 +382,9 @@ export const useAccountStore = create<AccountState>()(
     }),
     {
       name: "decogest-account",
-      version: 2,
+      version: 3,
       // v1 trazia o perfil totalmente preenchido; v2 adota "valor primeiro" (perfil mínimo).
+      // v3: corrige a identidade seed "José Felix" → "Daniel Silva" (mesmo utilizador em toda a app).
       migrate: (persisted: unknown, version: number) => {
         if (version < 2) {
           const s = (persisted ?? {}) as Partial<AccountState>;
@@ -397,7 +399,14 @@ export const useAccountStore = create<AccountState>()(
             faturas: s.faturas ?? FATURAS_SEED,
           } as AccountState;
         }
-        return persisted as AccountState;
+        const s = persisted as AccountState;
+        if (version < 3 && s?.privado?.nomeCompleto === "José Felix") {
+          s.privado = { ...s.privado, nomeCompleto: "Daniel Silva" };
+          if (s.plano?.dadosFaturacao?.nome === "José Felix") {
+            s.plano = { ...s.plano, dadosFaturacao: { ...s.plano.dadosFaturacao, nome: "Daniel Silva" } };
+          }
+        }
+        return s;
       },
     }
   )

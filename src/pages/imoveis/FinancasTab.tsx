@@ -45,7 +45,7 @@ import {
 } from "@/store/useTransactionsStore";
 import type { Property } from "@/store/usePropertiesStore";
 import { computeImovel, gerarAlertas, type AlertaNivel } from "@/lib/calc/imovel";
-import { eur, eurSigned, pct, dataPTShort } from "@/lib/format";
+import { eur, eurSigned, pct, n1, dataPTShort } from "@/lib/format";
 import { dentroPeriodo, PERIODO_LABEL, PERIODOS, type Periodo } from "@/lib/periodo";
 import { cn } from "@/lib/utils";
 
@@ -72,24 +72,6 @@ export function FinancasTab({ property }: { property: Property }) {
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
   const [sortKey, setSortKey] = useState<SortKey>("data");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  if (!enabled || txs.length === 0) {
-    return (
-      <EmptyState
-        icon={Wallet}
-        title="Sem movimentos para este imóvel"
-        description={
-          enabled
-            ? "Registe a primeira receita ou despesa para começar a acompanhar o desempenho financeiro deste imóvel."
-            : "Active o toggle «Dados de exemplo» no topo da página para popular movimentos, ou registe o primeiro."
-        }
-        ctaLabel="+ Registar primeiro movimento"
-        onCta={() =>
-          openExpenseForm({ initialTipo: "despesa", initialPropertyId: property.id })
-        }
-      />
-    );
-  }
 
   // Período aplicado a KPIs/gráficos
   const txsPeriodo = useMemo(() => txs.filter((t) => dentroPeriodo(t.data, periodo)), [txs, periodo]);
@@ -186,18 +168,26 @@ export function FinancasTab({ property }: { property: Property }) {
   }, [txs]);
 
   // Histórico de rendas (12 meses recentes)
+  // Regras: mês com registo → Pago · mês corrente sem registo → Pendente ·
+  // mês passado sem registo DEPOIS do 1.º registo de renda → Atrasado ·
+  // meses sem qualquer registo anterior → "—" (sem registo ≠ atraso)
   const historicoRendas = useMemo(() => {
     const hoje = new Date();
+    const rendas = txs.filter((t) => t.tipo === "receita" && t.categoria === "Renda");
+    const primeiraRenda = rendas.length
+      ? rendas.reduce((min, t) => (t.data < min ? t.data : min), rendas[0].data)
+      : null;
+    const mesPrimeiraRenda = primeiraRenda
+      ? new Date(new Date(`${primeiraRenda}T00:00:00`).getFullYear(), new Date(`${primeiraRenda}T00:00:00`).getMonth(), 1)
+      : null;
+    const mesCorrente = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     const out: { label: string; status: RendaStatus; valor: number }[] = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-      const recebida = txs.find(
-        (t) =>
-          t.tipo === "receita" &&
-          t.categoria === "Renda" &&
-          new Date(`${t.data}T00:00:00`).getFullYear() === d.getFullYear() &&
-          new Date(`${t.data}T00:00:00`).getMonth() === d.getMonth()
-      );
+      const recebida = rendas.find((t) => {
+        const td = new Date(`${t.data}T00:00:00`);
+        return td.getFullYear() === d.getFullYear() && td.getMonth() === d.getMonth();
+      });
       const label = `${MESES[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
       const valorEsperado = property.rendaMensal;
       const inicio = property.dataInicioArrendamento
@@ -207,7 +197,8 @@ export function FinancasTab({ property }: { property: Property }) {
       let status: RendaStatus;
       if (recebida) status = "Pago";
       else if (antesDoArrendamento || property.status !== "ocupado" || valorEsperado === 0) status = "—";
-      else if (d > new Date(hoje.getFullYear(), hoje.getMonth(), 1)) status = "Pendente";
+      else if (!mesPrimeiraRenda || d < mesPrimeiraRenda) status = "—";
+      else if (d.getTime() >= mesCorrente.getTime()) status = "Pendente";
       else status = "Atrasado";
       out.push({ label, status, valor: recebida?.valor ?? valorEsperado });
     }
@@ -245,6 +236,25 @@ export function FinancasTab({ property }: { property: Property }) {
   const previewRecibo = (url: string) => {
     window.open(url, "_blank");
   };
+
+  // Estado vazio — depois de TODOS os hooks, para a ordem nunca mudar entre renders
+  if (!enabled || txs.length === 0) {
+    return (
+      <EmptyState
+        icon={Wallet}
+        title="Sem movimentos para este imóvel"
+        description={
+          enabled
+            ? "Registe a primeira receita ou despesa para começar a acompanhar o desempenho financeiro deste imóvel."
+            : "Active o toggle «Dados de exemplo» no topo da página para popular movimentos, ou registe o primeiro."
+        }
+        ctaLabel="+ Registar primeiro movimento"
+        onCta={() =>
+          openExpenseForm({ initialTipo: "despesa", initialPropertyId: property.id })
+        }
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -297,7 +307,7 @@ export function FinancasTab({ property }: { property: Property }) {
           tone={k.liquido >= 0 ? "success" : "danger"}
           icon={Wallet}
         />
-        <Kpi label="Yield líquido" value={pct(k.yieldLiquido)} tone={k.yieldLiquido >= 4 ? "success" : k.yieldLiquido >= 0 ? "warning" : "danger"} />
+        <Kpi label="Resultado / preço" value={pct(k.yieldLiquido)} tone={k.yieldLiquido >= 4 ? "success" : k.yieldLiquido >= 0 ? "warning" : "danger"} hint="Movimentos do período" />
         <Kpi label="Cashflow mensal" value={eurSigned(imovelKpis.cashflowMensal)} tone={imovelKpis.cashflowMensal >= 0 ? "success" : "danger"} hint="Configurado" />
         <Kpi
           label="Resultado acumulado"
@@ -427,7 +437,7 @@ export function FinancasTab({ property }: { property: Property }) {
               value={
                 imovelKpis.tempoRecuperacao === null
                   ? "Não recupera"
-                  : `${imovelKpis.tempoRecuperacao.toFixed(1)} anos`
+                  : `${n1(imovelKpis.tempoRecuperacao)} anos`
               }
               tone={imovelKpis.tempoRecuperacao === null ? "danger" : imovelKpis.tempoRecuperacao < 12 ? "success" : "warning"}
             />
@@ -450,7 +460,8 @@ export function FinancasTab({ property }: { property: Property }) {
       {/* Histórico de rendas */}
       <Card>
         <CardContent>
-          <h3 className="mb-3 font-display text-base font-semibold text-ink">Histórico de rendas · últimos 12 meses</h3>
+          <h3 className="mb-1 font-display text-base font-semibold text-ink">Histórico de rendas · últimos 12 meses</h3>
+          <p className="mb-3 text-[11px] text-muted">— = sem registo nesse mês (não conta como atraso)</p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {historicoRendas.map((m) => (
               <RendaCelula key={m.label} {...m} />

@@ -49,7 +49,7 @@ import {
   investimentoTotalCedencia,
 } from "@/lib/calc/rede";
 import { metricasHero } from "@/components/rede/metrics";
-import { eur, pct, dataPT } from "@/lib/format";
+import { eur, pct, dataPT, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Vista = "publica" | "autor";
@@ -118,7 +118,7 @@ export default function ListingDetail() {
             <h1 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl lg:text-5xl">{listing.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/80">
               <span className="flex items-center gap-1"><MapPin size={14} /> {showExact ? listing.exactAddress : `${listing.city} · ${listing.district} (zona aprox.)`}</span>
-              <span className="flex items-center gap-1"><Eye size={13} /> {listing.viewsCount} visualizações</span>
+              <span className="flex items-center gap-1"><Eye size={13} /> {plural(listing.viewsCount, "visualização", "visualizações")}</span>
             </div>
             {!showExact && <p className="mt-1.5 text-xs text-white/50">Morada exata partilhada após contacto</p>}
           </div>

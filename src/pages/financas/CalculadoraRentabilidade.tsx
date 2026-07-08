@@ -217,7 +217,7 @@ function ParamsCard({ title, children, onExample }: { title: string; children: R
 function Arrendamento() {
   const ex = { preco: 165000, entrada: 40000, rendaMensal: 950, prestacaoMensal: 520, despesasFixasMensais: 90 };
   const [i, setI] = useState(ex);
-  const r = useMemo(() => calcArrendamento({ ...i, taxaIRS: 0.28 }), [i]);
+  const r = useMemo(() => calcArrendamento({ ...i, taxaIRS: 0.25 }), [i]);
   const set = (k: keyof typeof i) => (v: number) => setI((s) => ({ ...s, [k]: v }));
 
   const proj = useMemo(
@@ -243,9 +243,9 @@ function Arrendamento() {
         <VereditoHero
           valuePct={r.yieldLiquidoPct}
           reference={YIELD_MERCADO_MEDIO}
-          heroLabel="Yield líquido"
+          heroLabel="Yield líquida (antes de IRS e crédito)"
           heroValue={pct(r.yieldLiquidoPct)}
-          oneliner={`Gera ${eurSigned(r.cashflowMensal)} por mês depois de tudo pago.`}
+          oneliner={`Gera ${eurSigned(r.cashflowMensal)} por mês depois de tudo pago (crédito e IRS incluídos).`}
         />
         <div className="mt-5 grid grid-cols-3 gap-2">
           <KeyCard label="Cashflow / mês" value={eurSigned(r.cashflowMensal)} tone={r.cashflowMensal >= 0 ? "pos" : "neg"} />
@@ -255,7 +255,7 @@ function Arrendamento() {
         <div className="mt-5">
           <SecRow k="Rendimento bruto anual" v={eur(r.rendBrutoAnual)} />
           <SecRow k="Despesas anuais" v={eur(r.despesasAnuais)} />
-          <SecRow k="Imposto (IRS 28%)" v={eur(r.impostos)} />
+          <SecRow k="Imposto (IRS 25% s/ rendas − despesas dedutíveis)" v={eur(r.impostos)} />
           <SecRow k="Rendimento líquido final" v={eur(r.rendLiquidoFinal)} />
         </div>
         <div className="mt-5">
@@ -392,12 +392,12 @@ function Cedencia() {
           reference={20}
           heroLabel="Lucro da cedência"
           heroValue={eurSigned(r.lucroAposImp)}
-          oneliner={`Retorno de ${pct(r.retornoTotalPct)} sobre ${eur(r.capitais)} de capital empatado.`}
+          oneliner={`Retorno líquido de ${pct(r.retornoTotalPct)} sobre ${eur(r.capitais)} de capital empatado.`}
         />
         <div className="mt-5 grid grid-cols-3 gap-2">
           <KeyCard label="Sinal" value={eur(r.sinalValor)} />
           <KeyCard label="Capital empatado" value={eur(r.capitais)} />
-          <KeyCard label="Retorno" value={pct(r.retornoTotalPct)} />
+          <KeyCard label="Retorno líquido" value={pct(r.retornoTotalPct)} />
         </div>
         <div className="mt-5">
           <SecRow k="IMT (sobre sinal)" v={eur(r.imt)} />
@@ -447,7 +447,7 @@ function Investidores() {
               comEmpresa ? "border-primary bg-accent text-primary" : "border-line text-muted"
             )}
           >
-            {comEmpresa ? "Com empresa < 1 ano (×0,81)" : "Sem empresa (×0,72)"}
+            {comEmpresa ? "Com empresa (IRC 19% · ×0,81)" : "Particular (mais-valias 50%×48% · ×0,76)"}
           </button>
         </div>
       </ParamsCard>
@@ -466,7 +466,7 @@ function Investidores() {
         </div>
         <div className="mt-5">
           <SecRow k="Lucro bruto do negócio" v={eurSigned(r.lucroBruto)} />
-          <SecRow k="Fator fiscal" v={comEmpresa ? "×0,81" : "×0,72"} />
+          <SecRow k="Fator fiscal" v={comEmpresa ? "×0,81 (IRC 19%)" : "×0,76 (mais-valias particular)"} />
           <SecRow k="Lucro líquido total" v={eurSigned(r.lucroAposImp)} />
         </div>
       </ResultsShell>

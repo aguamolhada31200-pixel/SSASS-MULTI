@@ -73,6 +73,7 @@ import { FinancasTab } from "@/pages/imoveis/FinancasTab";
 import { SociosTab } from "@/components/collab/SociosTab";
 import { DecisoesTab } from "@/components/collab/DecisoesTab";
 import { AtividadeTab } from "@/components/collab/AtividadeTab";
+import { calcularIMT } from "@/lib/calc/imt";
 import { eur, pct, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
@@ -365,7 +366,7 @@ function ReabVisaoGeral({ p, inv, totalGasto, saldo, venda, maisValia, impostos,
         <CardContent>
           <SH title="Burocracia — flip" />
           <div className="grid gap-2 sm:grid-cols-2">
-            <BuroItem label="IMT na compra" value={eur((p.custosAquisicao ?? 0) * 0.6)} done />
+            <BuroItem label="IMT na compra" value={eur(calcularIMT(p.precoAquisicao ?? 0, "HS"))} done />
             <BuroItem label="Licença de obras (Câmara)" done={p.cronograma?.find((e) => e.nome.toLowerCase().includes("licen"))?.concluida ?? false} />
             <BuroItem label={`IVA da obra ${p.zonaARU ? "6% (zona ARU)" : "23%"}`} info={p.zonaARU ? "Benefício fiscal ARU aplicável" : "Taxa normal"} />
             <BuroItem label="Certificação energética" />

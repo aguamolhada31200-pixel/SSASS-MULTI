@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export type PropType = "al" | "tradicional" | "estudantes" | "comercial";
@@ -65,9 +65,13 @@ export const STATUS_LABEL: Record<PropStatus, string> = {
   inativo: "Inativo",
 };
 
-/** Estado derivado quando não é dado explicitamente. */
-export function deriveStatus(rendaMensal: number): PropStatus {
-  return rendaMensal > 0 ? "ocupado" : "disponivel";
+/**
+ * Estado por defeito de um imóvel novo: Disponível.
+ * Um imóvel só passa a "Ocupado" quando tem um inquilino associado
+ * (sincronizado pelo useTenantsStore) — ter renda definida não ocupa nada.
+ */
+export function deriveStatus(_rendaMensal: number): PropStatus {
+  return "disponivel";
 }
 
 export type PropertyInput = Omit<Property, "id" | "createdAt" | "status"> & {
@@ -90,7 +94,7 @@ const SEED: Property[] = [
     prestacaoMensal: 445,
     rendaMensal: 1350,
     dataInicioArrendamento: "2022-06-01",
-    irsPct: 28,
+    irsPct: 25,
     imiAnual: 320,
     seguroAnual: 180,
     condominioMensal: 45,
@@ -149,7 +153,7 @@ const SEED: Property[] = [
     taxaJuro: 3.5,
     prestacaoMensal: 520,
     rendaMensal: 0,
-    irsPct: 28,
+    irsPct: 25,
     imiAnual: 280,
     seguroAnual: 170,
     condominioMensal: 50,
@@ -177,7 +181,7 @@ const SEED: Property[] = [
     prestacaoMensal: 580,
     rendaMensal: 1850,
     dataInicioArrendamento: "2026-02-01",
-    irsPct: 28,
+    irsPct: 25,
     imiAnual: 420,
     seguroAnual: 220,
     condominioMensal: 80,
@@ -228,9 +232,9 @@ export const usePropertiesStore = create<PropertiesState>()(
               ? {
                   ...p,
                   ...patch,
-                  status:
-                    patch.status ??
-                    (patch.rendaMensal !== undefined ? deriveStatus(patch.rendaMensal) : p.status),
+                  // Alterar a renda não mexe na ocupação — só um patch explícito
+                  // (ou a sincronização com inquilinos) muda o status.
+                  status: patch.status ?? p.status,
                 }
               : p
           ),
@@ -241,7 +245,7 @@ export const usePropertiesStore = create<PropertiesState>()(
     }),
     {
       name: "decogest-properties",
-      version: 3,
+      version: 4,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { properties?: Property[] } | undefined;
         if (state?.properties && version < 2) {
@@ -255,6 +259,13 @@ export const usePropertiesStore = create<PropertiesState>()(
           // v3: imóvel subjacente ao projeto colaborativo Príncipe Real.
           const ids = new Set(state.properties.map((p) => p.id));
           SEED.forEach((s) => { if (!ids.has(s.id)) state.properties!.push(s); });
+        }
+        if (state?.properties && version < 4) {
+          // v4: taxa especial cat. F é 25% desde 2023 — atualizar seeds a 28%.
+          const seedIds = new Set(SEED.map((s) => s.id));
+          state.properties = state.properties.map((p) =>
+            seedIds.has(p.id) && p.irsPct === 28 ? { ...p, irsPct: 25 } : p
+          );
         }
         return state as PropertiesState;
       },

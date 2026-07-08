@@ -4,8 +4,12 @@ export * from "./models";
 export * from "./avaliacao";
 export * from "./imovel";
 
-/** Média de mercado de referência para yield/retorno (gauge da Calculadora). */
-export const YIELD_MERCADO_MEDIO = 3.5;
+/**
+ * Média de mercado de referência para yield líquida (gauge da Calculadora).
+ * Yield líquida = (renda − despesas operacionais) / preço, antes de IRS e
+ * financiamento — referência nacional ~5% (Lisboa/Porto mais baixo).
+ */
+export const YIELD_MERCADO_MEDIO = 5.0;
 
 export type Veredito = "bom" | "medio" | "mau";
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useForm, type Resolver } from "react-hook-form";
+import { useForm, type Resolver, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ import {
   type TipoMov,
   type Periodicidade,
 } from "@/store/useTransactionsStore";
+import { eur } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const schema = z.object({
@@ -172,10 +173,18 @@ export function ExpenseFormModal() {
     } else {
       add(payload);
       toast.success("Movimento registado ✨", {
-        description: `${values.tipo === "receita" ? "Receita" : "Despesa"} · ${values.valor.toLocaleString("pt-PT")} €`,
+        description: `${values.tipo === "receita" ? "Receita" : "Despesa"} · ${eur(values.valor)}`,
       });
     }
     closeExpenseForm();
+  };
+
+  // Validação falhou → além do realce nos campos, dizer PORQUÊ num toast
+  const onInvalid = (errs: FieldErrors<FormValues>) => {
+    const primeiro = Object.values(errs).find((e) => e?.message);
+    toast.error("Não foi possível registar o movimento", {
+      description: String(primeiro?.message ?? "Verifique os campos assinalados a vermelho."),
+    });
   };
 
   return (
@@ -199,7 +208,7 @@ export function ExpenseFormModal() {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onValid as (v: FormValues) => void)} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={handleSubmit(onValid as (v: FormValues) => void, onInvalid)} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-4 overflow-y-auto p-5">
             {/* Toggle tipo */}
             <div className="grid grid-cols-2 gap-2">

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
 import { usePropertiesStore, type PropType, type PropertyPhoto } from "@/store/usePropertiesStore";
 import { useObrasStore, CATEGORIA_LABEL, type ObraCategoria, type ObraEstado } from "@/store/useObrasStore";
+import { pmt } from "@/lib/calc/imt";
+import { eur } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const schema = z.object({
@@ -54,7 +56,7 @@ const EMPTY: FormValues = {
   prestacaoMensal: 0,
   rendaMensal: 0,
   dataInicioArrendamento: "",
-  irsPct: 28,
+  irsPct: 25,
   imiAnual: 0,
   seguroAnual: 0,
   condominioMensal: 0,
@@ -120,6 +122,7 @@ export function PropertyFormModal() {
     reset,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -146,7 +149,40 @@ export function PropertyFormModal() {
 
   const next = async () => {
     const ok = await trigger(STEP_FIELDS[step]);
-    if (ok) setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    if (!ok) return;
+    // Ao sair da Aquisição: derivar o financiado (compra − entrada) se ficou em branco
+    if (step === 0) {
+      const compra = Number(getValues("valorCompra")) || 0;
+      const entrada = Number(getValues("entrada")) || 0;
+      const financiado = Number(getValues("financiado")) || 0;
+      if (!financiado && entrada > 0 && compra > entrada) {
+        const derivado = compra - entrada;
+        setValue("financiado", derivado, { shouldDirty: true });
+        toast.info("Valor financiado preenchido automaticamente", {
+          description: `Compra − entrada = ${eur(derivado)}. Ajuste se não for financiado.`,
+        });
+      }
+    }
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  };
+
+  const sugerirPrestacao = () => {
+    const compra = Number(getValues("valorCompra")) || 0;
+    const entrada = Number(getValues("entrada")) || 0;
+    let financiado = Number(getValues("financiado")) || 0;
+    if (!financiado && entrada > 0 && compra > entrada) financiado = compra - entrada;
+    if (financiado <= 0) {
+      toast.error("Indique o valor financiado (ou compra e entrada) primeiro.");
+      return;
+    }
+    const prazo = Number(getValues("prazoAnos")) || 30;
+    const taxa = Number(getValues("taxaJuro")) || 4;
+    const prestacao = Math.round(pmt(taxa / 100, prazo, financiado));
+    setValue("financiado", financiado, { shouldDirty: true });
+    setValue("prestacaoMensal", prestacao, { shouldDirty: true });
+    toast.info("Prestação estimada", {
+      description: `${eur(financiado)} a ${prazo} anos · TAN ${taxa}% → ${eur(prestacao)}/mês. Ajuste ao valor real do banco.`,
+    });
   };
 
   const onValid = (values: FormValues) => {
@@ -267,6 +303,14 @@ export function PropertyFormModal() {
                 <Num label="Prazo do financiamento (opcional)" reg={register("prazoAnos")} suffix="anos" />
                 <Num label="Taxa de juro (opcional)" reg={register("taxaJuro")} suffix="%" />
                 <Num label="Prestação mensal (opcional)" reg={register("prestacaoMensal")} suffix="€" />
+                <div className="sm:col-span-2 -mt-1 space-y-1">
+                  <button type="button" onClick={sugerirPrestacao} className="text-xs font-medium text-secondary hover:underline">
+                    ⚡ Sugerir prestação a partir do financiado (prazo/taxa acima; defaults 30 anos · 4%)
+                  </button>
+                  <p className="text-[11px] text-muted">
+                    Se deixar o financiado em branco, calculamos compra − entrada ao avançar.
+                  </p>
+                </div>
               </>
             )}
 
@@ -277,16 +321,17 @@ export function PropertyFormModal() {
                   <input type="date" {...register("dataInicioArrendamento")} className={inputCls} />
                 </Field>
                 <p className="text-xs text-muted sm:col-span-2">
-                  Sem renda → o imóvel fica marcado como <strong>Disponível</strong> e dispara alertas de imóvel vago.
+                  O imóvel fica <strong>Disponível</strong> até associar um inquilino — passa a
+                  «Ocupado» automaticamente quando o fizer (tab Inquilinos do imóvel).
                 </p>
               </>
             )}
 
             {step === 2 && (
               <div className="sm:col-span-2">
-                <Field label="Percentagem de IRS sobre o arrendamento (opcional · default 28%)" error={errors.irsPct?.message}>
+                <Field label="Percentagem de IRS sobre o arrendamento (opcional · default 25% — taxa especial cat. F; 15/10/5% para contratos longos)" error={errors.irsPct?.message}>
                   <div className="flex flex-wrap items-center gap-2">
-                    {[5, 10, 25, 28].map((v) => (
+                    {[5, 10, 15, 25, 28].map((v) => (
                       <button
                         key={v}
                         type="button"

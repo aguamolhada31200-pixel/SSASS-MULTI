@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { usePropertiesStore } from "./usePropertiesStore";
 
 export type TipoInquilino = "regular" | "estudante";
 export type StatusInquilino = "ativo" | "expirado" | "sem_contrato";
@@ -199,6 +200,25 @@ function uid(): string {
   return `tn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * A ocupação do imóvel deriva dos inquilinos: com inquilino ativo associado →
+ * "ocupado"; sem nenhum → "disponivel". Estados manuais (em_obras/inativo)
+ * nunca são alterados por aqui.
+ */
+function sincronizarOcupacao(...propertyIds: (string | undefined)[]) {
+  const props = usePropertiesStore.getState();
+  for (const pid of propertyIds) {
+    if (!pid) continue;
+    const prop = props.properties.find((p) => p.id === pid);
+    if (!prop || prop.status === "em_obras" || prop.status === "inativo") continue;
+    const temInquilino = useTenantsStore
+      .getState()
+      .tenants.some((t) => t.propertyId === pid && t.status !== "expirado");
+    const alvo = temInquilino ? "ocupado" : "disponivel";
+    if (prop.status !== alvo) props.update(pid, { status: alvo });
+  }
+}
+
 export const useTenantsStore = create<TenantsState>()(
   persist(
     (set, get) => ({
@@ -211,13 +231,21 @@ export const useTenantsStore = create<TenantsState>()(
           createdAt: new Date().toISOString(),
         };
         set((s) => ({ tenants: [tenant, ...s.tenants] }));
+        sincronizarOcupacao(data.propertyId);
         return id;
       },
-      update: (id, patch) =>
+      update: (id, patch) => {
+        const antes = get().tenants.find((t) => t.id === id)?.propertyId;
         set((s) => ({
           tenants: s.tenants.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-        })),
-      remove: (id) => set((s) => ({ tenants: s.tenants.filter((t) => t.id !== id) })),
+        }));
+        sincronizarOcupacao(antes, patch.propertyId ?? get().tenants.find((t) => t.id === id)?.propertyId);
+      },
+      remove: (id) => {
+        const antes = get().tenants.find((t) => t.id === id)?.propertyId;
+        set((s) => ({ tenants: s.tenants.filter((t) => t.id !== id) }));
+        sincronizarOcupacao(antes);
+      },
       getById: (id) => get().tenants.find((t) => t.id === id),
       byProperty: (propertyId) => get().tenants.filter((t) => t.propertyId === propertyId),
       resetSeed: () => set({ tenants: SEED }),

@@ -105,10 +105,20 @@ export function ctaCedencia(l: Listing): number {
 }
 
 /**
- * Há obras quando o imóvel está "a recuperar" — a app assume cenário com reabilitação.
+ * Há obras quando o NEGÓCIO envolve reabilitação:
+ * · valor de obras previsto > 0; ou
+ * · tipo de cedência ≠ "apenas CPCV" (projeto aprovado, licença e obra
+ *   iniciada implicam reabilitação à frente).
+ * Uma cedência "apenas CPCV" sem obras previstas avalia-se pelo mercado ATUAL
+ * — o estado do imóvel ("a recuperar") descreve o imóvel, não o plano.
  */
-export function comObrasCedencia(l: Pick<Listing, "estado">): boolean {
-  return l.estado === "a recuperar";
+export function comObrasCedencia(
+  l: Pick<Listing, "tipoCedencia" | "obra" | "valorMercadoPosObras" | "estado">
+): boolean {
+  if ((l.obra ?? 0) > 0) return true;
+  if (l.tipoCedencia) return l.tipoCedencia !== "cpcv";
+  // retro-compat: anúncios antigos sem tipo definido
+  return (l.valorMercadoPosObras ?? 0) > 0 || l.estado === "a recuperar";
 }
 
 /**
@@ -129,7 +139,9 @@ export function investimentoTotalCedencia(l: Listing): number {
 }
 
 /** Label do ROI em cedência — muda consoante o cenário. */
-export function roiLabelCedencia(l: Pick<Listing, "estado">): string {
+export function roiLabelCedencia(
+  l: Pick<Listing, "tipoCedencia" | "obra" | "valorMercadoPosObras" | "estado">
+): string {
   return comObrasCedencia(l) ? "ROI pós-obras" : "ROI da operação";
 }
 

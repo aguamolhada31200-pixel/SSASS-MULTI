@@ -133,12 +133,15 @@ export default function ObraDetalhe() {
   const compVal = gastoComprovado(obra, despesas);
   const transpTone = toneTransparencia(pctComp);
 
-  // Barras paralelas orçamento vs prazo
-  const totalDias = Math.max(0, Math.round((new Date(`${obra.dataFimPrevista}T00:00:00`).getTime() - new Date(`${obra.dataInicio}T00:00:00`).getTime()) / 86400000));
+  // Barras paralelas orçamento vs prazo (obras sem datas mostram "—", nunca NaN)
+  const temDatas = !!obra.dataInicio && !!obra.dataFimPrevista;
+  const totalDias = temDatas
+    ? Math.max(0, Math.round((new Date(`${obra.dataFimPrevista}T00:00:00`).getTime() - new Date(`${obra.dataInicio}T00:00:00`).getTime()) / 86400000))
+    : 0;
   const decorridos = totalDias > 0 ? Math.max(0, Math.min(totalDias, Math.round((Date.now() - new Date(`${obra.dataInicio}T00:00:00`).getTime()) / 86400000))) : 0;
   const prazoPct = totalDias > 0 ? Math.round((decorridos / totalDias) * 100) : 0;
   const gastoPct = obra.orcamento > 0 ? Math.round((g / obra.orcamento) * 100) : 0;
-  const gastoAFrente = gastoPct > prazoPct + 5; // gasta-se mais depressa do que o tempo passa
+  const gastoAFrente = temDatas && gastoPct > prazoPct + 5; // gasta-se mais depressa do que o tempo passa
 
   const ownerHref = project
     ? `/comunidade/colaborativa/${project.id}`
@@ -248,9 +251,9 @@ export default function ObraDetalhe() {
             <KpiMini label="Progresso" value={`${prog}%`} tone="info" />
             <KpiMini
               label={atrasada ? "Atrasada" : "Restantes"}
-              value={atrasada ? `${Math.abs(dias)}d` : `${dias}d`}
+              value={!temDatas || !Number.isFinite(dias) ? "—" : atrasada ? `${Math.abs(dias)}d` : `${dias}d`}
               tone={atrasada ? "danger" : "info"}
-              sub={`${dataPT(obra.dataInicio)} → ${dataPT(obra.dataFimPrevista)}`}
+              sub={temDatas ? `${dataPT(obra.dataInicio)} → ${dataPT(obra.dataFimPrevista)}` : "Sem datas definidas"}
             />
             <KpiMini
               label="Próximo marco"
@@ -281,7 +284,7 @@ export default function ObraDetalhe() {
               />
               <ParallelBar
                 label="Prazo"
-                value={`${decorridos} de ${totalDias} dias (${prazoPct}%)`}
+                value={temDatas ? `${decorridos} de ${totalDias} dias (${prazoPct}%)` : "Sem datas definidas"}
                 pct={prazoPct}
                 color="#8B5E3C"
                 className="mt-2.5"

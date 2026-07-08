@@ -1,5 +1,6 @@
 import type { Property } from "@/store/usePropertiesStore";
 import { computeImovel } from "@/lib/calc/imovel";
+import { n } from "@/lib/format";
 
 export type SituacaoEstado = "ganha" | "perde" | "vago" | "obras";
 
@@ -30,18 +31,18 @@ export function situacaoImovel(p: Property): SituacaoImovel {
       estado: "vago",
       emoji: "🔴",
       cor: "var(--danger)",
-      titulo: `Vago — cada mês custa ${Math.round(k.totalDespesasMensais)} €`,
+      titulo: `Vago — cada mês custa ${n(Math.round(k.totalDespesasMensais))} €`,
       ...base,
     };
 
   if (k.cashflowMensal > 0)
-    return { estado: "ganha", emoji: "🟢", cor: "var(--success)", titulo: `A gerar +${Math.round(k.cashflowMensal)} €/mês`, ...base };
+    return { estado: "ganha", emoji: "🟢", cor: "var(--success)", titulo: `A gerar +${n(Math.round(k.cashflowMensal))} €/mês`, ...base };
 
   return {
     estado: "perde",
     emoji: "🟡",
     cor: "var(--warning)",
-    titulo: `Arrendado mas perde ${Math.abs(Math.round(k.cashflowMensal))} €/mês`,
+    titulo: `Arrendado mas perde ${n(Math.abs(Math.round(k.cashflowMensal)))} €/mês`,
     ...base,
   };
 }

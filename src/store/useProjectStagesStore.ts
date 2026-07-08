@@ -181,30 +181,33 @@ function seedStages(
 const C: StageStatus = "concluida";
 const EC: StageStatus = "em_curso";
 const P: StageStatus = "pendente";
-const B: StageStatus = "bloqueada";
 
+// Etapas SEMPRE coerentes com o estado real dos imóveis na carteira:
+// Arroios e Studio AL estão comprados e a render → 11/11; Príncipe Real está
+// arrendado → 11/11; o T3 de Coimbra está "em obras" → etapa 8 em curso.
 const SEED_PROJECTS: InvestmentProject[] = [
   { id: "proj-arroios", nome: "T2 Arroios", propertyId: "seed-arroios", modo: "arrendamento", createdAt: "2022-02-01" },
   { id: "proj-porto", nome: "Studio AL Baixa", propertyId: "seed-porto-al", modo: "arrendamento", createdAt: "2022-12-01" },
-  { id: "proj-coimbra", nome: "T3 Coimbra estudantes", propertyId: "seed-coimbra", modo: "arrendamento", createdAt: "2025-11-01" },
+  { id: "proj-coimbra", nome: "T3 a remodelar — Coimbra", propertyId: "seed-coimbra", modo: "arrendamento", createdAt: "2026-02-01" },
   {
     id: "proj-principe",
     nome: "Apartamento Príncipe Real",
+    propertyId: "seed-principe-real",
     modo: "arrendamento",
     fotoUrl: "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=70",
-    createdAt: "2026-04-01",
+    createdAt: "2026-01-15",
   },
 ];
 
 const SEED_STAGES: Stage[] = [
-  // T2 Arroios — 11/11 concluídas (14 meses)
+  // T2 Arroios — comprado e arrendado: 11/11 concluídas
   ...seedStages("proj-arroios", "arrendamento", [C, C, C, C, C, C, C, C, C, C, C], "2022-02-01", 38, 0),
-  // Studio Porto — 1-7 concluídas, 8 em curso (12 dias), 9-11 pendentes
-  ...seedStages("proj-porto", "arrendamento", [C, C, C, C, C, C, C, EC, P, P, P], "2022-12-01", 30, 12),
-  // T3 Coimbra — 1-9 concluídas, 10 em curso (35 dias → alerta), 11 pendente
-  ...seedStages("proj-coimbra", "arrendamento", [C, C, C, C, C, C, C, C, C, EC, P], "2025-11-01", 28, 35),
-  // Príncipe Real — sem compra: 1 concluída, 2 bloqueada, 3-4 concluídas, 5 em curso
-  ...seedStages("proj-principe", "arrendamento", [C, B, C, C, EC, P, P, P, P, P, P], "2026-04-01", 25, 18),
+  // Studio AL Baixa — comprado e a render desde 2023: 11/11 concluídas
+  ...seedStages("proj-porto", "arrendamento", [C, C, C, C, C, C, C, C, C, C, C], "2022-12-01", 30, 0),
+  // T3 Coimbra — escritura feita (abr 2026), obras a decorrer: etapa 8 em curso
+  ...seedStages("proj-coimbra", "arrendamento", [C, C, C, C, C, C, C, EC, P, P, P], "2026-02-01", 28, 50),
+  // Príncipe Real — comprado (mar 2026) e arrendado: 11/11 concluídas
+  ...seedStages("proj-principe", "arrendamento", [C, C, C, C, C, C, C, C, C, C, C], "2026-01-15", 25, 0),
 ];
 
 // ───────────────────── Store ─────────────────────
@@ -336,7 +339,28 @@ export const useProjectStagesStore = create<ProjectStagesState>()(
 
       resetSeed: () => set({ projects: SEED_PROJECTS, stages: SEED_STAGES }),
     }),
-    { name: "decogest-project-stages", version: 1 }
+    {
+      name: "decogest-project-stages",
+      version: 2,
+      // v2: etapas seed alinhadas com o estado real dos imóveis (Studio AL e
+      // Príncipe Real concluídos; T3 Coimbra em Obras). Substitui projetos/etapas
+      // seed antigos e mantém projetos criados pelo utilizador.
+      migrate: (persisted: unknown, version: number) => {
+        const state = (persisted ?? {}) as { projects?: InvestmentProject[]; stages?: Stage[] };
+        if (version < 2 && state.projects && state.stages) {
+          const seedIds = new Set(SEED_PROJECTS.map((p) => p.id));
+          state.projects = [
+            ...SEED_PROJECTS,
+            ...state.projects.filter((p) => !seedIds.has(p.id)),
+          ];
+          state.stages = [
+            ...SEED_STAGES,
+            ...state.stages.filter((st) => !seedIds.has(st.projectId)),
+          ];
+        }
+        return state as ProjectStagesState;
+      },
+    }
   )
 );
 

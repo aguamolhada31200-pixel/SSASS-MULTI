@@ -21,7 +21,7 @@ import { useListingsStore } from "@/store/useListingsStore";
 import { usePartnerRatingsStore } from "@/store/usePartnerRatingsStore";
 import { useConversationsStore } from "@/store/useConversationsStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
-import { eur, pct } from "@/lib/format";
+import { eur, pct, dataPTShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export default function InvestorProfile() {
@@ -211,7 +211,7 @@ export default function InvestorProfile() {
                 <Linha k="Track record" v={`${profile.projetosConcluidos} projetos`} />
                 {profile.taxaResposta != null && <Linha k="Responde em" v={`~${profile.respostaHoras}h`} />}
                 {profile.taxaResposta != null && <Linha k="Taxa de resposta" v={`${profile.taxaResposta}%`} />}
-                <Linha k="Membro desde" v={profile.createdAt} />
+                <Linha k="Membro desde" v={dataPTShort(profile.createdAt)} />
               </CardContent>
             </Card>
 

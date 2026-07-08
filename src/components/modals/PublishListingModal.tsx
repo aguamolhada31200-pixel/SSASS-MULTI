@@ -92,8 +92,15 @@ const schema = z
       req(!!v.valorVendaPrevisto && v.valorVendaPrevisto > 0, "valorVendaPrevisto", "Obrigatório");
     } else if (v.type === "cedencia") {
       req(!!v.valorCedencia && v.valorCedencia > 0, "valorCedencia", "Obrigatório");
-      if (v.estado === "a recuperar") {
-        // cenário com obras → o retorno depende do valor de mercado pós-obras
+      req(!!v.tipoCedencia, "tipoCedencia", "Obrigatório");
+      req(!!v.motivoCedencia, "motivoCedencia", "Obrigatório");
+      // Com obras = obra prevista > 0 OU tipo ≠ "apenas CPCV" (projeto/licença/
+      // reabilitação implicam obras à frente). "Apenas CPCV" sem obras avalia-se
+      // pelo valor de mercado ATUAL — o pós-obras não é exigido.
+      const cedComObras =
+        (Number(v.obra) || 0) > 0 ||
+        (v.tipoCedencia ? v.tipoCedencia !== "cpcv" : v.estado === "a recuperar");
+      if (cedComObras) {
         req(!!v.valorMercadoPosObras && v.valorMercadoPosObras > 0, "valorMercadoPosObras", "Obrigatório");
       } else {
         req(!!v.valorVendaPrevisto && v.valorVendaPrevisto > 0, "valorVendaPrevisto", "Obrigatório");
@@ -551,8 +558,9 @@ function CamposCedencia({
   const impostos = Number(values.impostos) || 0;
   const sinal = Number(values.sinalPagoCedente) || 0;
   const restante = Math.max(0, valorImovel - sinal);
-  const comObras = values.estado === "a recuperar";
   const obra = Number(values.obra) || 0;
+  // Com obras = obra prevista > 0 OU tipo ≠ "apenas CPCV" (mesma regra de lib/calc/rede)
+  const comObras = obra > 0 || (values.tipoCedencia ? values.tipoCedencia !== "cpcv" : values.estado === "a recuperar");
   const capitalNecessario = valorCedencia + impostos + (comObras ? obra : 0);
   const cta = valorCedencia + restante + impostos;
 
@@ -605,15 +613,21 @@ function CamposCedencia({
         </button>
       </Field>
 
+      <Num label="Valor previsto das obras (opcional — se o negócio envolve reabilitação)" reg={register("obra")} suffix="€" />
       {comObras ? (
         <>
-          <Num label="Valor previsto das obras" reg={register("obra")} suffix="€" />
           <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
           <Field label="Prazo estimado das obras (opcional)" className="sm:col-span-2">
             <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 4 meses" />
           </Field>
         </>
-      ) : null}
+      ) : (
+        <Field label=" ">
+          <p className="rounded-lg border border-line bg-bg px-3 py-2.5 text-[11px] text-muted">
+            Cedência sem obras — o lucro calcula-se pelo <strong>valor de mercado atual</strong> − CTA.
+          </p>
+        </Field>
+      )}
 
       <Field label="Capital Necessário (auto)">
         <div className="flex items-center rounded-lg border border-gold/40 bg-gold/5">
@@ -691,7 +705,8 @@ function computeCedencia(v: FormValues) {
   const obra = Number(v.obra) || 0;
   const venda = Number(v.valorVendaPrevisto) || 0; // valor de mercado atual
   const posObras = Number(v.valorMercadoPosObras) || 0;
-  const comObras = v.estado === "a recuperar";
+  // Mesma regra de lib/calc/rede: obra prevista > 0 OU tipo ≠ "apenas CPCV"
+  const comObras = obra > 0 || (v.tipoCedencia ? v.tipoCedencia !== "cpcv" : v.estado === "a recuperar");
 
   const precoAcordado = Math.max(0, valorImovel - valorNegociado);
   const restante = Math.max(0, valorImovel - sinal);
@@ -745,7 +760,7 @@ function LiveComputed({ type, v }: { type: ListingType; v: FormValues }) {
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <KpiMini label="Lucro estimado" value={eur(c.lucro)} tone={c.lucro >= 0 ? "success" : "danger"} />
-        <KpiMini label="ROI" value={pct(c.roi)} tone="gold" />
+        <KpiMini label={c.comObras ? "ROI pós-obras" : "ROI da operação"} value={pct(c.roi)} tone="gold" />
         <KpiMini label="Retorno s/ Entrada" value={pct(c.retEntrada)} tone="gold" />
         <KpiMini label="Capital Necessário" value={eur(c.capitalNecessario)} tone="gold" />
       </div>
