@@ -60,6 +60,13 @@ import {
 
 const TABS = ["Visão geral", "Inquilinos", "Contratos", "Finanças", "Obras", "Documentos", "Manutenção", "Histórico"] as const;
 
+/** "Rua X, 4.º Dto · 1250-100 Lisboa" — só junta o que existe, ignora vazios. */
+function moradaFormatada(p: Property): string {
+  const rua = [p.address, p.morada2].filter((x) => x && x.trim()).join(", ");
+  const cp = [p.codigoPostal, p.city].filter((x) => x && x.trim()).join(" ");
+  return [rua, cp].filter((x) => x && x.trim()).join(" · ") || p.city || "—";
+}
+
 export default function ImovelDetail() {
   const { id } = useParams();
   const property = usePropertiesStore((s) => s.properties.find((p) => p.id === id));
@@ -104,8 +111,13 @@ export default function ImovelDetail() {
             <Badge tone={property.status === "ocupado" ? "success" : property.status === "em_obras" ? "info" : "warning"}>
               {STATUS_LABEL[property.status]}
             </Badge>
+            {property.areaUtil ? <Badge tone="neutral">{property.areaUtil} m²</Badge> : null}
+            {property.numQuartos ? <Badge tone="neutral">{property.numQuartos} quartos</Badge> : null}
+            {property.classeEnergetica ? (
+              <Badge tone="success">Energia {property.classeEnergetica}</Badge>
+            ) : null}
           </div>
-          <p className="mt-1 truncate text-sm text-muted">{property.address}, {property.city}</p>
+          <p className="mt-1 truncate text-sm text-muted">{moradaFormatada(property)}</p>
         </div>
         <div className="flex shrink-0 gap-2">
           <Button size="sm" variant="outline" onClick={() => openPropertyForm(property.id)}>
@@ -218,6 +230,41 @@ function VisaoGeral({
         <BigKpi label="Recuperação da entrada" value={tempo} icon />
       </div>
 
+      {/* Descrição + caracterização física + nota privada */}
+      {(property.descricao || property.notaPrivada || property.areaUtil || property.numDivisoes || property.numQuartos || property.numCasasBanho || property.classeEnergetica) && (
+        <Card>
+          <CardContent>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-display text-base font-semibold text-ink">Descrição do imóvel</h3>
+              <button onClick={onEdit} className="text-sm text-secondary hover:underline">Editar →</button>
+            </div>
+            {(property.areaUtil || property.numDivisoes || property.numQuartos || property.numCasasBanho || property.classeEnergetica) && (
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {property.areaUtil ? <MiniStat label="Área útil" value={`${property.areaUtil} m²`} /> : null}
+                {property.numDivisoes ? <MiniStat label="Divisões" value={String(property.numDivisoes)} /> : null}
+                {property.numQuartos ? <MiniStat label="Quartos" value={String(property.numQuartos)} /> : null}
+                {property.numCasasBanho ? <MiniStat label="WCs" value={String(property.numCasasBanho)} /> : null}
+                {property.classeEnergetica ? <MiniStat label="Classe energética" value={property.classeEnergetica} tone="pos" /> : null}
+              </div>
+            )}
+            {property.descricao && (
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">Descrição</p>
+                <p className="whitespace-pre-line text-sm text-ink">{property.descricao}</p>
+              </div>
+            )}
+            {property.notaPrivada && (
+              <div className={cn("rounded-xl border border-gold/25 bg-gold/5 p-3", property.descricao && "mt-3")}>
+                <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-gold-dark">
+                  🔒 Nota privada · só visível para si
+                </p>
+                <p className="whitespace-pre-line text-sm text-ink">{property.notaPrivada}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPIs detalhados */}
       <Card>
         <CardContent>
@@ -321,6 +368,17 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: "pos
     <div className="rounded-lg bg-bg p-3">
       <p className="text-[11px] text-muted">{label}</p>
       <p className={cn("num mt-0.5 text-base font-bold", color)}>{value}</p>
+    </div>
+  );
+}
+
+/** Célula compacta para caracterização física (área, quartos, WCs…). */
+function MiniStat({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) {
+  const color = tone === "pos" ? "text-success" : tone === "neg" ? "text-danger" : "text-ink";
+  return (
+    <div className="rounded-lg border border-line bg-card p-2.5 text-center">
+      <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
+      <p className={cn("num mt-0.5 text-sm font-bold", color)}>{value}</p>
     </div>
   );
 }

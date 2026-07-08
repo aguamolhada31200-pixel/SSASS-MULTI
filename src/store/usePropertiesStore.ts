@@ -18,6 +18,26 @@ export function normalizePhotos(raw: unknown): PropertyPhoto[] {
   );
 }
 
+export type ClasseEnergetica = "A+" | "A" | "B" | "B-" | "C" | "D" | "E" | "F";
+export type TipoRendaProposto = "arrendamento" | "al" | "estudantes" | "curta_duracao";
+export type FrequenciaPagamento = "mensal" | "trimestral" | "semestral" | "anual";
+
+export const CLASSE_ENERGETICA: ClasseEnergetica[] = ["A+", "A", "B", "B-", "C", "D", "E", "F"];
+
+export const TIPO_RENDA_LABEL: Record<TipoRendaProposto, string> = {
+  arrendamento: "Arrendamento tradicional (NRAU)",
+  al: "Alojamento Local",
+  estudantes: "Estudantes (ano letivo)",
+  curta_duracao: "Curta duração",
+};
+
+export const FREQ_PAGAMENTO_LABEL: Record<FrequenciaPagamento, string> = {
+  mensal: "Mensal",
+  trimestral: "Trimestral",
+  semestral: "Semestral",
+  anual: "Anual",
+};
+
 export interface Property {
   id: string;
   /** userId do dono. Se omitido, assume-se o utilizador atual (retro-compat). */
@@ -34,11 +54,31 @@ export interface Property {
   prazoAnos: number;
   taxaJuro?: number; // %
   prestacaoMensal: number;
+  // A.2 Morada detalhada (todos opcionais)
+  morada2?: string;
+  codigoPostal?: string;
+  freguesia?: string;
+  concelho?: string;
+  distrito?: string;
+  pais?: string;
+  // A.3 Descrição física (todos opcionais)
+  areaUtil?: number; // m²
+  numDivisoes?: number;
+  numQuartos?: number;
+  numCasasBanho?: number;
+  classeEnergetica?: ClasseEnergetica;
+  descricao?: string;
+  notaPrivada?: string;
   // B. Rendimentos
   rendaMensal: number;
   dataInicioArrendamento?: string;
+  caucao?: number;
+  tipoRendaProposto?: TipoRendaProposto;
+  frequenciaPagamento?: FrequenciaPagamento;
+  estadiaMinimaMeses?: number;
+  estadiaMaximaMeses?: number;
   // C. Impostos
-  irsPct: number; // 5/10/25/28
+  irsPct: number; // 5/10/15/25/28
   // D. Despesas fixas
   imiAnual: number;
   seguroAnual: number;

@@ -7,17 +7,25 @@ import { useNavigate } from "react-router-dom";
 import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Trash2, Plus, Hammer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
-import { usePropertiesStore, type PropType, type PropertyPhoto } from "@/store/usePropertiesStore";
+import {
+  usePropertiesStore,
+  CLASSE_ENERGETICA,
+  TIPO_RENDA_LABEL,
+  FREQ_PAGAMENTO_LABEL,
+  type PropType,
+  type PropertyPhoto,
+  type ClasseEnergetica,
+  type TipoRendaProposto,
+  type FrequenciaPagamento,
+} from "@/store/usePropertiesStore";
 import { useObrasStore, CATEGORIA_LABEL, type ObraCategoria, type ObraEstado } from "@/store/useObrasStore";
 import { pmt } from "@/lib/calc/imt";
 import { eur } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const schema = z.object({
-  // A. Aquisição — obrigatórios: nome, cidade, tipo, valor de compra (+ renda no passo 2)
+  // A. Aquisição — obrigatórios: nome, cidade, tipo, valor de compra
   name: z.string().min(2, "Indique o nome do imóvel"),
-  address: z.string().optional().default(""),
-  city: z.string().min(2, "Indique a cidade"),
   type: z.enum(["al", "tradicional", "estudantes", "comercial"]),
   dataCompra: z.string().optional().default(""),
   valorCompra: z.coerce.number().positive("Valor de compra inválido"),
@@ -26,9 +34,31 @@ const schema = z.object({
   prazoAnos: z.coerce.number().min(0).max(60),
   taxaJuro: z.coerce.number().min(0).max(30).optional(),
   prestacaoMensal: z.coerce.number().min(0),
+  // A.2 Morada detalhada — apenas cidade é obrigatória
+  address: z.string().optional().default(""),
+  morada2: z.string().optional().default(""),
+  codigoPostal: z.string().optional().default(""),
+  freguesia: z.string().optional().default(""),
+  concelho: z.string().optional().default(""),
+  city: z.string().min(2, "Indique a cidade"),
+  distrito: z.string().optional().default(""),
+  pais: z.string().optional().default("Portugal"),
+  // A.3 Descrição física — todos opcionais
+  areaUtil: z.coerce.number().min(0).optional(),
+  numDivisoes: z.coerce.number().min(0).optional(),
+  numQuartos: z.coerce.number().min(0).optional(),
+  numCasasBanho: z.coerce.number().min(0).optional(),
+  classeEnergetica: z.enum(["A+", "A", "B", "B-", "C", "D", "E", "F"]).optional(),
+  descricao: z.string().optional().default(""),
+  notaPrivada: z.string().optional().default(""),
   // B. Rendimentos
   rendaMensal: z.coerce.number().min(0),
   dataInicioArrendamento: z.string().optional(),
+  caucao: z.coerce.number().min(0).optional(),
+  tipoRendaProposto: z.enum(["arrendamento", "al", "estudantes", "curta_duracao"]).optional(),
+  frequenciaPagamento: z.enum(["mensal", "trimestral", "semestral", "anual"]).optional(),
+  estadiaMinimaMeses: z.coerce.number().min(0).optional(),
+  estadiaMaximaMeses: z.coerce.number().min(0).optional(),
   // C. Impostos
   irsPct: z.coerce.number().min(0).max(100),
   // D. Despesas
@@ -44,8 +74,6 @@ type FormValues = z.infer<typeof schema>;
 
 const EMPTY: FormValues = {
   name: "",
-  address: "",
-  city: "",
   type: "tradicional",
   dataCompra: "",
   valorCompra: 0,
@@ -54,8 +82,28 @@ const EMPTY: FormValues = {
   prazoAnos: 30,
   taxaJuro: undefined,
   prestacaoMensal: 0,
+  address: "",
+  morada2: "",
+  codigoPostal: "",
+  freguesia: "",
+  concelho: "",
+  city: "",
+  distrito: "",
+  pais: "Portugal",
+  areaUtil: undefined,
+  numDivisoes: undefined,
+  numQuartos: undefined,
+  numCasasBanho: undefined,
+  classeEnergetica: undefined,
+  descricao: "",
+  notaPrivada: "",
   rendaMensal: 0,
   dataInicioArrendamento: "",
+  caucao: undefined,
+  tipoRendaProposto: undefined,
+  frequenciaPagamento: "mensal",
+  estadiaMinimaMeses: undefined,
+  estadiaMaximaMeses: undefined,
   irsPct: 25,
   imiAnual: 0,
   seguroAnual: 0,
@@ -91,14 +139,22 @@ const TYPES: { value: PropType; label: string }[] = [
   { value: "comercial", label: "Comercial" },
 ];
 
-const STEPS = ["Aquisição", "Rendimentos", "Impostos", "Despesas", "Fotos", "Obras"];
+const STEPS = ["Aquisição", "Morada", "Descrição", "Rendimentos", "Encargos", "Fotos", "Obras"];
 
 const STEP_FIELDS: (keyof FormValues)[][] = [
-  ["name", "address", "city", "type", "dataCompra", "valorCompra", "entrada", "financiado", "prazoAnos", "taxaJuro", "prestacaoMensal"],
-  ["rendaMensal", "dataInicioArrendamento"],
-  ["irsPct"],
-  ["imiAnual", "seguroAnual", "condominioMensal", "outrasMensais"],
+  // 0 · Aquisição — identidade + valores
+  ["name", "type", "dataCompra", "valorCompra", "entrada", "financiado", "prazoAnos", "taxaJuro", "prestacaoMensal"],
+  // 1 · Morada — cidade obrigatória
+  ["address", "morada2", "codigoPostal", "freguesia", "concelho", "city", "distrito", "pais"],
+  // 2 · Descrição física + notas
+  ["areaUtil", "numDivisoes", "numQuartos", "numCasasBanho", "classeEnergetica", "descricao", "notaPrivada"],
+  // 3 · Rendimentos
+  ["rendaMensal", "dataInicioArrendamento", "caucao", "tipoRendaProposto", "frequenciaPagamento", "estadiaMinimaMeses", "estadiaMaximaMeses"],
+  // 4 · Encargos (IRS + despesas fixas)
+  ["irsPct", "imiAnual", "seguroAnual", "condominioMensal", "outrasMensais"],
+  // 5 · Fotos
   ["photos"],
+  // 6 · Obras — nada a validar
   [],
 ];
 
@@ -146,6 +202,8 @@ export function PropertyFormModal() {
 
   const photos = watch("photos") ?? [];
   const irsPct = watch("irsPct");
+  const classeEnergetica = watch("classeEnergetica");
+  const tipoRendaProposto = watch("tipoRendaProposto");
 
   const next = async () => {
     const ok = await trigger(STEP_FIELDS[step]);
@@ -245,7 +303,7 @@ export function PropertyFormModal() {
       onMouseDown={closePropertyForm}
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-2xl sm:rounded-2xl"
+        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-2xl sm:rounded-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -276,16 +334,12 @@ export function PropertyFormModal() {
         {/* Body */}
         <form onSubmit={handleSubmit(onValid)} className="flex min-h-0 flex-1 flex-col">
           <div className="grid flex-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2">
+            {/* ───────── 0 · Aquisição ───────── */}
             {step === 0 && (
               <>
+                <SectionTitle>Identificação e valores</SectionTitle>
                 <Field label="Nome do imóvel" error={errors.name?.message} className="sm:col-span-2">
                   <input {...register("name")} placeholder="Ex.: T2 Arroios" className={inputCls} />
-                </Field>
-                <Field label="Morada (opcional)" error={errors.address?.message} className="sm:col-span-2">
-                  <input {...register("address")} placeholder="Rua, número" className={inputCls} />
-                </Field>
-                <Field label="Cidade" error={errors.city?.message}>
-                  <input {...register("city")} placeholder="Lisboa" className={inputCls} />
                 </Field>
                 <Field label="Tipo">
                   <select {...register("type")} className={inputCls}>
@@ -314,12 +368,129 @@ export function PropertyFormModal() {
               </>
             )}
 
+            {/* ───────── 1 · Morada ───────── */}
             {step === 1 && (
               <>
+                <SectionTitle>Morada do imóvel</SectionTitle>
+                <Field label="Morada" error={errors.address?.message} className="sm:col-span-2">
+                  <input {...register("address")} placeholder="Rua, avenida, número" className={inputCls} />
+                </Field>
+                <Field label="Morada 2 (opcional)" className="sm:col-span-2">
+                  <input {...register("morada2")} placeholder="Andar, porta, apartamento" className={inputCls} />
+                </Field>
+                <Field label="Código postal (opcional)">
+                  <input {...register("codigoPostal")} placeholder="1250-100" className={inputCls} />
+                </Field>
+                <Field label="Cidade" error={errors.city?.message}>
+                  <input {...register("city")} placeholder="Lisboa" className={inputCls} />
+                </Field>
+                <Field label="Freguesia (opcional)">
+                  <input {...register("freguesia")} placeholder="Ex.: Santo António" className={inputCls} />
+                </Field>
+                <Field label="Concelho (opcional)">
+                  <input {...register("concelho")} placeholder="Ex.: Lisboa" className={inputCls} />
+                </Field>
+                <Field label="Distrito (opcional)">
+                  <input {...register("distrito")} placeholder="Ex.: Lisboa" className={inputCls} />
+                </Field>
+                <Field label="País">
+                  <input {...register("pais")} placeholder="Portugal" className={inputCls} />
+                </Field>
+                <p className="text-[11px] text-muted sm:col-span-2">
+                  Estes dados são usados no cabeçalho de contratos PDF e para associar o imóvel a uma zona/mercado.
+                </p>
+              </>
+            )}
+
+            {/* ───────── 2 · Descrição ───────── */}
+            {step === 2 && (
+              <>
+                <SectionTitle>Características físicas</SectionTitle>
+                <Num label="Área útil (m² · opcional)" reg={register("areaUtil")} suffix="m²" />
+                <Num label="Nº de divisões (opcional)" reg={register("numDivisoes")} suffix="" />
+                <Num label="Nº de quartos (opcional)" reg={register("numQuartos")} suffix="" />
+                <Num label="Casas de banho (opcional)" reg={register("numCasasBanho")} suffix="" />
+                <Field label="Classe energética (opcional)" className="sm:col-span-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setValue("classeEnergetica", undefined, { shouldDirty: true })}
+                      className={cn(
+                        "rounded-lg border px-3 py-1.5 text-sm",
+                        !classeEnergetica ? "border-primary bg-accent text-primary" : "border-line text-muted hover:bg-accent"
+                      )}
+                    >
+                      —
+                    </button>
+                    {CLASSE_ENERGETICA.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setValue("classeEnergetica", c, { shouldDirty: true })}
+                        className={cn(
+                          "rounded-lg border px-3 py-1.5 text-sm font-medium",
+                          classeEnergetica === c ? "border-primary bg-accent text-primary" : "border-line text-muted hover:bg-accent"
+                        )}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <SectionTitle className="mt-2">Descrição</SectionTitle>
+                <Field label="Descrição do imóvel (opcional)" className="sm:col-span-2">
+                  <textarea
+                    {...register("descricao")}
+                    rows={3}
+                    placeholder="Tipo, disposição, conforto, características específicas — usado no contrato de arrendamento."
+                    className={cn(inputCls, "h-auto min-h-[80px] py-2 leading-relaxed")}
+                  />
+                </Field>
+                <Field label="Nota privada (opcional · só visível para si)" className="sm:col-span-2">
+                  <textarea
+                    {...register("notaPrivada")}
+                    rows={2}
+                    placeholder="Anotações internas: pontos de atenção, contactos úteis, código do porteiro…"
+                    className={cn(inputCls, "h-auto min-h-[64px] py-2 leading-relaxed")}
+                  />
+                </Field>
+              </>
+            )}
+
+            {/* ───────── 3 · Rendimentos ───────── */}
+            {step === 3 && (
+              <>
+                <SectionTitle>Renda e caução</SectionTitle>
                 <Num label="Renda mensal total" reg={register("rendaMensal")} suffix="€" />
+                <Num label="Caução (opcional)" reg={register("caucao")} suffix="€" />
+                <Field label="Tipo de renda proposto (opcional)" className="sm:col-span-2">
+                  <select {...register("tipoRendaProposto")} className={inputCls}>
+                    <option value="">— Selecionar —</option>
+                    {(Object.keys(TIPO_RENDA_LABEL) as TipoRendaProposto[]).map((k) => (
+                      <option key={k} value={k}>{TIPO_RENDA_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Frequência de pagamento">
+                  <select {...register("frequenciaPagamento")} className={inputCls}>
+                    {(Object.keys(FREQ_PAGAMENTO_LABEL) as FrequenciaPagamento[]).map((k) => (
+                      <option key={k} value={k}>{FREQ_PAGAMENTO_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </Field>
                 <Field label="Início do arrendamento (opcional)">
                   <input type="date" {...register("dataInicioArrendamento")} className={inputCls} />
                 </Field>
+
+                {(tipoRendaProposto === "al" || tipoRendaProposto === "curta_duracao") && (
+                  <>
+                    <SectionTitle className="mt-2">Duração da estadia</SectionTitle>
+                    <Num label="Estadia mínima (opcional)" reg={register("estadiaMinimaMeses")} suffix="meses" />
+                    <Num label="Estadia máxima (opcional)" reg={register("estadiaMaximaMeses")} suffix="meses" />
+                  </>
+                )}
+
                 <p className="text-xs text-muted sm:col-span-2">
                   O imóvel fica <strong>Disponível</strong> até associar um inquilino — passa a
                   «Ocupado» automaticamente quando o fizer (tab Inquilinos do imóvel).
@@ -327,35 +498,36 @@ export function PropertyFormModal() {
               </>
             )}
 
-            {step === 2 && (
-              <div className="sm:col-span-2">
-                <Field label="Percentagem de IRS sobre o arrendamento (opcional · default 25% — taxa especial cat. F; 15/10/5% para contratos longos)" error={errors.irsPct?.message}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {[5, 10, 15, 25, 28].map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setValue("irsPct", v, { shouldValidate: true })}
-                        className={cn(
-                          "rounded-lg border px-4 py-2 text-sm",
-                          Number(irsPct) === v ? "border-primary bg-accent text-primary" : "border-line text-muted hover:bg-accent"
-                        )}
-                      >
-                        {v}%
-                      </button>
-                    ))}
-                    <div className="flex items-center rounded-lg border border-line bg-card">
-                      <span className="px-2 text-xs text-muted">Outro</span>
-                      <input type="number" step="1" {...register("irsPct")} className="h-9 w-16 bg-transparent px-2 text-sm outline-none" />
-                      <span className="px-2 text-sm text-muted">%</span>
-                    </div>
-                  </div>
-                </Field>
-              </div>
-            )}
-
-            {step === 3 && (
+            {/* ───────── 4 · Encargos (IRS + despesas) ───────── */}
+            {step === 4 && (
               <>
+                <SectionTitle>IRS sobre o arrendamento</SectionTitle>
+                <div className="sm:col-span-2">
+                  <Field label="Percentagem de IRS (opcional · default 25% — taxa especial cat. F; 15/10/5% para contratos longos)" error={errors.irsPct?.message}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[5, 10, 15, 25, 28].map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setValue("irsPct", v, { shouldValidate: true })}
+                          className={cn(
+                            "rounded-lg border px-4 py-2 text-sm",
+                            Number(irsPct) === v ? "border-primary bg-accent text-primary" : "border-line text-muted hover:bg-accent"
+                          )}
+                        >
+                          {v}%
+                        </button>
+                      ))}
+                      <div className="flex items-center rounded-lg border border-line bg-card">
+                        <span className="px-2 text-xs text-muted">Outro</span>
+                        <input type="number" step="1" {...register("irsPct")} className="h-9 w-16 bg-transparent px-2 text-sm outline-none" />
+                        <span className="px-2 text-sm text-muted">%</span>
+                      </div>
+                    </div>
+                  </Field>
+                </div>
+
+                <SectionTitle className="mt-2">Despesas fixas do imóvel</SectionTitle>
                 <Num label="IMI anual (opcional)" reg={register("imiAnual")} suffix="€" />
                 <Num label="Seguro anual (opcional)" reg={register("seguroAnual")} suffix="€" />
                 <Num label="Condomínio mensal (opcional)" reg={register("condominioMensal")} suffix="€" />
@@ -363,7 +535,8 @@ export function PropertyFormModal() {
               </>
             )}
 
-            {step === 4 && (
+            {/* ───────── 5 · Fotos ───────── */}
+            {step === 5 && (
               <div className="sm:col-span-2">
                 <PhotoStep
                   photos={photos}
@@ -377,7 +550,8 @@ export function PropertyFormModal() {
               </div>
             )}
 
-            {step === 5 && (
+            {/* ───────── 6 · Obras ───────── */}
+            {step === 6 && (
               <div className="sm:col-span-2 space-y-4">
                 {/* Toggle */}
                 <button
@@ -512,6 +686,19 @@ export function PropertyFormModal() {
 
 const inputCls =
   "h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary";
+
+/** Título discreto de secção dentro de um passo — separa blocos temáticos sem quebrar o grid. */
+function SectionTitle({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("sm:col-span-2 flex items-center gap-2 pt-1", className)}>
+      <span className="h-1 w-1 rounded-full bg-gold" />
+      <p className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-dark">
+        {children}
+      </p>
+      <span className="h-px flex-1 bg-line" />
+    </div>
+  );
+}
 
 function Field({
   label,
