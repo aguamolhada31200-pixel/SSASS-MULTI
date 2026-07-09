@@ -62,13 +62,38 @@ export function roiReab(l: Listing): number {
 }
 
 /**
- * Retorno sobre a entrada (reabilitação):
- * Lucro / Capital próprio investido (capital procurado) × 100.
+ * Percentagem que cabe ao PARCEIRO (quem entra com capital) — primeiro número
+ * do split ("50 / 50" → 50; "60 / 40" → 60). Se o split não está definido,
+ * assume 100 (sem partilha → o parceiro fica com o lucro todo).
+ */
+export function splitParceiroPct(l: Pick<Listing, "split">): number {
+  if (!l.split || !l.split.trim()) return 100;
+  const m = l.split.match(/(\d+(?:[.,]\d+)?)/);
+  if (!m) return 100;
+  const v = parseFloat(m[1].replace(",", "."));
+  return isFinite(v) && v > 0 && v <= 100 ? v : 100;
+}
+
+/**
+ * Lucro estimado do PARCEIRO = Lucro estimado pós-obras × (Split ÷ 100).
+ * Representa o que efetivamente cabe ao investidor externo depois de partilhar
+ * com o dono do anúncio.
+ */
+export function lucroParceiroReab(l: Listing): number {
+  return lucroReab(l) * (splitParceiroPct(l) / 100);
+}
+
+/**
+ * Retorno sobre a Entrada % = (Lucro do PARCEIRO ÷ Capital Procurado) × 100.
+ * Bug corrigido: usava o lucro TOTAL do projeto, ignorando o split — o retorno
+ * vinha inflacionado quando o autor ficava com metade.
+ * Exemplo: Lucro 42.000 · Split 50 · Capital 25.000
+ *   → Lucro parceiro = 21.000 → Retorno = 84% (era 168% antes).
  */
 export function retornoEntradaReab(l: Listing): number {
   const cap = l.capitalProcurado ?? 0;
   if (cap <= 0) return 0;
-  return (lucroReab(l) / cap) * 100;
+  return (lucroParceiroReab(l) / cap) * 100;
 }
 
 /**

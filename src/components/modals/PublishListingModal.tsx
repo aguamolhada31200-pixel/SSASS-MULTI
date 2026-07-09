@@ -11,10 +11,12 @@ import {
   useListingsStore,
   ENERGY_SCALE,
   TIPO_CEDENCIA_LABEL,
+  TIPO_IMOVEL_LABEL,
   type ListingType,
   type Tipologia,
   type EstadoImovel,
   type TipoCedencia,
+  type TipoImovel,
 } from "@/store/useListingsStore";
 import { CURRENT_USER_ID } from "@/store/useProfilesStore";
 import {
@@ -41,6 +43,7 @@ const schema = z
     city: z.string().min(2, "Indique a cidade"),
     exactAddress: z.string().optional().default(""),
     tipologia: z.enum(["T0", "T1", "T2", "T3", "T4", "T5+"]),
+    tipoImovel: z.enum(["apartamento", "moradia", "predio", "quinta", "loja", "casa", "casa_ferias"]).optional(),
     areaUtil: z.coerce.number().optional(),
     estado: z.enum(["a recuperar", "bom", "renovado", "novo"]),
     galleryUrls: z.array(z.object({ url: z.string(), legenda: z.string().optional() })).default([]),
@@ -123,6 +126,7 @@ const EMPTY: FormValues = {
   city: "",
   exactAddress: "",
   tipologia: "T2",
+  tipoImovel: undefined,
   areaUtil: 0,
   estado: "a recuperar",
   galleryUrls: [],
@@ -134,9 +138,9 @@ const EMPTY: FormValues = {
 };
 
 const TYPE_CARDS: { type: ListingType; label: string; desc: string; icon: typeof Hammer }[] = [
-  { type: "reabilitacao", label: "Parceiros para Reabilitação", desc: "Procuro capital para comprar, recuperar e revender com margem.", icon: Hammer },
+  { type: "reabilitacao", label: "Parceiros para Reabilitação (Fix e Flip)", desc: "Procuro capital para comprar, recuperar e revender com margem.", icon: Hammer },
   { type: "cedencia", label: "Parceiros para Cedência de Posição", desc: "Cedo uma posição de CPCV antes da escritura.", icon: Handshake },
-  { type: "arrendamento", label: "Oportunidades para Arrendamento", desc: "Imóvel pronto a arrendar, para rendimento passivo.", icon: KeyRound },
+  { type: "arrendamento", label: "Oportunidades para Arrendamento (Buy e Hold)", desc: "Imóvel pronto a arrendar, para rendimento passivo.", icon: KeyRound },
 ];
 
 export function PublishListingModal() {
@@ -200,6 +204,7 @@ export function PublishListingModal() {
       city: values.city,
       exactAddress: values.exactAddress,
       tipologia: values.tipologia as Tipologia,
+      tipoImovel: values.tipoImovel,
       areaUtil: values.areaUtil,
       estado: values.estado as EstadoImovel,
       coverImageUrl,
@@ -300,7 +305,7 @@ export function PublishListingModal() {
         return;
       }
     }
-    setStep((s) => Math.min(s + 1, 2));
+    setStep((s) => Math.min(s + 1, 3));
   };
 
   return (
@@ -312,13 +317,13 @@ export function PublishListingModal() {
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="font-display text-lg font-semibold text-ink">{editingId ? "Editar anúncio" : "Publicar anúncio"}</h2>
-            <p className="text-xs text-muted">Passo {step + 1} de 3 · {["Categoria", "Detalhes", "Contacto e pré-visualização"][step]}</p>
+            <p className="text-xs text-muted">Passo {step + 1} de 4 · {["Categoria", "Detalhes", "Contacto", "Resumo e confirmação"][step]}</p>
           </div>
           <button onClick={closeListingForm} className="text-muted hover:text-ink"><X size={20} /></button>
         </div>
 
         <div className="flex gap-1.5 px-5 pt-4">
-          {["Categoria", "Detalhes", "Publicar"].map((s, i) => (
+          {["Categoria", "Detalhes", "Contacto", "Resumo"].map((s, i) => (
             <div key={s} className="flex-1">
               <div className={cn("h-1.5 rounded-full transition-colors", i <= step ? "bg-gold" : "bg-line")} />
               <p className={cn("mt-1 text-[10px]", i === step ? "font-medium text-gold-dark" : "text-muted")}>{s}</p>
@@ -389,6 +394,14 @@ export function PublishListingModal() {
                   <Field label="Morada exata (opcional · só partilhada após contacto)" error={errors.exactAddress?.message} className="sm:col-span-2">
                     <input {...register("exactAddress")} className={inputCls} placeholder="Rua, número, andar" />
                   </Field>
+                  <Field label="Tipo de imóvel">
+                    <select {...register("tipoImovel")} className={inputCls}>
+                      <option value="">— Selecionar —</option>
+                      {(Object.keys(TIPO_IMOVEL_LABEL) as TipoImovel[]).map((k) => (
+                        <option key={k} value={k}>{TIPO_IMOVEL_LABEL[k]}</option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field label="Tipologia">
                     <select {...register("tipologia")} className={inputCls}>
                       {(["T0", "T1", "T2", "T3", "T4", "T5+"] as Tipologia[]).map((t) => <option key={t}>{t}</option>)}
@@ -452,30 +465,38 @@ export function PublishListingModal() {
               </div>
             )}
 
-            {/* STEP 2 — contacto + preview */}
+            {/* STEP 2 — contacto e visibilidade */}
             {step === 2 && (
               <div className="space-y-5">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Preferência de contacto">
-                    <select {...register("contactPreference")} className={inputCls}>
-                      <option value="mensagem">Mensagem na plataforma</option>
-                      <option value="email">Email</option>
-                      <option value="telefone">Telefone</option>
-                    </select>
-                  </Field>
-                  <Field label="Visibilidade">
-                    <select {...register("visibility")} className={inputCls}>
-                      <option value="public">Público (todos)</option>
-                      <option value="verified">Só investidores verificados</option>
-                    </select>
-                  </Field>
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Como quer ser contactado?</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Preferência de contacto">
+                      <select {...register("contactPreference")} className={inputCls}>
+                        <option value="mensagem">Mensagem na plataforma</option>
+                        <option value="email">Email</option>
+                        <option value="telefone">Telefone</option>
+                      </select>
+                    </Field>
+                    <Field label="Visibilidade">
+                      <select {...register("visibility")} className={inputCls}>
+                        <option value="public">Público (todos)</option>
+                        <option value="verified">Só investidores verificados</option>
+                      </select>
+                    </Field>
+                  </div>
                 </div>
 
-                <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Pré-visualização do anúncio</p>
-                  <PreviewCard v={valoresLive} />
+                <div className="rounded-xl border border-line bg-bg/60 p-4 text-xs text-muted">
+                  <p className="font-medium text-ink">💡 O passo seguinte é um resumo para confirmar tudo antes de publicar.</p>
+                  <p className="mt-1">A morada exata só é partilhada depois do investidor manifestar interesse.</p>
                 </div>
               </div>
+            )}
+
+            {/* STEP 3 — RESUMO E CONFIRMAÇÃO */}
+            {step === 3 && (
+              <SummaryStep v={valoresLive} />
             )}
           </div>
 
@@ -483,13 +504,13 @@ export function PublishListingModal() {
             <Button type="button" variant="ghost" onClick={() => (step === 0 ? closeListingForm() : setStep((s) => s - 1))}>
               <ChevronLeft size={16} /> {step === 0 ? "Cancelar" : "Voltar"}
             </Button>
-            {step < 2 ? (
+            {step < 3 ? (
               <Button type="button" variant="gold" onClick={next}>
                 Próximo <ChevronRight size={16} />
               </Button>
             ) : (
-              <Button type="submit" variant="gold">
-                <Check size={16} /> {editingId ? "Guardar alterações" : "Publicar anúncio"}
+              <Button type="submit" variant="gold" size="lg">
+                <Check size={16} /> {editingId ? "Guardar alterações" : "Publicar anúncio ✨"}
               </Button>
             )}
           </div>
@@ -810,14 +831,161 @@ function PreviewCard({ v }: { v: FormValues }) {
       <div className="relative h-36 bg-accent">
         {cover ? <img src={cover} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-muted">Sem foto</div>}
         <span className="absolute left-3 top-3 rounded-full bg-card/90 px-2.5 py-1 text-xs font-medium text-secondary backdrop-blur">
-          {v.type === "reabilitacao" ? "Reabilitação" : v.type === "cedencia" ? "Cedência de Posição" : "Arrendamento"}
+          {v.type === "reabilitacao" ? "Reabilitação (Fix e Flip)" : v.type === "cedencia" ? "Cedência de Posição" : "Arrendamento (Buy e Hold)"}
         </span>
       </div>
       <div className="p-4">
         <h3 className="font-display text-base font-semibold text-ink">{v.title || "Título do anúncio"}</h3>
-        <p className="text-xs text-muted">{v.city || "Cidade"} · {v.tipologia} · {Number(v.areaUtil) || 0} m² · {v.estado}</p>
+        <p className="text-xs text-muted">{v.city || "Cidade"} · {v.tipoImovel ? TIPO_IMOVEL_LABEL[v.tipoImovel as TipoImovel] + " · " : ""}{v.tipologia} · {Number(v.areaUtil) || 0} m² · {v.estado}</p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Passo 4 — Resumo antes de publicar. Mostra ao autor todos os campos que
+ * preencheu, agrupados por secção, para uma última confirmação antes de o
+ * anúncio ir para a Rede. É intencionalmente longo — melhor confirmar aqui
+ * do que corrigir depois de publicado.
+ */
+function SummaryStep({ v }: { v: FormValues }) {
+  const tipoLabel =
+    v.type === "reabilitacao"
+      ? "Reabilitação (Fix e Flip)"
+      : v.type === "cedencia"
+        ? "Cedência de Posição"
+        : "Arrendamento (Buy e Hold)";
+
+  const fotosCount = (v.galleryUrls ?? []).length;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-gold/30 bg-gradient-to-br from-gold/5 to-card p-4">
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-gold-dark">Pronto a publicar?</p>
+        <p className="text-sm text-muted">Reveja todos os campos abaixo. Depois de publicar, o anúncio aparece imediatamente na Rede — pode sempre editá-lo mais tarde na sua área.</p>
+      </div>
+
+      <SummarySection title="Anúncio">
+        <SummaryRow k="Categoria" v={tipoLabel} />
+        <SummaryRow k="Título" v={v.title || "—"} />
+        {v.description && <SummaryRow k="Descrição" v={v.description} multiline />}
+      </SummarySection>
+
+      <SummarySection title="Localização e imóvel">
+        <SummaryRow k="Distrito" v={v.district || "—"} />
+        <SummaryRow k="Concelho" v={v.city || "—"} />
+        {v.exactAddress && <SummaryRow k="Morada exata (privada)" v={v.exactAddress} />}
+        {v.tipoImovel && <SummaryRow k="Tipo de imóvel" v={TIPO_IMOVEL_LABEL[v.tipoImovel as TipoImovel]} />}
+        <SummaryRow k="Tipologia" v={v.tipologia} />
+        {(Number(v.areaUtil) || 0) > 0 && <SummaryRow k="Área útil" v={`${Number(v.areaUtil)} m²`} />}
+        <SummaryRow k="Estado" v={v.estado} />
+        <SummaryRow k="Certificado energético" v={v.energyCertificate ?? "—"} />
+      </SummarySection>
+
+      {v.type === "reabilitacao" && (
+        <SummaryFinanceReab v={v} />
+      )}
+      {v.type === "cedencia" && (
+        <SummaryFinanceCedencia v={v} />
+      )}
+      {v.type === "arrendamento" && (
+        <SummaryFinanceArrendamento v={v} />
+      )}
+
+      <SummarySection title="Contacto e visibilidade">
+        <SummaryRow
+          k="Preferência de contacto"
+          v={v.contactPreference === "mensagem" ? "Mensagem na plataforma" : v.contactPreference === "email" ? "Email" : "Telefone"}
+        />
+        <SummaryRow
+          k="Visibilidade"
+          v={v.visibility === "public" ? "Público (todos)" : "Só investidores verificados"}
+        />
+      </SummarySection>
+
+      <SummarySection title="Multimédia">
+        <SummaryRow k="Fotos" v={fotosCount > 0 ? `${fotosCount} carregada${fotosCount === 1 ? "" : "s"} · a 1.ª é a capa` : "Sem fotos (recomenda-se pelo menos 1)"} />
+        {v.floorPlanUrl && <SummaryRow k="Planta" v="Anexada" />}
+      </SummarySection>
+
+      <div>
+        <p className="mb-2 text-xs font-medium uppercase tracking-widest text-muted">Pré-visualização do card</p>
+        <PreviewCard v={v} />
+      </div>
+    </div>
+  );
+}
+
+function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-line bg-card overflow-hidden">
+      <div className="border-b border-line bg-bg/60 px-4 py-2.5">
+        <p className="font-display text-[11px] font-semibold uppercase tracking-widest text-gold-dark">{title}</p>
+      </div>
+      <div className="divide-y divide-line/60">{children}</div>
+    </div>
+  );
+}
+
+function SummaryRow({ k, v, multiline }: { k: string; v: string | number; multiline?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-4 py-2.5">
+      <span className="text-xs text-muted">{k}</span>
+      <span className={cn("text-sm font-medium text-ink text-right", multiline ? "max-w-md whitespace-pre-line" : "truncate")}>{v}</span>
+    </div>
+  );
+}
+
+function SummaryFinanceReab({ v }: { v: FormValues }) {
+  const valorImovel = Number(v.valorImovel) || 0;
+  const orcamento = Number(v.orcamentoObras) || 0;
+  const capital = Number(v.capitalProcurado) || 0;
+  const venda = Number(v.valorVendaPrevisto) || 0;
+  return (
+    <SummarySection title="Números da operação — Reabilitação (Fix e Flip)">
+      {valorImovel > 0 && <SummaryRow k="Valor do imóvel (CPCV)" v={eur(valorImovel)} />}
+      {orcamento > 0 && <SummaryRow k="Orçamento das obras" v={eur(orcamento)} />}
+      {capital > 0 && <SummaryRow k="Capital procurado" v={eur(capital)} />}
+      {venda > 0 && <SummaryRow k="Valor de venda previsto (pós-obras)" v={eur(venda)} />}
+      {v.split && <SummaryRow k="Split da parceria" v={v.split} />}
+      {v.prazoObras && <SummaryRow k="Prazo das obras" v={v.prazoObras} />}
+      {v.tempoAteVenda && <SummaryRow k="Tempo até venda" v={v.tempoAteVenda} />}
+    </SummarySection>
+  );
+}
+
+function SummaryFinanceCedencia({ v }: { v: FormValues }) {
+  const valorImovel = Number(v.valorImovel) || 0;
+  const valorCedencia = Number(v.valorCedencia) || 0;
+  const impostos = Number(v.impostos) || 0;
+  const obra = Number(v.obra) || 0;
+  const mercadoAtual = Number(v.valorVendaPrevisto) || 0;
+  const posObras = Number(v.valorMercadoPosObras) || 0;
+  return (
+    <SummarySection title="Números da operação — Cedência de Posição">
+      {v.tipoCedencia && <SummaryRow k="Tipo de cedência" v={TIPO_CEDENCIA_LABEL[v.tipoCedencia]} />}
+      {valorImovel > 0 && <SummaryRow k="Valor do imóvel (CPCV)" v={eur(valorImovel)} />}
+      {valorCedencia > 0 && <SummaryRow k="Valor da cedência" v={eur(valorCedencia)} />}
+      {impostos > 0 && <SummaryRow k="Impostos (IMT + IS + Registo)" v={eur(impostos)} />}
+      {obra > 0 && <SummaryRow k="Valor previsto das obras" v={eur(obra)} />}
+      {mercadoAtual > 0 && <SummaryRow k="Valor de mercado atual" v={eur(mercadoAtual)} />}
+      {posObras > 0 && <SummaryRow k="Valor de mercado pós-obras" v={eur(posObras)} />}
+      {v.motivoCedencia && <SummaryRow k="Motivo" v={v.motivoCedencia.replace("_", " ")} />}
+      {v.terminoCpcv && <SummaryRow k="Término do CPCV" v={v.terminoCpcv} />}
+    </SummarySection>
+  );
+}
+
+function SummaryFinanceArrendamento({ v }: { v: FormValues }) {
+  const preco = Number(v.precoImovel) || 0;
+  const capital = Number(v.capitalNecessario) || 0;
+  const renda = Number(v.rendaMensal) || 0;
+  return (
+    <SummarySection title="Números da operação — Arrendamento (Buy e Hold)">
+      {preco > 0 && <SummaryRow k="Preço do imóvel" v={eur(preco)} />}
+      {capital > 0 && <SummaryRow k="Capital necessário" v={eur(capital)} />}
+      {renda > 0 && <SummaryRow k="Renda mensal" v={eur(renda)} />}
+    </SummarySection>
   );
 }
 

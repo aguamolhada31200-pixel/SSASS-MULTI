@@ -202,7 +202,7 @@ export default function RedeInvestidores() {
               </Chip>
               {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
                 <Chip key={t} ativo={categoria === t} onClick={() => setCategoria(t)}>
-                  {t === "reabilitacao" ? "Parceiros para Reabilitação" : t === "cedencia" ? "Cedência de Posição" : "Arrendamento"}
+                  {TYPE_LABEL_SHORT[t]}
                 </Chip>
               ))}
             </div>

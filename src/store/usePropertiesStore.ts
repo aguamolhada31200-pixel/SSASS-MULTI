@@ -18,6 +18,29 @@ export function normalizePhotos(raw: unknown): PropertyPhoto[] {
   );
 }
 
+/**
+ * Categoria estrutural do imóvel (independente do modelo de negócio).
+ * Usado tanto na ficha do imóvel como nos anúncios da Rede.
+ */
+export type TipoImovel =
+  | "apartamento"
+  | "moradia"
+  | "predio"
+  | "quinta"
+  | "loja"
+  | "casa"
+  | "casa_ferias";
+
+export const TIPO_IMOVEL_LABEL: Record<TipoImovel, string> = {
+  apartamento: "Apartamento",
+  moradia: "Moradia",
+  predio: "Prédio",
+  quinta: "Quinta / Herdade",
+  loja: "Loja",
+  casa: "Casa",
+  casa_ferias: "Casa de férias",
+};
+
 export type ClasseEnergetica = "A+" | "A" | "B" | "B-" | "C" | "D" | "E" | "F";
 export type TipoRendaProposto = "arrendamento" | "al" | "estudantes" | "curta_duracao";
 export type FrequenciaPagamento = "mensal" | "trimestral" | "semestral" | "anual";
@@ -62,6 +85,7 @@ export interface Property {
   distrito?: string;
   pais?: string;
   // A.3 Descrição física (todos opcionais)
+  tipoImovel?: TipoImovel;
   areaUtil?: number; // m²
   numDivisoes?: number;
   numQuartos?: number;

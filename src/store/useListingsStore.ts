@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CURRENT_USER_ID } from "./useProfilesStore";
+import type { TipoImovel } from "./usePropertiesStore";
+export { TIPO_IMOVEL_LABEL, type TipoImovel } from "./usePropertiesStore";
 
 export type ListingType = "reabilitacao" | "cedencia" | "arrendamento";
 export type EstadoAnuncio = "ativo" | "financiado" | "concluido";
@@ -37,6 +39,7 @@ export interface Listing {
   city: string;
   exactAddress: string;
   tipologia: Tipologia;
+  tipoImovel?: TipoImovel;
   areaUtil: number;
   estado: EstadoImovel;
   coverImageUrl: string;
@@ -105,15 +108,15 @@ export type ListingInput = Omit<
 >;
 
 export const TYPE_LABEL: Record<ListingType, string> = {
-  reabilitacao: "Parceiros para Reabilitação",
+  reabilitacao: "Parceiros para Reabilitação (Fix e Flip)",
   cedencia: "Parceiros para Cedência de Posição",
-  arrendamento: "Oportunidades para Arrendamento",
+  arrendamento: "Oportunidades para Arrendamento (Buy e Hold)",
 };
 
 export const TYPE_LABEL_SHORT: Record<ListingType, string> = {
-  reabilitacao: "Reabilitação",
+  reabilitacao: "Reabilitação (Fix e Flip)",
   cedencia: "Cedência de Posição",
-  arrendamento: "Arrendamento",
+  arrendamento: "Arrendamento (Buy e Hold)",
 };
 
 export const ESTADO_ANUNCIO_LABEL: Record<EstadoAnuncio, string> = {

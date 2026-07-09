@@ -10,11 +10,13 @@ import { useModalStore } from "@/store/useModalStore";
 import {
   usePropertiesStore,
   CLASSE_ENERGETICA,
+  TIPO_IMOVEL_LABEL,
   TIPO_RENDA_LABEL,
   FREQ_PAGAMENTO_LABEL,
   type PropType,
   type PropertyPhoto,
   type ClasseEnergetica,
+  type TipoImovel,
   type TipoRendaProposto,
   type FrequenciaPagamento,
 } from "@/store/usePropertiesStore";
@@ -44,6 +46,7 @@ const schema = z.object({
   distrito: z.string().optional().default(""),
   pais: z.string().optional().default("Portugal"),
   // A.3 Descrição física — todos opcionais
+  tipoImovel: z.enum(["apartamento", "moradia", "predio", "quinta", "loja", "casa", "casa_ferias"]).optional(),
   areaUtil: z.coerce.number().min(0).optional(),
   numDivisoes: z.coerce.number().min(0).optional(),
   numQuartos: z.coerce.number().min(0).optional(),
@@ -90,6 +93,7 @@ const EMPTY: FormValues = {
   city: "",
   distrito: "",
   pais: "Portugal",
+  tipoImovel: undefined,
   areaUtil: undefined,
   numDivisoes: undefined,
   numQuartos: undefined,
@@ -147,7 +151,7 @@ const STEP_FIELDS: (keyof FormValues)[][] = [
   // 1 · Morada — cidade obrigatória
   ["address", "morada2", "codigoPostal", "freguesia", "concelho", "city", "distrito", "pais"],
   // 2 · Descrição física + notas
-  ["areaUtil", "numDivisoes", "numQuartos", "numCasasBanho", "classeEnergetica", "descricao", "notaPrivada"],
+  ["tipoImovel", "areaUtil", "numDivisoes", "numQuartos", "numCasasBanho", "classeEnergetica", "descricao", "notaPrivada"],
   // 3 · Rendimentos
   ["rendaMensal", "dataInicioArrendamento", "caucao", "tipoRendaProposto", "frequenciaPagamento", "estadiaMinimaMeses", "estadiaMaximaMeses"],
   // 4 · Encargos (IRS + despesas fixas)
@@ -406,6 +410,14 @@ export function PropertyFormModal() {
             {step === 2 && (
               <>
                 <SectionTitle>Características físicas</SectionTitle>
+                <Field label="Tipo de imóvel (opcional)" className="sm:col-span-2">
+                  <select {...register("tipoImovel")} className={inputCls}>
+                    <option value="">— Selecionar —</option>
+                    {(Object.keys(TIPO_IMOVEL_LABEL) as TipoImovel[]).map((k) => (
+                      <option key={k} value={k}>{TIPO_IMOVEL_LABEL[k]}</option>
+                    ))}
+                  </select>
+                </Field>
                 <Num label="Área útil (m² · opcional)" reg={register("areaUtil")} suffix="m²" />
                 <Num label="Nº de divisões (opcional)" reg={register("numDivisoes")} suffix="" />
                 <Num label="Nº de quartos (opcional)" reg={register("numQuartos")} suffix="" />
