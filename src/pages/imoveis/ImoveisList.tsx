@@ -27,6 +27,15 @@ const statusTone: Record<PropStatus, "success" | "warning" | "info" | "neutral">
 };
 
 const typeGradient: Record<PropType, string> = {
+  // Categoria física
+  apartamento: "from-[#8B5E3C] to-[#5C3D2E]",
+  moradia: "from-[#A47C5B] to-[#6B4C3B]",
+  predio: "from-[#5C3D2E] to-[#2E1A0E]",
+  quinta: "from-[#4A7C59] to-[#2E4A34]",
+  loja: "from-[#C17E2A] to-[#7A4E1A]",
+  casa: "from-[#B08560] to-[#6B4C3B]",
+  casa_ferias: "from-[#E8C77E] to-[#B08A45]",
+  // Modo de exploração (legado)
   tradicional: "from-[#8B5E3C] to-[#5C3D2E]",
   al: "from-[#C8A664] to-[#9B7F3F]",
   estudantes: "from-[#9B7F3F] to-[#5C3D2E]",

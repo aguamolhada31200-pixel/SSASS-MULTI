@@ -1,7 +1,25 @@
 ﻿import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type PropType = "al" | "tradicional" | "estudantes" | "comercial";
+/**
+ * Categoria do imóvel. Une o modo de exploração legado (tradicional / AL /
+ * estudantes / comercial — usado internamente para retro-compat com dados já
+ * criados) com a categoria física pedida pelo utilizador (apartamento, moradia,
+ * prédio, quinta/herdade, loja, casa, casa de férias).
+ * O AL fica no tipo por retro-compat mas já não aparece no dropdown de escolha.
+ */
+export type PropType =
+  | "apartamento"
+  | "moradia"
+  | "predio"
+  | "quinta"
+  | "loja"
+  | "casa"
+  | "casa_ferias"
+  | "tradicional"
+  | "estudantes"
+  | "comercial"
+  | "al";
 export type PropStatus = "ocupado" | "disponivel" | "em_obras" | "inativo";
 
 /** Foto de imóvel com legenda opcional. */
@@ -116,10 +134,17 @@ export interface Property {
 }
 
 export const PROP_TYPE_LABEL: Record<PropType, string> = {
-  al: "Alojamento Local",
+  apartamento: "Apartamento",
+  moradia: "Moradia",
+  predio: "Prédio",
+  quinta: "Quinta / Herdade",
+  loja: "Loja",
+  casa: "Casa",
+  casa_ferias: "Casa de férias",
   tradicional: "Tradicional",
   estudantes: "Estudantes",
   comercial: "Comercial",
+  al: "Alojamento Local",
 };
 
 export const STATUS_LABEL: Record<PropStatus, string> = {

@@ -28,7 +28,19 @@ import { cn } from "@/lib/utils";
 const schema = z.object({
   // A. Aquisição — obrigatórios: nome, cidade, tipo, valor de compra
   name: z.string().min(2, "Indique o nome do imóvel"),
-  type: z.enum(["al", "tradicional", "estudantes", "comercial"]),
+  type: z.enum([
+    "apartamento",
+    "moradia",
+    "predio",
+    "quinta",
+    "loja",
+    "casa",
+    "casa_ferias",
+    "tradicional",
+    "estudantes",
+    "comercial",
+    "al",
+  ]),
   dataCompra: z.string().optional().default(""),
   valorCompra: z.coerce.number().positive("Valor de compra inválido"),
   entrada: z.coerce.number().min(0),
@@ -77,7 +89,7 @@ type FormValues = z.infer<typeof schema>;
 
 const EMPTY: FormValues = {
   name: "",
-  type: "tradicional",
+  type: "apartamento",
   dataCompra: "",
   valorCompra: 0,
   entrada: 0,
@@ -136,12 +148,21 @@ const EMPTY_OBRA: ObraFormData = {
   estado: "por_iniciar",
 };
 
-// Nota: Alojamento Local NÃO aparece aqui — é uma modalidade de exploração,
-// não uma categoria de imóvel. Quem quiser marcar como AL, indica-o no passo
-// Rendimentos → "Tipo de renda proposto = Alojamento Local".
-// Mantemos "al" no PropType do store para retro-compatibilidade com imóveis
-// já criados antes desta mudança.
-const TYPES: { value: PropType; label: string }[] = [
+// Categoria física do imóvel (padrão dos portais imobiliários) — o que o
+// utilizador espera ver ao classificar o imóvel. Alojamento Local continua
+// fora deste dropdown por ser uma modalidade de exploração (fica em Rendimentos
+// → "Tipo de renda proposto"). "al" no PropType existe só por retro-compat.
+const TYPES_FISICOS: { value: PropType; label: string }[] = [
+  { value: "apartamento", label: "Apartamento" },
+  { value: "moradia", label: "Moradia" },
+  { value: "predio", label: "Prédio" },
+  { value: "quinta", label: "Quinta / Herdade" },
+  { value: "loja", label: "Loja" },
+  { value: "casa", label: "Casa" },
+  { value: "casa_ferias", label: "Casa de férias" },
+];
+
+const TYPES_EXPLORACAO: { value: PropType; label: string }[] = [
   { value: "tradicional", label: "Tradicional" },
   { value: "estudantes", label: "Estudantes" },
   { value: "comercial", label: "Comercial" },
@@ -351,9 +372,16 @@ export function PropertyFormModal() {
                 </Field>
                 <Field label="Tipo">
                   <select {...register("type")} className={inputCls}>
-                    {TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
+                    <optgroup label="Categoria do imóvel">
+                      {TYPES_FISICOS.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Modo de exploração">
+                      {TYPES_EXPLORACAO.map((t) => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </optgroup>
                   </select>
                 </Field>
                 <Field label="Data de compra (opcional)" error={errors.dataCompra?.message}>
