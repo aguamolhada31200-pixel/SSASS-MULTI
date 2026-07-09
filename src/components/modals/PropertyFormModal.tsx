@@ -136,9 +136,13 @@ const EMPTY_OBRA: ObraFormData = {
   estado: "por_iniciar",
 };
 
+// Nota: Alojamento Local NÃO aparece aqui — é uma modalidade de exploração,
+// não uma categoria de imóvel. Quem quiser marcar como AL, indica-o no passo
+// Rendimentos → "Tipo de renda proposto = Alojamento Local".
+// Mantemos "al" no PropType do store para retro-compatibilidade com imóveis
+// já criados antes desta mudança.
 const TYPES: { value: PropType; label: string }[] = [
   { value: "tradicional", label: "Tradicional" },
-  { value: "al", label: "Alojamento Local" },
   { value: "estudantes", label: "Estudantes" },
   { value: "comercial", label: "Comercial" },
 ];
