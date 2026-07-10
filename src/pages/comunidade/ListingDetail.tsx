@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Lightbox } from "@/components/Lightbox";
 import { Stars } from "@/components/rede/Stars";
-import { useListingsStore, ENERGY_SCALE, TYPE_LABEL_SHORT, MOTIVO_LABEL, ESTADO_ANUNCIO_LABEL, TIPO_CEDENCIA_LABEL } from "@/store/useListingsStore";
+import { useListingsStore, ENERGY_SCALE, TYPE_LABEL_SHORT, MOTIVO_LABEL, ESTADO_ANUNCIO_LABEL, TIPO_CEDENCIA_LABEL, TIPO_IMOVEL_LABEL } from "@/store/useListingsStore";
 import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { useSavedStore } from "@/store/useSavedStore";
 import { useInterestsStore } from "@/store/useInterestsStore";
@@ -35,7 +35,6 @@ import {
   roiReab,
   lucroReab,
   lucroParceiroReab,
-  splitParceiroPct,
   ctaReab,
   impostosReab,
   valorMercadoAtualReab,
@@ -418,14 +417,16 @@ function CorpoReab({ listing }: { listing: L }) {
   const roi = roiReab(listing);
   const lucroParceiro = lucroParceiroReab(listing);
   const retEntrada = retornoEntradaReab(listing);
-  const splitPct = splitParceiroPct(listing);
   const uplift = mercadoAtual > 0 ? ((mercadoPos - mercadoAtual) / mercadoAtual) * 100 : 0;
   const capitalProcurado = listing.capitalProcurado ?? 0;
 
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div className="grid grid-cols-3 gap-3">
+        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
+          {listing.tipoImovel && (
+            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
+          )}
           <MetricCard label="Tipologia" value={listing.tipologia} />
           <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
           <MetricCard label="Estado" value={listing.estado} />
@@ -497,20 +498,6 @@ function CorpoReab({ listing }: { listing: L }) {
             <MetricCard label="Lucro estimado do parceiro" value={eur(lucroParceiro)} tone={lucroParceiro >= 0 ? "success" : "danger"} highlighted />
             <MetricCard label="Retorno sobre a entrada" value={pct(retEntrada)} tone="gold" highlighted />
           </div>
-
-          {listing.split && capitalProcurado > 0 && (
-            <div className="mt-4 rounded-xl border border-line bg-bg/60 p-3 text-xs text-muted">
-              <p className="mb-1 font-semibold uppercase tracking-wider text-gold-dark">Como se calcula</p>
-              <p>
-                <span className="text-ink">Lucro do parceiro</span> = Lucro pós-obras {eur(lucro)} × {splitPct}% =
-                <strong className="num text-ink"> {eur(lucroParceiro)}</strong>
-              </p>
-              <p>
-                <span className="text-ink">Retorno s/ entrada</span> = {eur(lucroParceiro)} ÷ {eur(capitalProcurado)} × 100 =
-                <strong className="num text-ink"> {pct(retEntrada)}</strong>
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
     </>
@@ -532,7 +519,10 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div className="grid grid-cols-3 gap-3">
+        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
+          {listing.tipoImovel && (
+            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
+          )}
           <MetricCard label="Tipologia" value={listing.tipologia} />
           <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
           <MetricCard label="Estado" value={listing.estado} />
@@ -672,7 +662,10 @@ function CorpoArrendamento({ listing }: { listing: L }) {
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div className="grid grid-cols-3 gap-3">
+        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
+          {listing.tipoImovel && (
+            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
+          )}
           <MetricCard label="Tipologia" value={listing.tipologia} />
           <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
           <MetricCard label="Estado" value={listing.estado} />
