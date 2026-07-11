@@ -3,11 +3,15 @@ import {
   FileBarChart,
   Wrench,
   Images,
+  Smartphone,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import ImoveisList from "@/pages/imoveis/ImoveisList";
 import ImovelDetail from "@/pages/imoveis/ImovelDetail";
+import ArrendamentosList from "@/pages/imoveis/ArrendamentosList";
+import NovoArrendamento from "@/pages/imoveis/NovoArrendamento";
+import ArrendamentoDetail from "@/pages/imoveis/ArrendamentoDetail";
 import RedeInvestidores from "@/pages/comunidade/RedeInvestidores";
 import ListingDetail from "@/pages/comunidade/ListingDetail";
 import InvestorProfile from "@/pages/comunidade/InvestorProfile";
@@ -40,6 +44,27 @@ export default function App() {
 
         {/* Imóveis */}
         <Route path="imoveis" element={<ImoveisList />} />
+        {/* Arrendamentos (antes de :id — rotas estáticas têm prioridade) */}
+        <Route path="imoveis/arrendamentos" element={<ArrendamentosList />} />
+        <Route path="imoveis/arrendamentos/novo" element={<NovoArrendamento />} />
+        <Route path="imoveis/arrendamentos/:id" element={<ArrendamentoDetail />} />
+        <Route path="imoveis/arrendamentos/:id/editar" element={<NovoArrendamento />} />
+        <Route
+          path="imoveis/acesso-digital"
+          element={
+            <Placeholder
+              title="Acesso Digital"
+              subtitle="Fechaduras inteligentes e entrada sem chaves"
+              icon={Smartphone}
+              fase="Fase 2 — Operação avançada"
+              bullets={[
+                "Códigos de acesso temporários por inquilino/estadia",
+                "Registo de entradas · integração com fechaduras smart",
+                "Partilha segura com equipas de limpeza e manutenção",
+              ]}
+            />
+          }
+        />
         <Route path="imoveis/:id" element={<ImovelDetail />} />
 
         {/* Comunidade */}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, Plus, Search, MapPin } from "lucide-react";
+import { Building2, Plus, Search, MapPin, KeyRound } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/Button";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useExampleData } from "@/store/useExampleData";
 import { useModalStore } from "@/store/useModalStore";
 import { usePropertiesStore, PROP_TYPE_LABEL, STATUS_LABEL, type PropStatus, type PropType } from "@/store/usePropertiesStore";
+import { useArrendamentosStore, ocupaImovel } from "@/store/useArrendamentosStore";
 import { situacaoImovel } from "@/lib/property";
 import { eur, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -45,9 +46,12 @@ const typeGradient: Record<PropType, string> = {
 export default function ImoveisList() {
   const { enabled } = useExampleData();
   const properties = usePropertiesStore((s) => s.properties);
+  const arrendamentos = useArrendamentosStore((s) => s.arrendamentos);
   const openPropertyForm = useModalStore((s) => s.openPropertyForm);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("todos");
   const [q, setQ] = useState("");
+
+  const idsArrendados = new Set(arrendamentos.filter(ocupaImovel).map((a) => a.propertyId));
 
   const list = enabled ? properties : [];
   const filtered = list.filter(
@@ -150,6 +154,11 @@ export default function ImoveisList() {
                       <span>{s.emoji}</span>
                       <span className="truncate font-medium">{s.titulo}</span>
                     </div>
+                    {!idsArrendados.has(p.id) && p.status !== "em_obras" && p.status !== "inativo" && (
+                      <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-gold/10 px-2 py-1 text-[11px] font-medium text-gold-dark">
+                        <KeyRound size={12} /> Sem arrendamento — criar →
+                      </p>
+                    )}
                   </div>
                 </Link>
               );

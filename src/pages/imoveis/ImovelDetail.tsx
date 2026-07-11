@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Building2, Pencil, Trash2, ArrowLeft, TriangleAlert, Clock, Plus, Hammer } from "lucide-react";
+import { Building2, Pencil, Trash2, ArrowLeft, TriangleAlert, Clock, Plus, Hammer, KeyRound } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -34,6 +34,8 @@ import { useDocumentsStore, DOC_CATEGORIAS, type DocCategoria } from "@/store/us
 import { useMaintenanceStore, PRIORIDADE_LABEL, ESTADO_PEDIDO_LABEL, type Prioridade, type EstadoPedido } from "@/store/useMaintenanceStore";
 import { useTransactionsStore } from "@/store/useTransactionsStore";
 import { useModalStore } from "@/store/useModalStore";
+import { useArrendamentosStore, rendaRecorrente, ocupaImovel } from "@/store/useArrendamentosStore";
+import { EstadoBadge, TipoBadge, InquilinoAvatares } from "@/components/arrendamentos/shared";
 import { computeImovel, gerarAlertas, type AlertaNivel } from "@/lib/calc/imovel";
 import { FinancasTab } from "./FinancasTab";
 import { PropertyGallery } from "./PropertyGallery";
@@ -58,7 +60,7 @@ import {
   PauseCircle,
 } from "lucide-react";
 
-const TABS = ["Visão geral", "Inquilinos", "Contratos", "Finanças", "Obras", "Documentos", "Manutenção", "Histórico"] as const;
+const TABS = ["Visão geral", "Inquilinos", "Arrendamentos", "Contratos", "Finanças", "Obras", "Documentos", "Manutenção", "Histórico"] as const;
 
 /** "Rua X, 4.º Dto · 1250-100 Lisboa" — só junta o que existe, ignora vazios. */
 function moradaFormatada(p: Property): string {
@@ -153,6 +155,7 @@ export default function ImovelDetail() {
           <VisaoGeral property={property} k={k} alertas={alertas} situacao={s} onEdit={() => openPropertyForm(property.id)} />
         )}
         {tab === "Inquilinos" && <ImovelInquilinosTab propertyId={property.id} />}
+        {tab === "Arrendamentos" && <ImovelArrendamentosTab propertyId={property.id} />}
         {tab === "Contratos" && <ImovelContratosTab propertyId={property.id} />}
         {tab === "Finanças" && <FinancasTab property={property} />}
         {tab === "Obras" && <ImovelObrasTab propertyId={property.id} />}
@@ -178,6 +181,10 @@ function VisaoGeral({
   situacao: ReturnType<typeof situacaoImovel>;
   onEdit: () => void;
 }) {
+  const navigate = useNavigate();
+  const arrendamentoAtivo = useArrendamentosStore((s) =>
+    s.arrendamentos.find((a) => a.propertyId === property.id && ocupaImovel(a))
+  );
   const tempo =
     k.tempoRecuperacao === null ? "Não recupera" : `${n1(k.tempoRecuperacao)} anos`;
 
@@ -204,6 +211,24 @@ function VisaoGeral({
 
   return (
     <div className="space-y-5">
+      {/* CTA — imóvel sem arrendamento ativo */}
+      {!arrendamentoAtivo && property.status !== "inativo" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gold/40 bg-gold/5 p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15">
+              <KeyRound size={22} className="text-gold-dark" />
+            </span>
+            <div>
+              <p className="font-display text-base font-semibold text-ink">Este imóvel ainda não tem arrendamento</p>
+              <p className="text-xs text-muted">A renda pertence ao arrendamento — crie um para começar a registar rendas, caução e alertas.</p>
+            </div>
+          </div>
+          <Button variant="gold" onClick={() => navigate(`/imoveis/arrendamentos/novo?imovel=${property.id}`)}>
+            <Plus size={16} /> Criar arrendamento
+          </Button>
+        </div>
+      )}
+
       {/* Situação Financeira — veredito */}
       <div
         className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-5"
@@ -802,6 +827,66 @@ export function ImovelInquilinosTab({ propertyId }: { propertyId: string }) {
               )}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────── Arrendamentos ─────────────────────────
+
+function ImovelArrendamentosTab({ propertyId }: { propertyId: string }) {
+  const arrendamentos = useArrendamentosStore((s) => s.arrendamentos.filter((a) => a.propertyId === propertyId));
+  const navigate = useNavigate();
+  const criarUrl = `/imoveis/arrendamentos/novo?imovel=${propertyId}`;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted">{arrendamentos.length} arrendamento(s) neste imóvel</p>
+        <Button size="sm" onClick={() => navigate(criarUrl)}>
+          <Plus size={14} /> Criar arrendamento
+        </Button>
+      </div>
+
+      {arrendamentos.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted">
+            <KeyRound size={28} className="mx-auto mb-2" />
+            <p className="text-sm">Este imóvel ainda não tem arrendamento.</p>
+            <Button size="sm" variant="gold" className="mt-3" onClick={() => navigate(criarUrl)}>
+              <Plus size={14} /> Criar arrendamento
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {arrendamentos.map((a) => (
+            <Link
+              key={a.id}
+              to={`/imoveis/arrendamentos/${a.id}`}
+              className="block rounded-xl border border-line bg-card p-4 shadow-sm transition-colors hover:bg-bg"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="num text-sm font-semibold text-ink">{a.identificador}</span>
+                    <EstadoBadge a={a} />
+                    <TipoBadge tipo={a.tipo} />
+                  </div>
+                  <div className="mt-1.5"><InquilinoAvatares tenantIds={a.inquilinos} showNames /></div>
+                </div>
+                <p className="num text-base font-bold text-primary">{eur(rendaRecorrente(a))}/mês</p>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MiniKpi label="Início" value={a.dataInicio ? dataPT(a.dataInicio) : "—"} />
+                <MiniKpi label="Fim" value={a.dataFim ? dataPT(a.dataFim) : "Sem termo"} />
+                <MiniKpi label="Caução" value={a.caucao ? eur(a.caucao) : "—"} />
+                <MiniKpi label="Dia pgto." value={`Dia ${a.diaPagamento}`} />
+              </div>
+              <p className="mt-2 text-sm text-secondary">Ver arrendamento →</p>
+            </Link>
+          ))}
         </div>
       )}
     </div>

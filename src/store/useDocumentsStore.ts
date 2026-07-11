@@ -61,6 +61,7 @@ export interface PropertyDocument {
   propertyId?: string;
   tenantId?: string;
   contractId?: string;
+  arrendamentoId?: string;
   projectId?: string;
   obraId?: string;
   // Organização / metadados
@@ -478,7 +479,7 @@ interface DocumentsState {
   setCategoria: (id: string, categoria: DocCategoria) => void;
   associate: (
     id: string,
-    assoc: Pick<PropertyDocument, "propertyId" | "tenantId" | "contractId" | "projectId" | "obraId">
+    assoc: Pick<PropertyDocument, "propertyId" | "tenantId" | "contractId" | "arrendamentoId" | "projectId" | "obraId">
   ) => void;
   // Pastas personalizadas
   addFolder: (nome: string) => void;

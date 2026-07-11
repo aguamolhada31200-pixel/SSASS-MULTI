@@ -26,9 +26,12 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { useTenantsStore, STATUS_LABEL, TIPO_LABEL, urgenciaContrato, diasAteFim, type StatusInquilino, type TipoInquilino } from "@/store/useTenantsStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { useContractsStore } from "@/store/useContractsStore";
+import { useArrendamentosStore, rendaRecorrente } from "@/store/useArrendamentosStore";
 import { useTransactionsStore } from "@/store/useTransactionsStore";
 import { useModalStore } from "@/store/useModalStore";
+import { EstadoBadge } from "@/components/arrendamentos/shared";
 import { eur, dataPT } from "@/lib/format";
+import { KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = ["Perfil", "Contratos", "Pagamentos", "Documentos", "Histórico"] as const;
@@ -208,9 +211,10 @@ function ContratosTab({ tenantId }: { tenantId: string }) {
     tenant.propertyId ? s.properties.find((p) => p.id === tenant.propertyId) : undefined
   );
   const contract = useContractsStore((s) => s.contracts.find((c) => c.primaryTenantId === tenantId));
+  const arrendamentos = useArrendamentosStore((s) => s.arrendamentos.filter((a) => a.inquilinos.includes(tenantId)));
   const openContractDoc = useModalStore((s) => s.openContractDoc);
 
-  if (!contract && !tenant.contractId && !tenant.dataInicioContrato) {
+  if (arrendamentos.length === 0 && !contract && !tenant.contractId && !tenant.dataInicioContrato) {
     return (
       <Card>
         <CardContent className="py-12 text-center text-muted">
@@ -227,7 +231,42 @@ function ContratosTab({ tenantId }: { tenantId: string }) {
   const u = urgenciaContrato(tenant.dataFimContrato);
 
   return (
-    <Card>
+    <div className="space-y-4">
+      {arrendamentos.length > 0 && (
+        <Card>
+          <CardContent>
+            <SectionHeader title="Arrendamentos" />
+            <div className="space-y-2">
+              {arrendamentos.map((a) => (
+                <Link
+                  key={a.id}
+                  to={`/imoveis/arrendamentos/${a.id}`}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-line bg-bg/40 p-3 transition-colors hover:bg-accent/40"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent">
+                      <KeyRound size={16} className="text-secondary" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="num truncate text-sm font-medium text-ink">{a.identificador}</p>
+                      <p className="text-[11px] text-muted">
+                        {a.dataInicio ? dataPT(a.dataInicio) : "—"}{a.dataFim ? ` → ${dataPT(a.dataFim)}` : " · sem termo"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="num text-sm font-bold text-primary">{eur(rendaRecorrente(a))}</span>
+                    <EstadoBadge a={a} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {(contract || tenant.contractId || tenant.dataInicioContrato) && (
+      <Card>
       <CardContent>
         <SectionHeader title="Contratos associados" />
         <div className="rounded-2xl border border-line p-4">
@@ -274,6 +313,8 @@ function ContratosTab({ tenantId }: { tenantId: string }) {
         </div>
       </CardContent>
     </Card>
+      )}
+    </div>
   );
 }
 

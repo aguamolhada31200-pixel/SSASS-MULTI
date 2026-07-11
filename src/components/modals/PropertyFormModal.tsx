@@ -505,9 +505,7 @@ export function PropertyFormModal() {
             {/* ───────── 3 · Rendimentos ───────── */}
             {step === 3 && (
               <>
-                <SectionTitle>Renda e caução</SectionTitle>
-                <Num label="Renda mensal total" reg={register("rendaMensal")} suffix="€" />
-                <Num label="Caução (opcional)" reg={register("caucao")} suffix="€" />
+                <SectionTitle>Proposta de renda</SectionTitle>
                 <Field label="Tipo de renda proposto (opcional)" className="sm:col-span-2">
                   <select {...register("tipoRendaProposto")} className={inputCls}>
                     <option value="">— Selecionar —</option>
@@ -523,9 +521,6 @@ export function PropertyFormModal() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Início do arrendamento (opcional)">
-                  <input type="date" {...register("dataInicioArrendamento")} className={inputCls} />
-                </Field>
 
                 {(tipoRendaProposto === "al" || tipoRendaProposto === "curta_duracao") && (
                   <>
@@ -535,10 +530,17 @@ export function PropertyFormModal() {
                   </>
                 )}
 
-                <p className="text-xs text-muted sm:col-span-2">
-                  O imóvel fica <strong>Disponível</strong> até associar um inquilino — passa a
-                  «Ocupado» automaticamente quando o fizer (tab Inquilinos do imóvel).
-                </p>
+                <div className="sm:col-span-2 rounded-xl border border-gold/25 bg-gold/5 p-3">
+                  <p className="text-xs font-medium text-ink">
+                    💡 A <strong>renda</strong>, a <strong>caução</strong> e as datas do contrato
+                    deixaram de se definir aqui.
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted">
+                    Um imóvel acabado de comprar não tem renda. A renda pertence ao <strong>arrendamento</strong>:
+                    depois de guardar, crie um em <strong>Imóveis › Arrendamentos</strong> e o imóvel
+                    passa automaticamente a «Arrendado».
+                  </p>
+                </div>
               </>
             )}
 
