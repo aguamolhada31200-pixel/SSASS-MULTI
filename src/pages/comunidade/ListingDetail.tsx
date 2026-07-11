@@ -493,9 +493,6 @@ function CorpoReab({ listing }: { listing: L }) {
       <Card className="border-gold/30 bg-gradient-to-br from-gold/[0.04] to-card">
         <CardContent>
           <SectionHeader title="Rentabilidade do investidor" />
-          <p className="mb-4 text-sm text-muted">
-            O que efetivamente cabe a <strong>si, como investidor</strong> que entra com o capital — depois de aplicar a divisão do lucro com o promotor.
-          </p>
 
           {/* Divisão do lucro — deixa claro QUAL a percentagem do investidor */}
           <SplitParceria invPct={invPct} promPct={promPct} capital={capitalProcurado} lucroParceiro={lucroParceiro} />
