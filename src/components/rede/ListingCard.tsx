@@ -16,6 +16,7 @@ import { eur, pct } from "@/lib/format";
 import {
   investimentoTotalReab,
   roiReab,
+  splitParceiroPct,
   ctaCedencia,
   lucroCedencia,
   roiCedencia,
@@ -196,7 +197,7 @@ function buildCardMetrics(l: Listing): CMetric[] {
     return [
       { k: "Capital procurado", v: eur(l.capitalProcurado ?? 0), dot: "bg-gold", color: "text-gold-dark" },
       { k: "ROI esperado", v: pct(roiReab(l)), dot: "bg-success", color: "text-success" },
-      { k: "Split", v: l.split ?? "—", dot: "bg-secondary", color: "text-ink" },
+      { k: "A sua parte", v: `${splitParceiroPct(l)}% do lucro`, dot: "bg-gold", color: "text-gold-dark" },
       { k: "Até venda", v: l.tempoAteVenda ?? "—", dot: "bg-muted", color: "text-ink" },
     ];
   }

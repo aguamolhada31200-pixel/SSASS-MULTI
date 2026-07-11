@@ -62,9 +62,10 @@ export function roiReab(l: Listing): number {
 }
 
 /**
- * Percentagem que cabe ao PARCEIRO (quem entra com capital) — primeiro número
- * do split ("50 / 50" → 50; "60 / 40" → 60). Se o split não está definido,
- * assume 100 (sem partilha → o parceiro fica com o lucro todo).
+ * CONVENÇÃO DO SPLIT: o formato é "investidor / promotor" e o **primeiro número
+ * é sempre a parte do PARCEIRO investidor** (quem entra com o capital).
+ * Ex.: "60 / 40" → investidor 60%, promotor (dono do anúncio) 40%.
+ * Sem split definido → assume 100 (sem partilha, o investidor fica com o lucro todo).
  */
 export function splitParceiroPct(l: Pick<Listing, "split">): number {
   if (!l.split || !l.split.trim()) return 100;
@@ -72,6 +73,11 @@ export function splitParceiroPct(l: Pick<Listing, "split">): number {
   if (!m) return 100;
   const v = parseFloat(m[1].replace(",", "."));
   return isFinite(v) && v > 0 && v <= 100 ? v : 100;
+}
+
+/** Parte do lucro que fica para o PROMOTOR (dono do anúncio) = 100 − parte do investidor. */
+export function splitPromotorPct(l: Pick<Listing, "split">): number {
+  return Math.max(0, 100 - splitParceiroPct(l));
 }
 
 /**

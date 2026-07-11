@@ -19,6 +19,7 @@ import {
   Lock,
   ShieldCheck,
   Maximize2,
+  Handshake,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -35,6 +36,8 @@ import {
   roiReab,
   lucroReab,
   lucroParceiroReab,
+  splitParceiroPct,
+  splitPromotorPct,
   ctaReab,
   impostosReab,
   valorMercadoAtualReab,
@@ -419,6 +422,8 @@ function CorpoReab({ listing }: { listing: L }) {
   const retEntrada = retornoEntradaReab(listing);
   const uplift = mercadoAtual > 0 ? ((mercadoPos - mercadoAtual) / mercadoAtual) * 100 : 0;
   const capitalProcurado = listing.capitalProcurado ?? 0;
+  const invPct = splitParceiroPct(listing);
+  const promPct = splitPromotorPct(listing);
 
   return (
     <>
@@ -489,18 +494,60 @@ function CorpoReab({ listing }: { listing: L }) {
         <CardContent>
           <SectionHeader title="Rentabilidade do investidor" />
           <p className="mb-4 text-sm text-muted">
-            O que efetivamente cabe a quem entra com capital, depois de aplicar o split da parceria.
+            O que efetivamente cabe a <strong>si, como investidor</strong> que entra com o capital — depois de aplicar a divisão do lucro com o promotor.
           </p>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* Divisão do lucro — deixa claro QUAL a percentagem do investidor */}
+          <SplitParceria invPct={invPct} promPct={promPct} capital={capitalProcurado} lucroParceiro={lucroParceiro} />
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricCard label="Capital procurado" value={eur(capitalProcurado)} tone="gold" highlighted />
-            <MetricCard label="Split da parceria" value={listing.split ?? "—"} tone="gold" />
-            <MetricCard label="Lucro estimado do parceiro" value={eur(lucroParceiro)} tone={lucroParceiro >= 0 ? "success" : "danger"} highlighted />
+            <MetricCard label={`A sua parte do lucro (${invPct}%)`} value={eur(lucroParceiro)} tone={lucroParceiro >= 0 ? "success" : "danger"} highlighted />
             <MetricCard label="Retorno sobre a entrada" value={pct(retEntrada)} tone="gold" highlighted />
           </div>
         </CardContent>
       </Card>
     </>
+  );
+}
+
+/**
+ * Barra de divisão do lucro da parceria — mostra sem ambiguidade a fatia do
+ * INVESTIDOR (dourado) vs a do promotor. Responde a "qual é a minha percentagem?".
+ */
+function SplitParceria({ invPct, promPct, capital, lucroParceiro }: { invPct: number; promPct: number; capital: number; lucroParceiro: number }) {
+  return (
+    <div className="rounded-2xl border border-gold/30 bg-bg/40 p-4">
+      <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+        <Handshake size={13} className="text-gold-dark" /> Divisão do lucro da parceria
+      </p>
+      <div className="flex h-10 overflow-hidden rounded-lg border border-line">
+        <div
+          className="flex items-center justify-center bg-gold text-xs font-bold text-sidebar"
+          style={{ width: `${Math.max(invPct, 6)}%` }}
+        >
+          {invPct >= 16 ? `${invPct}%` : ""}
+        </div>
+        <div
+          className="flex items-center justify-center bg-accent text-xs font-semibold text-muted"
+          style={{ width: `${Math.max(promPct, 6)}%` }}
+        >
+          {promPct >= 16 ? `${promPct}%` : ""}
+        </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="flex items-center gap-1.5 font-semibold text-gold-dark">
+          <span className="h-2.5 w-2.5 rounded-full bg-gold" /> Você · investidor <span className="num">{invPct}%</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-muted">
+          <span className="h-2.5 w-2.5 rounded-full border border-line bg-accent" /> Promotor · dono do negócio <span className="num">{promPct}%</span>
+        </span>
+      </div>
+      <p className="mt-2.5 border-t border-line/60 pt-2.5 text-[13px] text-ink">
+        Entra com <span className="num font-semibold">{eur(capital)}</span> e fica com <span className="font-semibold text-gold-dark">{invPct}%</span> do lucro →{" "}
+        <span className="num font-bold text-success">{eur(lucroParceiro)}</span> para si.
+      </p>
+    </div>
   );
 }
 

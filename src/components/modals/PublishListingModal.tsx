@@ -135,6 +135,7 @@ const EMPTY: FormValues = {
   contactPreference: "mensagem",
   visibility: "public",
   temObra: false,
+  split: "50 / 50",
 };
 
 const TYPE_CARDS: { type: ListingType; label: string; desc: string; icon: typeof Hammer }[] = [
@@ -448,7 +449,7 @@ export function PublishListingModal() {
 
                 {/* Campos type-aware */}
                 <div className="rounded-xl border border-line bg-bg p-4">
-                  {type === "reabilitacao" && <CamposReab register={register} errors={errors} />}
+                  {type === "reabilitacao" && <CamposReab register={register} errors={errors} watch={watch} setValue={setValue} />}
                   {type === "cedencia" && (
                     <CamposCedencia
                       register={register}
@@ -543,8 +544,21 @@ function Num({ label, reg, error, suffix }: { label: string; reg: UseFormRegiste
   );
 }
 
+/** Lê a parte do investidor (1.º número do split "60 / 40" → 60). Default 50. */
+function parseInvestidorPct(s?: string): number {
+  if (!s) return 50;
+  const m = s.match(/(\d+(?:[.,]\d+)?)/);
+  const v = m ? parseFloat(m[1].replace(",", ".")) : 50;
+  return isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : 50;
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function CamposReab({ register, errors }: { register: any; errors: any }) {
+function CamposReab({ register, errors, watch, setValue }: { register: any; errors: any; watch: any; setValue: any }) {
+  const invPct = parseInvestidorPct(watch("split"));
+  const setInv = (x: number) => {
+    const inv = Math.max(0, Math.min(100, Math.round(x || 0)));
+    setValue("split", `${inv} / ${100 - inv}`, { shouldDirty: true, shouldValidate: true });
+  };
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Num label="Valor do imóvel" reg={register("valorImovel")} suffix="€" error={errors.valorImovel?.message} />
@@ -554,8 +568,38 @@ function CamposReab({ register, errors }: { register: any; errors: any }) {
       <Num label="Outros custos (opcional)" reg={register("outrosCustos")} suffix="€" />
       <Num label="Valor de venda previsto" reg={register("valorVendaPrevisto")} suffix="€" error={errors.valorVendaPrevisto?.message} />
       <Num label="Capital procurado" reg={register("capitalProcurado")} suffix="€" error={errors.capitalProcurado?.message} />
-      <Field label="Split (ex.: 50 / 50)"><input {...register("split")} className={inputCls} placeholder="50 / 50" /></Field>
       <Field label="Tempo estimado até venda"><input {...register("tempoAteVenda")} className={inputCls} placeholder="14 meses" /></Field>
+
+      {/* Divisão do lucro — deixa claro quanto o INVESTIDOR recebe */}
+      <div className="sm:col-span-2">
+        <span className="mb-1 block text-xs font-medium text-muted">Divisão do lucro — quanto oferece ao investidor?</span>
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={invPct}
+            onChange={(e) => setInv(Number(e.target.value))}
+            className="flex-1 accent-[#C8A664]"
+          />
+          <div className="flex items-center rounded-lg border border-line bg-card">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={invPct}
+              onChange={(e) => setInv(Number(e.target.value))}
+              className="h-9 w-14 bg-transparent px-2 text-center text-sm outline-none"
+            />
+            <span className="px-2 text-sm text-muted">%</span>
+          </div>
+        </div>
+        <p className="mt-1.5 flex items-center justify-between text-[11px]">
+          <span className="font-semibold text-gold-dark">Investidor recebe {invPct}%</span>
+          <span className="text-muted">Você (promotor) fica com {100 - invPct}%</span>
+        </p>
+      </div>
     </div>
   );
 }
@@ -947,7 +991,7 @@ function SummaryFinanceReab({ v }: { v: FormValues }) {
       {orcamento > 0 && <SummaryRow k="Orçamento das obras" v={eur(orcamento)} />}
       {capital > 0 && <SummaryRow k="Capital procurado" v={eur(capital)} />}
       {venda > 0 && <SummaryRow k="Valor de venda previsto (pós-obras)" v={eur(venda)} />}
-      {v.split && <SummaryRow k="Split da parceria" v={v.split} />}
+      {v.split && <SummaryRow k="Divisão do lucro" v={`Investidor ${parseInvestidorPct(v.split)}% · Promotor ${100 - parseInvestidorPct(v.split)}%`} />}
       {v.prazoObras && <SummaryRow k="Prazo das obras" v={v.prazoObras} />}
       {v.tempoAteVenda && <SummaryRow k="Tempo até venda" v={v.tempoAteVenda} />}
     </SummarySection>

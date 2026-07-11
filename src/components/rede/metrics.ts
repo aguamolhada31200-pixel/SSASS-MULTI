@@ -3,6 +3,7 @@ import { eur, pct } from "@/lib/format";
 import {
   investimentoTotalReab,
   roiReab,
+  splitParceiroPct,
   ctaCedencia,
   lucroCedencia,
   roiCedencia,
@@ -26,7 +27,7 @@ export function metricasCard(l: Listing): Metrica[] {
       { k: "Investimento total", v: eur(investimentoTotalReab(l)) },
       { k: "Capital procurado", v: eur(l.capitalProcurado ?? 0) },
       { k: "ROI esperado", v: pct(roiReab(l)), hero: true, tone: "gold" },
-      { k: "Split", v: l.split ?? "—" },
+      { k: "A sua parte", v: `${splitParceiroPct(l)}% do lucro`, tone: "gold" },
       { k: "Até venda", v: l.tempoAteVenda ?? "—" },
     ];
   }
