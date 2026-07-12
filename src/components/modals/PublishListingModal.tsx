@@ -57,6 +57,7 @@ const schema = z
     imt: z.coerce.number().optional(),
     escritura: z.coerce.number().optional(),
     outrosCustos: z.coerce.number().optional(),
+    valorMercadoAtual: z.coerce.number().optional(),
     valorVendaPrevisto: z.coerce.number().optional(),
     capitalProcurado: z.coerce.number().optional(),
     split: z.string().optional(),
@@ -92,7 +93,7 @@ const schema = z
     if (v.type === "reabilitacao") {
       req(!!v.valorImovel && v.valorImovel > 0, "valorImovel", "Obrigatório");
       req(!!v.capitalProcurado && v.capitalProcurado > 0, "capitalProcurado", "Obrigatório");
-      req(!!v.valorVendaPrevisto && v.valorVendaPrevisto > 0, "valorVendaPrevisto", "Obrigatório");
+      req(!!v.valorMercadoPosObras && v.valorMercadoPosObras > 0, "valorMercadoPosObras", "Obrigatório");
     } else if (v.type === "cedencia") {
       req(!!v.valorCedencia && v.valorCedencia > 0, "valorCedencia", "Obrigatório");
       req(!!v.tipoCedencia, "tipoCedencia", "Obrigatório");
@@ -223,10 +224,12 @@ export function PublishListingModal() {
       typed = {
         valorImovel: values.valorImovel,
         orcamentoObras: values.orcamentoObras,
-        imt: values.imt ?? 0,
-        escritura: values.escritura ?? 0,
+        impostos: values.impostos ?? 0,
         outrosCustos: values.outrosCustos ?? 0,
-        valorVendaPrevisto: values.valorVendaPrevisto,
+        valorMercadoAtual: values.valorMercadoAtual || undefined,
+        valorMercadoPosObras: values.valorMercadoPosObras,
+        valorNegociado: values.valorNegociado || undefined,
+        prazoObras: values.prazoObras || undefined,
         capitalProcurado: values.capitalProcurado,
         split: values.split || "—",
         tempoAteVenda: values.tempoAteVenda || "—",
@@ -449,7 +452,9 @@ export function PublishListingModal() {
 
                 {/* Campos type-aware */}
                 <div className="rounded-xl border border-line bg-bg p-4">
-                  {type === "reabilitacao" && <CamposReab register={register} errors={errors} watch={watch} setValue={setValue} />}
+                  {type === "reabilitacao" && (
+                    <CamposReab register={register} errors={errors} values={valoresLive} setValue={setValue} />
+                  )}
                   {type === "cedencia" && (
                     <CamposCedencia
                       register={register}
@@ -553,22 +558,77 @@ function parseInvestidorPct(s?: string): number {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function CamposReab({ register, errors, watch, setValue }: { register: any; errors: any; watch: any; setValue: any }) {
-  const invPct = parseInvestidorPct(watch("split"));
+function CamposReab({
+  register,
+  errors,
+  values,
+  setValue,
+}: {
+  register: any;
+  errors: any;
+  values: FormValues;
+  setValue: any;
+}) {
+  const invPct = parseInvestidorPct(values.split);
   const setInv = (x: number) => {
     const inv = Math.max(0, Math.min(100, Math.round(x || 0)));
     setValue("split", `${inv} / ${100 - inv}`, { shouldDirty: true, shouldValidate: true });
   };
+
+  const valorImovel = Number(values.valorImovel) || 0;
+  const valorNegociado = Number(values.valorNegociado) || 0; // desconto conseguido
+  const precoAcordado = Math.max(0, valorImovel - valorNegociado);
+  const impostos = Number(values.impostos) || 0;
+  const orcamento = Number(values.orcamentoObras) || 0;
+  const outros = Number(values.outrosCustos) || 0;
+  const investimentoTotal = valorImovel + impostos + orcamento + outros;
+
+  const calcularImpostosAuto = () => {
+    if (precoAcordado <= 0) return;
+    const imt = calcularIMT(precoAcordado, "HS");
+    const is = calcularIS(precoAcordado);
+    setValue("impostos", Math.round(imt + is + 250), { shouldValidate: true });
+  };
+
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Num label="Valor do imóvel" reg={register("valorImovel")} suffix="€" error={errors.valorImovel?.message} />
+      <Num label="Valor do imóvel (CPCV)" reg={register("valorImovel")} suffix="€" error={errors.valorImovel?.message} />
+      <Field label="Desconto obtido (opcional)">
+        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
+          <input type="number" step="any" {...register("valorNegociado")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
+          <span className="px-3 text-sm text-muted">€</span>
+        </div>
+        <p className="mt-1 text-[10px] text-muted">
+          = quanto baixou ao valor do imóvel {precoAcordado > 0 ? `· preço acordado ${eur(precoAcordado)}` : ""}
+        </p>
+      </Field>
+
+      <Field label="Impostos (IMT + IS + Registos)">
+        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
+          <input type="number" step="any" {...register("impostos")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
+          <span className="px-3 text-sm text-muted">€</span>
+        </div>
+        <button type="button" onClick={calcularImpostosAuto} className="mt-1 text-[11px] text-secondary hover:underline">
+          ⚡ Calcular automaticamente (IMT HS + IS 0,8% + Registo)
+        </button>
+      </Field>
       <Num label="Orçamento de obras" reg={register("orcamentoObras")} suffix="€" error={errors.orcamentoObras?.message} />
-      <Num label="IMT" reg={register("imt")} suffix="€" />
-      <Num label="Escritura" reg={register("escritura")} suffix="€" />
       <Num label="Outros custos (opcional)" reg={register("outrosCustos")} suffix="€" />
-      <Num label="Valor de venda previsto" reg={register("valorVendaPrevisto")} suffix="€" error={errors.valorVendaPrevisto?.message} />
+
+      <Field label="Investimento Total (auto)" className="sm:col-span-2">
+        <div className="flex items-center rounded-lg border border-gold/40 bg-gold/5">
+          <input readOnly value={investimentoTotal ? eur(investimentoTotal) : "—"} className="num h-10 w-full bg-transparent px-3 text-sm font-semibold text-gold-dark outline-none" />
+        </div>
+        <p className="mt-1 text-[10px] text-muted">= Valor do imóvel + Impostos + Orçamento de obras + Outros custos</p>
+      </Field>
+
+      <Num label="Valor de mercado atual (opcional, sem obras)" reg={register("valorMercadoAtual")} suffix="€" />
+      <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
+
+      <Field label="Prazo estimado das obras (opcional)"><input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 10 meses" /></Field>
+      <Field label="Tempo estimado até à venda (opcional)"><input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 18 meses" /></Field>
+
       <Num label="Capital procurado" reg={register("capitalProcurado")} suffix="€" error={errors.capitalProcurado?.message} />
-      <Field label="Tempo estimado até venda"><input {...register("tempoAteVenda")} className={inputCls} placeholder="14 meses" /></Field>
 
       {/* Divisão do lucro — deixa claro quanto o INVESTIDOR recebe */}
       <div className="sm:col-span-2">
@@ -786,11 +846,21 @@ function computeCedencia(v: FormValues) {
 
 function LiveComputed({ type, v }: { type: ListingType; v: FormValues }) {
   if (type === "reabilitacao") {
-    const inv = investimentoTotalReab(v as never);
+    // watch() devolve os valores em bruto (strings) — coagir antes de somar,
+    // senão "200000" + 0 concatena em vez de somar (e eur() rebenta a seguir).
+    const rv = {
+      valorImovel: Number(v.valorImovel) || 0,
+      impostos: Number(v.impostos) || 0,
+      orcamentoObras: Number(v.orcamentoObras) || 0,
+      outrosCustos: Number(v.outrosCustos) || 0,
+      valorMercadoPosObras: Number(v.valorMercadoPosObras) || 0,
+      valorVendaPrevisto: Number(v.valorVendaPrevisto) || 0,
+    };
+    const inv = investimentoTotalReab(rv);
     return (
       <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
         <Chip label="Investimento total" value={eur(inv)} />
-        <Chip label="ROI esperado" value={pct(roiReab(v as never))} />
+        <Chip label="ROI esperado" value={pct(roiReab(rv as never))} />
       </div>
     );
   }
@@ -982,18 +1052,28 @@ function SummaryRow({ k, v, multiline }: { k: string; v: string | number; multil
 
 function SummaryFinanceReab({ v }: { v: FormValues }) {
   const valorImovel = Number(v.valorImovel) || 0;
+  const impostos = Number(v.impostos) || 0;
   const orcamento = Number(v.orcamentoObras) || 0;
+  const outros = Number(v.outrosCustos) || 0;
+  const investimentoTotal = valorImovel + impostos + orcamento + outros;
+  const mercadoAtual = Number(v.valorMercadoAtual) || 0;
+  const posObras = Number(v.valorMercadoPosObras) || 0;
+  const desconto = Number(v.valorNegociado) || 0;
   const capital = Number(v.capitalProcurado) || 0;
-  const venda = Number(v.valorVendaPrevisto) || 0;
   return (
     <SummarySection title="Números da operação — Reabilitação (Fix e Flip)">
       {valorImovel > 0 && <SummaryRow k="Valor do imóvel (CPCV)" v={eur(valorImovel)} />}
+      {desconto > 0 && <SummaryRow k="Desconto obtido" v={eur(desconto)} />}
+      {impostos > 0 && <SummaryRow k="Impostos (IMT + IS + Registos)" v={eur(impostos)} />}
       {orcamento > 0 && <SummaryRow k="Orçamento das obras" v={eur(orcamento)} />}
+      {outros > 0 && <SummaryRow k="Outros custos" v={eur(outros)} />}
+      {investimentoTotal > 0 && <SummaryRow k="Investimento Total" v={eur(investimentoTotal)} />}
+      {mercadoAtual > 0 && <SummaryRow k="Valor de mercado atual" v={eur(mercadoAtual)} />}
+      {posObras > 0 && <SummaryRow k="Valor de mercado pós-obras" v={eur(posObras)} />}
       {capital > 0 && <SummaryRow k="Capital procurado" v={eur(capital)} />}
-      {venda > 0 && <SummaryRow k="Valor de venda previsto (pós-obras)" v={eur(venda)} />}
       {v.split && <SummaryRow k="Divisão do lucro" v={`Investidor ${parseInvestidorPct(v.split)}% · Promotor ${100 - parseInvestidorPct(v.split)}%`} />}
       {v.prazoObras && <SummaryRow k="Prazo das obras" v={v.prazoObras} />}
-      {v.tempoAteVenda && <SummaryRow k="Tempo até venda" v={v.tempoAteVenda} />}
+      {v.tempoAteVenda && <SummaryRow k="Tempo até à venda" v={v.tempoAteVenda} />}
     </SummarySection>
   );
 }
