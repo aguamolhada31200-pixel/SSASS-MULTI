@@ -108,13 +108,13 @@ export type ListingInput = Omit<
 >;
 
 export const TYPE_LABEL: Record<ListingType, string> = {
-  reabilitacao: "Parceiros para Reabilitação (Fix e Flip)",
+  reabilitacao: "Parceiros para Compra e Revenda",
   cedencia: "Parceiros para Cedência de Posição",
   arrendamento: "Oportunidades para Arrendamento (Buy e Hold)",
 };
 
 export const TYPE_LABEL_SHORT: Record<ListingType, string> = {
-  reabilitacao: "Reabilitação (Fix e Flip)",
+  reabilitacao: "Compra e Revenda",
   cedencia: "Cedência de Posição",
   arrendamento: "Arrendamento (Buy e Hold)",
 };
@@ -136,14 +136,14 @@ export const TIPO_CEDENCIA_LABEL: Record<TipoCedencia, string> = {
   cpcv: "Cedência apenas do CPCV",
   projeto_aprovado: "Cedência com projeto aprovado",
   licenca: "Cedência com licença",
-  obra_iniciada: "Cedência em reabilitação",
+  obra_iniciada: "Cedência com obra iniciada",
 };
 
 export const TIPO_CEDENCIA_LABEL_SHORT: Record<TipoCedencia, string> = {
   cpcv: "CPCV",
   projeto_aprovado: "Projeto aprovado",
   licenca: "Licença",
-  obra_iniciada: "Em reabilitação",
+  obra_iniciada: "Em obras",
 };
 
 export const ENERGY_SCALE: EnergyCert[] = ["A+", "A", "B", "B-", "C", "D", "E", "F"];
@@ -155,9 +155,9 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     id: "reab-porto",
     authorId: "joao-pereira",
     type: "reabilitacao",
-    title: "Reabilitação Baixa do Porto",
+    title: "Compra e Revenda Baixa do Porto",
     description:
-      "Apartamento T3 para reabilitação integral na Baixa do Porto, a 5 minutos da Avenida dos Aliados. Projeto de arquitetura aprovado, licença de obras em curso. Procuro parceiro de capital para concluir a obra e vender com forte margem.",
+      "Apartamento T3 para compra e revenda na Baixa do Porto, a 5 minutos da Avenida dos Aliados. Projeto de arquitetura aprovado, licença de obras em curso. Procuro parceiro de capital para concluir a obra e vender com forte margem.",
     district: "Porto",
     city: "Porto",
     exactAddress: "Rua de Cedofeita 212, 2.º",
@@ -321,7 +321,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     type: "cedencia",
     title: "Cedência com projeto Loja Almada",
     description:
-      "Cedência de loja comercial em Almada, com projeto aprovado para mudança de uso (loja → habitação T1 + estúdio). Aprovação em Reabilitação Urbana.",
+      "Cedência de loja comercial em Almada, com projeto aprovado para mudança de uso (loja → habitação T1 + estúdio). Aprovação em Área de Reabilitação Urbana.",
     district: "Setúbal",
     city: "Almada",
     exactAddress: "Rua Cândido dos Reis 56, R/C",
@@ -553,9 +553,9 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     id: "reab-aveiro",
     authorId: "joao-pereira",
     type: "reabilitacao",
-    title: "Prédio para reabilitar em Aveiro",
+    title: "Prédio para compra e revenda em Aveiro",
     description:
-      "Prédio de 4 frações no centro de Aveiro, para reabilitação e revenda fracionada. Parceria já financiada parcialmente — resta uma quota disponível.",
+      "Prédio de 4 frações no centro de Aveiro, para compra, reabilitação e revenda fracionada. Parceria já financiada parcialmente — resta uma quota disponível.",
     district: "Aveiro",
     city: "Aveiro",
     exactAddress: "Rua de Coimbra 18",

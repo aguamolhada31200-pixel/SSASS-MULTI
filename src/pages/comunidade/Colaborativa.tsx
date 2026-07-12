@@ -96,7 +96,7 @@ export default function Colaborativa() {
           <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-md">
             {([
               { key: "todos", label: "Todos", count: projects.length },
-              { key: "reabilitacao", label: "Reabilitação", count: countReab },
+              { key: "reabilitacao", label: "Compra e Revenda", count: countReab },
               { key: "arrendamento", label: "Arrendamento", count: countArr },
             ] as const).map((t) => (
               <button
@@ -219,7 +219,7 @@ function ProjectCard({ project: pr }: { project: CollabProject }) {
           >
             {isReab ? (
               <span className="flex items-center gap-1">
-                <Hammer size={10} /> Reabilitação
+                <Hammer size={10} /> Compra e Revenda
               </span>
             ) : (
               <span className="flex items-center gap-1">

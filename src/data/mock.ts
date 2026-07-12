@@ -249,7 +249,7 @@ export const LISTINGS: NetworkListing[] = [
     id: "l3",
     type: "parceiro",
     businessModel: "flip",
-    title: "Reabilitação de prédio · 4 frações Aveiro",
+    title: "Compra e revenda de prédio · 4 frações Aveiro",
     city: "Aveiro",
     district: "Aveiro",
     author: "Daniel Silva",
@@ -290,7 +290,7 @@ export const LISTING_TYPE_LABEL: Record<ListingType, string> = {
 export const COLLAB_PROJECT = {
   id: "aveiro-flip",
   number: "002",
-  name: "Reabilitação Aveiro · 4 frações",
+  name: "Compra e Revenda Aveiro · 4 frações",
   city: "Aveiro",
   status: "Em obras",
   businessModel: "flip" as const,

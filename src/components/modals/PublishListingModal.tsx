@@ -140,7 +140,7 @@ const EMPTY: FormValues = {
 };
 
 const TYPE_CARDS: { type: ListingType; label: string; desc: string; icon: typeof Hammer }[] = [
-  { type: "reabilitacao", label: "Parceiros para Reabilitação (Fix e Flip)", desc: "Procuro capital para comprar, recuperar e revender com margem.", icon: Hammer },
+  { type: "reabilitacao", label: "Parceiros para Compra e Revenda", desc: "Procuro capital para comprar, recuperar e revender com margem.", icon: Hammer },
   { type: "cedencia", label: "Parceiros para Cedência de Posição", desc: "Cedo uma posição de CPCV antes da escritura.", icon: Handshake },
   { type: "arrendamento", label: "Oportunidades para Arrendamento (Buy e Hold)", desc: "Imóvel pronto a arrendar, para rendimento passivo.", icon: KeyRound },
 ];
@@ -374,7 +374,7 @@ export function PublishListingModal() {
                 {/* Comuns */}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Título" error={errors.title?.message} className="sm:col-span-2">
-                    <input {...register("title")} placeholder="Ex.: Reabilitação Baixa do Porto" className={inputCls} />
+                    <input {...register("title")} placeholder="Ex.: Compra e Revenda Baixa do Porto" className={inputCls} />
                   </Field>
                   <Field label="Descrição" error={errors.description?.message} className="sm:col-span-2">
                     <textarea {...register("description")} rows={3} className={cn(inputCls, "h-auto py-2")} />
@@ -684,7 +684,7 @@ function CamposSecao({ title, children }: { title: string; children: React.React
     <div>
       <div className="mb-3 flex items-center gap-2">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
-        <p className="font-display text-xs font-semibold uppercase tracking-[0.14em] text-gold-dark">{title}</p>
+        <p className="font-display text-xs font-bold uppercase tracking-[0.14em] text-gold-dark">{title}</p>
         <span className="h-px flex-1 bg-line" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">{children}</div>
@@ -766,7 +766,7 @@ function CamposCedencia({
         </button>
       </Field>
 
-      <Num label="Valor previsto das obras (opcional — se o negócio envolve reabilitação)" reg={register("obra")} suffix="€" />
+      <Num label="Valor previsto das obras (opcional)" reg={register("obra")} suffix="€" />
       {comObras ? (
         <>
           <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
@@ -973,7 +973,7 @@ function PreviewCard({ v }: { v: FormValues }) {
       <div className="relative h-36 bg-accent">
         {cover ? <img src={cover} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-muted">Sem foto</div>}
         <span className="absolute left-3 top-3 rounded-full bg-card/90 px-2.5 py-1 text-xs font-medium text-secondary backdrop-blur">
-          {v.type === "reabilitacao" ? "Reabilitação (Fix e Flip)" : v.type === "cedencia" ? "Cedência de Posição" : "Arrendamento (Buy e Hold)"}
+          {v.type === "reabilitacao" ? "Compra e Revenda" : v.type === "cedencia" ? "Cedência de Posição" : "Arrendamento (Buy e Hold)"}
         </span>
       </div>
       <div className="p-4">
@@ -993,7 +993,7 @@ function PreviewCard({ v }: { v: FormValues }) {
 function SummaryStep({ v }: { v: FormValues }) {
   const tipoLabel =
     v.type === "reabilitacao"
-      ? "Reabilitação (Fix e Flip)"
+      ? "Compra e Revenda"
       : v.type === "cedencia"
         ? "Cedência de Posição"
         : "Arrendamento (Buy e Hold)";
@@ -1089,7 +1089,7 @@ function SummaryFinanceReab({ v }: { v: FormValues }) {
   const desconto = Number(v.valorNegociado) || 0;
   const capital = Number(v.capitalProcurado) || 0;
   return (
-    <SummarySection title="Números da operação — Reabilitação (Fix e Flip)">
+    <SummarySection title="Números da operação — Compra e Revenda">
       {valorImovel > 0 && <SummaryRow k="Valor do imóvel (CPCV)" v={eur(valorImovel)} />}
       {desconto > 0 && <SummaryRow k="Desconto obtido" v={eur(desconto)} />}
       {impostos > 0 && <SummaryRow k="Impostos (IMT + IS + Registos)" v={eur(impostos)} />}

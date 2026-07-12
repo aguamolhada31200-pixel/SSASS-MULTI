@@ -169,7 +169,7 @@ function HeroProject({ project: p }: { project: CollabProject }) {
               <span className="font-display text-sm text-gold-soft">PROJETO #{p.number}</span>
               <Badge tone={STATUS_TONE[p.status] as any}>{STATUS_LABEL[p.status]}</Badge>
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", isReab ? "bg-secondary/20 text-white" : "bg-success/20 text-white")}>
-                {isReab ? "Reabilitação" : "Arrendamento"}
+                {isReab ? "Compra e Revenda" : "Arrendamento"}
               </span>
             </div>
             <h1 className="mt-1 font-display text-2xl font-bold text-white sm:text-3xl">{p.title}</h1>

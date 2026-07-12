@@ -406,7 +406,7 @@ export function CollabFormModal() {
 
 function StepTipo({ tipo, onPick, disabled }: { tipo: CollabType; onPick: (t: CollabType) => void; disabled: boolean }) {
   const cards: { key: CollabType; icon: typeof Hammer; title: string; desc: string }[] = [
-    { key: "reabilitacao", icon: Hammer, title: "Reabilitação (flip)", desc: "Comprar, reabilitar e vender com margem. Foco em obra, orçamento e lucro estimado." },
+    { key: "reabilitacao", icon: Hammer, title: "Compra e Revenda", desc: "Comprar, reabilitar e vender com margem. Foco em obra, orçamento e lucro estimado." },
     { key: "arrendamento", icon: Home, title: "Arrendamento (rendimento)", desc: "Rendimento recorrente distribuído entre sócios. Foco em renda, yield e cashflow." },
   ];
   return (
@@ -541,7 +541,7 @@ function StepImovel({
       {/* Dados financeiros */}
       <div className="rounded-xl border border-line/60 bg-bg/40 p-4">
         <p className="mb-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-secondary">
-          <Sparkles size={12} className="text-gold" /> Dados financeiros — {isReab ? "reabilitação" : "arrendamento"}
+          <Sparkles size={12} className="text-gold" /> Dados financeiros — {isReab ? "compra e revenda" : "arrendamento"}
         </p>
         {isReab ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -674,7 +674,7 @@ function StepRevisao({
       : form.nome || "—";
   return (
     <div className="space-y-4">
-      <Linha k="Tipo" v={isReab ? "Reabilitação (flip)" : "Arrendamento (rendimento)"} />
+      <Linha k="Tipo" v={isReab ? "Compra e Revenda" : "Arrendamento (rendimento)"} />
       <Linha k="Projeto" v={form.nome || "—"} />
       <Linha k="Imóvel" v={`${imovelNome}${form.imovelMode === "novo" ? " (novo)" : ""}`} />
       <Linha k="Localização" v={[form.cidade, form.distrito].filter(Boolean).join(" · ") || "—"} />

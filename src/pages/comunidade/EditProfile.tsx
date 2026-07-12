@@ -94,7 +94,7 @@ export default function EditProfile() {
           <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="URL do avatar (ou carregue acima)…" className={inputCls} />
 
           <Field label="Tagline">
-            <input value={tagline} onChange={(e) => setTagline(e.target.value)} className={inputCls} placeholder="Ex.: Reabilitação urbana no Grande Porto" />
+            <input value={tagline} onChange={(e) => setTagline(e.target.value)} className={inputCls} placeholder="Ex.: Compra e revenda no Grande Porto" />
           </Field>
           <Field label="Bio">
             <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} className={cn(inputCls, "h-auto py-2")} />

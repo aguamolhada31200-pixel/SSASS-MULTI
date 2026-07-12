@@ -47,7 +47,7 @@ const SEED: Conversation[] = [
     contextId: "reab-porto",
     createdAt: "2026-06-03",
     messages: [
-      { id: "m5", senderId: CURRENT_USER_ID, content: "João, a reabilitação no Porto parece muito interessante. Como funciona o split 50/50 na prática?", createdAt: "2026-06-03T14:20:00", read: true },
+      { id: "m5", senderId: CURRENT_USER_ID, content: "João, o projeto no Porto parece muito interessante. Como funciona o split 50/50 na prática?", createdAt: "2026-06-03T14:20:00", read: true },
       { id: "m6", senderId: "joao-pereira", content: "Olá Daniel. O capital procurado (95k) cobre a obra e parte da aquisição; o lucro líquido divide-se 50/50 após venda. Posso enviar o dossier completo.", createdAt: "2026-06-03T15:00:00", read: true },
     ],
   },

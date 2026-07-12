@@ -637,7 +637,7 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
       {comObras && (
         <Card>
           <CardContent>
-            <SectionHeader title="Situação Após Reabilitação" />
+            <SectionHeader title="Situação Após Revenda" />
             <p className="mb-4 text-sm text-muted">
               Investimento Total = CTA + Valor previsto das obras. ROI pós-obras = Lucro pós-obras / Investimento Total.
             </p>

@@ -19,7 +19,7 @@ const SEED: PartnerRating[] = [
     ratedUserId: "joao-pereira",
     raterUserId: "carlos-mendes",
     raterName: "Carlos Mendes",
-    projectName: "Reabilitação Rua de Santa Catarina",
+    projectName: "Compra e Revenda Rua de Santa Catarina",
     rating: 5,
     testimonial: "Transparência total nas contas e cumpriu prazos à risca. Voltaria a investir com o João sem hesitar.",
     createdAt: "2025-12-10",

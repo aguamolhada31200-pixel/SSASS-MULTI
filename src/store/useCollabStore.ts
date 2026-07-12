@@ -36,7 +36,7 @@ export const STATUS_TONE: Record<ProjectStatus, string> = {
 };
 
 export const TYPE_LABEL: Record<CollabType, string> = {
-  reabilitacao: "Reabilitação",
+  reabilitacao: "Compra e Revenda",
   arrendamento: "Arrendamento",
 };
 
@@ -167,7 +167,7 @@ const SEED: CollabProject[] = [
     id: "porto-flip",
     type: "reabilitacao",
     number: "001",
-    title: "Reabilitação Baixa do Porto",
+    title: "Compra e Revenda Baixa do Porto",
     city: "Porto",
     district: "Porto",
     coverImageUrl: IMG("1502672260266-1c1ef2d93688"),

@@ -235,7 +235,7 @@ export function NewObraModal() {
                   )}
                 >
                   <p className="text-sm font-medium text-ink">Projeto colaborativo</p>
-                  <p className="text-[11px] text-muted">Reabilitação ou parceria</p>
+                  <p className="text-[11px] text-muted">Compra e revenda ou parceria</p>
                 </button>
                 <button
                   onClick={() => patch({ origin: "property" })}
