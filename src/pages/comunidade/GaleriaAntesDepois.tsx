@@ -146,7 +146,7 @@ export default function GaleriaAntesDepois() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 pb-12 sm:px-6">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-12 sm:px-6">
         {/* Faixa de impacto */}
         <div className="-mt-12 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Impacto icone={Images} label="Transformações" valor={String(impacto.n)} />
