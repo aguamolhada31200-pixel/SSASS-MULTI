@@ -13,6 +13,7 @@ import {
   Clock3,
   TrendingUp,
   User2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ExampleDataToggle } from "@/components/ExampleDataToggle";
@@ -81,6 +82,14 @@ export default function GaleriaAntesDepois() {
       .sort((a, b) => Number(b.destaque) - Number(a.destaque) || (a.createdAt < b.createdAt ? 1 : -1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base, origem, divisao, tipo, soDestaques, projects]);
+
+  const temFiltro = origem !== "todos" || tipo !== "todos" || divisao !== "todas" || soDestaques;
+  const limparFiltros = () => {
+    setOrigem("todos");
+    setTipo("todos");
+    setDivisao("todas");
+    setSoDestaques(false);
+  };
 
   // Faixa de impacto — números que impressionam, calculados das comparações
   const impacto = useMemo(() => {
@@ -155,33 +164,52 @@ export default function GaleriaAntesDepois() {
           <Impacto icone={Clock3} label="Tempo médio por obra" valor={impacto.tempoMedio > 0 ? duracaoLabel(impacto.tempoMedio) : "—"} />
         </div>
 
-        {/* Filtros */}
+        {/* Filtros — painel com grupos rotulados */}
         {base.length > 0 && (
-          <div className="mt-6 space-y-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Chip ativo={origem === "todos"} onClick={() => setOrigem("todos")}>Todos os projetos</Chip>
-              {origens.map((o) => (
-                <Chip key={o.key} ativo={origem === o.key} onClick={() => setOrigem(o.key)}>{o.label}</Chip>
-              ))}
-              <span className="mx-1 hidden h-4 w-px bg-line sm:block" />
-              <Chip ativo={tipo === "todos"} onClick={() => setTipo("todos")}>Todas</Chip>
-              <Chip ativo={tipo === "reabilitacao"} onClick={() => setTipo("reabilitacao")}>Reabilitação</Chip>
-              <Chip ativo={tipo === "arrendamento"} onClick={() => setTipo("arrendamento")}>Arrendamento</Chip>
+          <div className="mt-6 rounded-2xl border border-line bg-card p-4 shadow-sm sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-3">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gold-dark">
+                <SlidersHorizontal size={14} /> Filtrar
+              </p>
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => setSoDestaques((v) => !v)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                    soDestaques ? "border-gold bg-gold/15 text-gold-dark" : "border-line text-muted hover:bg-accent hover:text-ink"
+                  )}
+                >
+                  <Star size={12} className={cn(soDestaques && "fill-gold-dark")} /> Só destaques
+                </button>
+                <span className="num hidden text-xs text-muted sm:inline">{filtradas.length} de {base.length}</span>
+                {temFiltro && (
+                  <button onClick={limparFiltros} className="text-xs font-medium text-secondary hover:underline">Limpar</button>
+                )}
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Chip ativo={divisao === "todas"} onClick={() => setDivisao("todas")}>Todas as divisões</Chip>
-              {divisoesPresentes.map((d) => {
-                const Icon = DIVISAO_ICON[d];
-                return (
-                  <Chip key={d} ativo={divisao === d} onClick={() => setDivisao(d)}>
-                    <Icon size={12} className="mr-1 inline" />{DIVISAO_LABEL[d]}
-                  </Chip>
-                );
-              })}
-              <span className="mx-1 hidden h-4 w-px bg-line sm:block" />
-              <Chip ativo={soDestaques} onClick={() => setSoDestaques((v) => !v)}>
-                <Star size={12} className={cn("mr-1 inline", soDestaques && "fill-current")} /> Só destaques
-              </Chip>
+            <div className="space-y-2.5">
+              <FiltroLinha label="Projeto">
+                <Chip ativo={origem === "todos"} onClick={() => setOrigem("todos")}>Todos</Chip>
+                {origens.map((o) => (
+                  <Chip key={o.key} ativo={origem === o.key} onClick={() => setOrigem(o.key)}>{o.label}</Chip>
+                ))}
+              </FiltroLinha>
+              <FiltroLinha label="Tipo">
+                <Chip ativo={tipo === "todos"} onClick={() => setTipo("todos")}>Todos</Chip>
+                <Chip ativo={tipo === "reabilitacao"} onClick={() => setTipo("reabilitacao")}>Reabilitação</Chip>
+                <Chip ativo={tipo === "arrendamento"} onClick={() => setTipo("arrendamento")}>Arrendamento</Chip>
+              </FiltroLinha>
+              <FiltroLinha label="Divisão">
+                <Chip ativo={divisao === "todas"} onClick={() => setDivisao("todas")}>Todas</Chip>
+                {divisoesPresentes.map((d) => {
+                  const Icon = DIVISAO_ICON[d];
+                  return (
+                    <Chip key={d} ativo={divisao === d} onClick={() => setDivisao(d)}>
+                      <Icon size={12} className="mr-1 inline" />{DIVISAO_LABEL[d]}
+                    </Chip>
+                  );
+                })}
+              </FiltroLinha>
             </div>
           </div>
         )}
@@ -242,11 +270,23 @@ function Chip({ ativo, onClick, children }: { ativo: boolean; onClick: () => voi
       onClick={onClick}
       className={cn(
         "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-        ativo ? "bg-primary text-white" : "border border-line bg-card text-muted hover:bg-accent hover:text-ink"
+        ativo ? "bg-primary text-white shadow-sm" : "border border-line bg-bg/40 text-muted hover:bg-accent hover:text-ink"
       )}
     >
       {children}
     </button>
+  );
+}
+
+/** Linha de filtro rotulada — rótulo alinhado à esquerda + chips que quebram linha. */
+function FiltroLinha({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3">
+      <span className="shrink-0 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted sm:w-16 sm:text-right">
+        {label}
+      </span>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
   );
 }
 
