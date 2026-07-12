@@ -52,7 +52,9 @@ const schema = z
     city: z.string().min(2, "Indique a cidade"),
     exactAddress: z.string().optional().default(""),
     tipologia: z.enum(["T0", "T1", "T2", "T3", "T4", "T5+"]),
-    tipoImovel: z.enum(["apartamento", "moradia", "predio", "quinta", "loja", "casa", "casa_ferias"]).optional(),
+    // `.or(z.literal(""))`: a opção "— Selecionar —" do <select> envia "" e
+    // z.enum().optional() só aceita undefined — sem isto o form bloqueava sem erro visível.
+    tipoImovel: z.enum(["apartamento", "moradia", "predio", "quinta", "loja", "casa", "casa_ferias"]).or(z.literal("")).optional(),
     areaUtil: z.coerce.number().optional(),
     estado: z.enum(["a recuperar", "bom", "renovado", "novo"]),
     galleryUrls: z.array(z.object({ url: z.string(), legenda: z.string().optional() })).default([]),
@@ -75,7 +77,7 @@ const schema = z
     valorNegociado: z.coerce.number().optional(),
     valorCedencia: z.coerce.number().optional(),
     sinalPagoCedente: z.coerce.number().optional(),
-    tipoCedencia: z.enum(["cpcv", "projeto_aprovado", "licenca", "obra_iniciada"]).optional(),
+    tipoCedencia: z.enum(["cpcv", "projeto_aprovado", "licenca", "obra_iniciada"]).or(z.literal("")).optional(),
     impostos: z.coerce.number().optional(),
     obra: z.coerce.number().optional(),
     valorMercadoPosObras: z.coerce.number().optional(),
@@ -88,7 +90,7 @@ const schema = z
     lucroEstimado: z.coerce.number().optional(),
     prazoAteEscritura: z.string().optional(),
     margemSeguranca: z.string().optional(),
-    motivoCedencia: z.enum(["falta_capital", "falta_tempo", "mudanca_estrategia", "outro"]).optional(),
+    motivoCedencia: z.enum(["falta_capital", "falta_tempo", "mudanca_estrategia", "outro"]).or(z.literal("")).optional(),
     // arrendamento
     precoImovel: z.coerce.number().optional(),
     rendaMensal: z.coerce.number().optional(),
@@ -216,7 +218,7 @@ export function PublishListingModal() {
       city: values.city,
       exactAddress: values.exactAddress,
       tipologia: values.tipologia as Tipologia,
-      tipoImovel: values.tipoImovel,
+      tipoImovel: values.tipoImovel || undefined,
       areaUtil: values.areaUtil,
       estado: values.estado as EstadoImovel,
       coverImageUrl,
