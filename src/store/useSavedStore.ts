@@ -40,7 +40,7 @@ export const useSavedStore = create<SavedState>()(
       },
     }),
     {
-      name: "decogest-saved",
+      name: "redegest-saved",
       version: 2,
       // v2: shortlist de exemplo + timestamps (mantém guardados do utilizador).
       migrate: (persisted: unknown, version: number) => {

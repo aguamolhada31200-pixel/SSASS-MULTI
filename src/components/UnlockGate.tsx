@@ -28,7 +28,7 @@ const CAMPO_META: Record<CampoSensivel, CampoMeta> = {
   iban: { label: "IBAN", micro: "Apenas para constar nos contratos. Não fazemos cobranças.", placeholder: "PT50 …" },
   cc: { label: "Cartão de Cidadão", micro: "Apenas para verificação. Eliminado após validação.", placeholder: "Nº do documento" },
   ccValidade: { label: "Validade do CC", type: "date" },
-  moradaFiscal: { label: "Morada fiscal", micro: "Aparece na fatura do decogest (RGPD).", placeholder: "Rua, nº, andar" },
+  moradaFiscal: { label: "Morada fiscal", micro: "Aparece na fatura do redegest (RGPD).", placeholder: "Rua, nº, andar" },
   codigoPostal: { label: "Código postal", placeholder: "0000-000" },
   regimeFiscal: { label: "Regime fiscal", type: "select" },
   contabilistaEmail: { label: "Email do contabilista", placeholder: "nome@contab.pt" },

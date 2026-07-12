@@ -344,7 +344,7 @@ export const useCollabStore = create<CollabState>()(
       resetSeed: () => set({ projects: SEED }),
     }),
     {
-      name: "decogest-collab",
+      name: "redegest-collab",
       version: 2,
       // v2: propertyId + sócios estendidos (role/capital/status). Mantém projetos do utilizador.
       migrate: (persisted: unknown, version: number) => {

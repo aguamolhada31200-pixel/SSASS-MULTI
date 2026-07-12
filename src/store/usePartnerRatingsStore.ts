@@ -79,6 +79,6 @@ export const usePartnerRatingsStore = create<PartnerRatingsState>()(
       getForUser: (userId) => get().ratings.filter((r) => r.ratedUserId === userId),
       resetSeed: () => set({ ratings: SEED }),
     }),
-    { name: "decogest-partner-ratings", version: 1 }
+    { name: "redegest-partner-ratings", version: 1 }
   )
 );

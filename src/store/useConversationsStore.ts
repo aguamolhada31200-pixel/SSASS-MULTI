@@ -119,6 +119,6 @@ export const useConversationsStore = create<ConversationsState>()(
       },
       resetSeed: () => set({ conversations: SEED }),
     }),
-    { name: "decogest-conversations", version: 1 }
+    { name: "redegest-conversations", version: 1 }
   )
 );

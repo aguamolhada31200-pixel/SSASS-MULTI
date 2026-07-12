@@ -146,6 +146,6 @@ export const useAiConversationsStore = create<AiState>()(
         })),
       resetSeed: () => set({ conversations: SEED }),
     }),
-    { name: "decogest-ai-conversations", version: 1 }
+    { name: "redegest-ai-conversations", version: 1 }
   )
 );

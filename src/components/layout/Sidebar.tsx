@@ -12,7 +12,7 @@ function Logo() {
           <path d="M7 11v7h10v-7" stroke="#F5ECD7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
-      <span className="font-display text-xl font-bold tracking-tight text-sidebar-text">decogest</span>
+      <span className="font-display text-xl font-bold tracking-tight text-sidebar-text">redegest</span>
     </div>
   );
 }

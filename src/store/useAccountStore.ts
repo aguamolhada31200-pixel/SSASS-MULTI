@@ -140,7 +140,7 @@ export const NOTIF_EVENTS: { key: string; label: string }[] = [
   { key: "mensagem_nova", label: "Nova mensagem" },
   { key: "decisao_colaborativa", label: "Decisão colaborativa pendente" },
   { key: "resumo_semanal", label: "Resumo semanal do portfólio (sex 18h)" },
-  { key: "changelog", label: "Atualizações do decogest" },
+  { key: "changelog", label: "Atualizações do redegest" },
 ];
 
 function notifDefaults(): Record<string, CanalNotif> {
@@ -320,7 +320,7 @@ function uid(prefix = "key"): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-const PROMOS: Record<string, number> = { DECOGEST10: 10, BEMVINDO: 20, ANUAL16: 16 };
+const PROMOS: Record<string, number> = { REDEGEST10: 10, BEMVINDO: 20, ANUAL16: 16 };
 
 export const useAccountStore = create<AccountState>()(
   persist(
@@ -381,7 +381,7 @@ export const useAccountStore = create<AccountState>()(
         }),
     }),
     {
-      name: "decogest-account",
+      name: "redegest-account",
       version: 3,
       // v1 trazia o perfil totalmente preenchido; v2 adota "valor primeiro" (perfil mínimo).
       // v3: corrige a identidade seed "José Felix" → "Daniel Silva" (mesmo utilizador em toda a app).

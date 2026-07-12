@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[decogest] Erro de render apanhado pelo ErrorBoundary:", error, info.componentStack);
+    console.error("[redegest] Erro de render apanhado pelo ErrorBoundary:", error, info.componentStack);
   }
 
   private recarregar = () => {

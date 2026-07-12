@@ -115,7 +115,7 @@ export const useNotificationsStore = create<NotificationsState>()(
       remove: (id) => set((s) => ({ notificacoes: s.notificacoes.filter((n) => n.id !== id) })),
       resetSeed: () => set({ notificacoes: SEED }),
     }),
-    { name: "decogest-notifications", version: 1 }
+    { name: "redegest-notifications", version: 1 }
   )
 );
 

@@ -195,7 +195,7 @@ function respContrato(): AiResponse {
       "5. **Atualização anual** — coeficiente IPC",
       "6. **Regras** — animais, fumadores, sublocação e regras da casa",
       "",
-      "Depois de assinar com o inquilino, **carregue o documento** no separador Contratos do imóvel — a decogest organiza tudo por contrato e arquiva na Pasta Digital.",
+      "Depois de assinar com o inquilino, **carregue o documento** no separador Contratos do imóvel — a redegest organiza tudo por contrato e arquiva na Pasta Digital.",
     ].join("\n"),
     actions: [{ label: "Abrir os meus imóveis →", to: "/imoveis", kind: "navigate" }],
     followups: ["Quais os prazos de denúncia do NRAU?"],

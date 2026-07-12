@@ -284,6 +284,6 @@ export const useDecisionsStore = create<DecisionsState>()(
         })),
       resetSeed: () => set({ decisoes: SEED }),
     }),
-    { name: "decogest-decisions", version: 1 }
+    { name: "redegest-decisions", version: 1 }
   )
 );

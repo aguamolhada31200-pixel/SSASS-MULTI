@@ -805,7 +805,7 @@ export default function NovoArrendamento() {
           </div>
           <p className="flex items-center gap-2 rounded-xl border border-gold/25 bg-gold/5 px-3 py-2.5 text-xs text-ink">
             <BellRing size={14} className="shrink-0 text-gold-dark" />
-            Os inquilinos <strong>não</strong> recebem notificações — o decogest é uma ferramenta do senhorio.
+            Os inquilinos <strong>não</strong> recebem notificações — o redegest é uma ferramenta do senhorio.
           </p>
         </div>
       )}

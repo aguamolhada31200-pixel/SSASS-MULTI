@@ -93,7 +93,7 @@ export const useInterestsStore = create<InterestsState>()(
       },
     }),
     {
-      name: "decogest-interests",
+      name: "redegest-interests",
       version: 2,
       // v2: seeds de exemplo (interesse do utilizador + 3 interessados no anúncio próprio).
       migrate: (persisted: unknown, version: number) => {

@@ -340,7 +340,7 @@ export const useTransactionsStore = create<TransactionsState>()(
       resetSeed: () => set({ transactions: SEED }),
     }),
     {
-      name: "decogest-transactions",
+      name: "redegest-transactions",
       version: 3,
       // v2: movimentos do Príncipe Real (rendas + despesas). Ids determinísticos → merge idempotente.
       // v3: receitas do Studio AL passam de "Renda" para "Receita AL" (cat. B ≠ cat. F).

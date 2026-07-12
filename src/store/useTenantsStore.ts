@@ -251,7 +251,7 @@ export const useTenantsStore = create<TenantsState>()(
       resetSeed: () => set({ tenants: SEED }),
     }),
     {
-      name: "decogest-tenants",
+      name: "redegest-tenants",
       version: 3,
       // v2: limpa entradas de exemplo vazias/stray. v3: inquilino do Príncipe Real.
       migrate: (persisted: unknown, version: number) => {

@@ -569,7 +569,7 @@ export const useArrendamentosStore = create<ArrendamentosState>()(
       resetSeed: () => set({ arrendamentos: SEED }),
     }),
     {
-      name: "decogest-arrendamentos",
+      name: "redegest-arrendamentos",
       version: 1,
     }
   )

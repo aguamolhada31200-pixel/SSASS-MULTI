@@ -125,7 +125,7 @@ const SEED: Profile[] = [
     avatarUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&q=70",
     coverUrl: "https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=1200&q=70",
     tagline: "Investidor há 10 anos (auto-declarado)",
-    bio: "Novo na decogest. Tenho experiência em compra e revenda no Minho e quero encontrar parceiros locais.",
+    bio: "Novo na redegest. Tenho experiência em compra e revenda no Minho e quero encontrar parceiros locais.",
     city: "Braga",
     isVerified: false,
     availableForPartnership: true,
@@ -203,7 +203,7 @@ export const useProfilesStore = create<ProfilesState>()(
       resetSeed: () => set({ profiles: SEED }),
     }),
     {
-      name: "decogest-profiles",
+      name: "redegest-profiles",
       version: 3,
       // v2: sócios de co-gestão. v3: imoveisAutoDeclarados nos anunciantes.
       migrate: (persisted: unknown, version: number) => {

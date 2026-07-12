@@ -181,7 +181,7 @@ export default function Perfil() {
           {/* Morada fiscal */}
           <SectionCard title="Morada fiscal" icon={MapPin}>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Morada (opcional)" hint="🔒 Aparece nos contratos e na fatura do decogest (RGPD)." className="sm:col-span-2">
+              <Field label="Morada (opcional)" hint="🔒 Aparece nos contratos e na fatura do redegest (RGPD)." className="sm:col-span-2">
                 <input value={p.moradaFiscal} onChange={(e) => set("moradaFiscal", e.target.value)} className={inputCls} />
                 <Nec>Necessário para Contratos PDF</Nec>
               </Field>

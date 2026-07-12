@@ -23,7 +23,7 @@ export default function Placeholder({ title, subtitle, icon: Icon = Construction
           </div>
           <h3 className="font-display text-lg font-semibold text-ink">Módulo especificado no blueprint</h3>
           <p className="mt-2 max-w-md text-sm text-muted">
-            Esta página está desenhada na especificação do decogest{fase ? ` (${fase})` : ""}. A interface e os dados
+            Esta página está desenhada na especificação do redegest{fase ? ` (${fase})` : ""}. A interface e os dados
             reais ligam-se nesta etapa do desenvolvimento.
           </p>
           {bullets && bullets.length > 0 && (

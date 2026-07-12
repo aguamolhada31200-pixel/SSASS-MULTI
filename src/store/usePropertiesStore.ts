@@ -333,7 +333,7 @@ export const usePropertiesStore = create<PropertiesState>()(
       resetSeed: () => set({ properties: SEED }),
     }),
     {
-      name: "decogest-properties",
+      name: "redegest-properties",
       version: 4,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { properties?: Property[] } | undefined;

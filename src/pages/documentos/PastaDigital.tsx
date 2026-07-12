@@ -838,7 +838,7 @@ function DocPanel({
     a.click();
   };
   const partilhar = () => {
-    navigator.clipboard?.writeText(`https://decogest-app.netlify.app/d/${doc.id}`);
+    navigator.clipboard?.writeText(`https://redegest-app.vercel.app/d/${doc.id}`);
     toast.success("Link de partilha copiado");
   };
 

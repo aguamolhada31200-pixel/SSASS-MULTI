@@ -89,6 +89,6 @@ export const useMaintenanceStore = create<MaintenanceState>()(
       byProperty: (propertyId) => get().requests.filter((r) => r.propertyId === propertyId),
       resetSeed: () => set({ requests: SEED }),
     }),
-    { name: "decogest-maintenance", version: 1 }
+    { name: "redegest-maintenance", version: 1 }
   )
 );

@@ -338,7 +338,7 @@ export const useContractsStore = create<ContractsState>()(
       resetSeed: () => set({ contracts: SEED }),
     }),
     {
-      name: "decogest-contracts",
+      name: "redegest-contracts",
       version: 3,
       // v3: contrato do Príncipe Real (projeto colaborativo #003).
       migrate: (persisted: unknown, version: number) => {

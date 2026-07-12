@@ -1432,7 +1432,7 @@ export const useObrasStore = create<ObrasState>()(
         }),
     }),
     {
-      name: "decogest-obras",
+      name: "redegest-obras",
       version: 7,
       // v4: co-gestão. v5/v6: obra parada + marcos espalhados. v7: comprovativos + confirmações.
       // Re-semeia os exemplos mantendo obras/itens criados pelo utilizador.

@@ -318,7 +318,7 @@ function TabAparencia() {
 // ───────────────────────── TAB 5 — Integrações ─────────────────────────
 
 const INTEGRACAO_INFO: { key: keyof ReturnType<typeof useAccountStore.getState>["integracoes"]; nome: string; desc: string }[] = [
-  { key: "stripe", nome: "Stripe", desc: "Subscrição decogest (pagamento do plano)." },
+  { key: "stripe", nome: "Stripe", desc: "Subscrição redegest (pagamento do plano)." },
   { key: "mbway", nome: "MB WAY + Multibanco", desc: "Cobrança de rendas aos inquilinos." },
   { key: "openBanking", nome: "Open Banking", desc: "Importar transações bancárias automaticamente." },
   { key: "docuseal", nome: "DocuSeal", desc: "Assinatura digital de contratos." },
@@ -371,7 +371,7 @@ function TabApi() {
         <div className="rounded-xl border border-dashed border-gold/40 bg-gold/5 p-6 text-center">
           <KeyRound size={28} className="mx-auto mb-2 text-gold-dark" />
           <p className="font-display text-lg font-semibold text-ink">Disponível no plano Business</p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted">Gere chaves de API, configure webhooks e integre o decogest nos seus sistemas.</p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted">Gere chaves de API, configure webhooks e integre o redegest nos seus sistemas.</p>
           <Button variant="gold" className="mt-4" onClick={() => navigate("/faturacao")}>Fazer upgrade para Business</Button>
         </div>
       </SectionCard>
@@ -402,7 +402,7 @@ function TabApi() {
       </SectionCard>
       <SectionCard title="Webhooks" icon={Plug}>
         <Field label="URL do endpoint"><input placeholder="https://o-seu-servidor.pt/webhooks" className={inputCls} /></Field>
-        <p className="mt-2 text-xs text-muted">Documentação: docs.decogest.pt</p>
+        <p className="mt-2 text-xs text-muted">Documentação: docs.redegest.pt</p>
       </SectionCard>
     </>
   );

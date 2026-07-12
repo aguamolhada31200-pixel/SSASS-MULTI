@@ -536,7 +536,7 @@ export const useDocumentsStore = create<DocumentsState>()(
         set((s) => ({ customFolders: s.customFolders.filter((f) => f !== nome) })),
     }),
     {
-      name: "decogest-documents",
+      name: "redegest-documents",
       version: 5,
       // v5: contrato + faturas do Príncipe Real ganham propertyId (surgem na Pasta do imóvel).
       migrate: (persisted: unknown, version: number) => {

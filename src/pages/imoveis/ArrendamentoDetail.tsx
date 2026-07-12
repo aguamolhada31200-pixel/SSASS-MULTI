@@ -413,7 +413,7 @@ function RendasTab({ a }: { a: Arrendamento }) {
 
       <p className="flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2.5 text-[11px] text-muted">
         <InfoIcon size={13} className="shrink-0" />
-        O decogest regista o pagamento e alimenta a Contabilidade (fonte única). A emissão do <strong>recibo de renda oficial</strong> é feita no Portal das Finanças — a app não gera recibos nem submete à AT.
+        O redegest regista o pagamento e alimenta a Contabilidade (fonte única). A emissão do <strong>recibo de renda oficial</strong> é feita no Portal das Finanças — a app não gera recibos nem submete à AT.
       </p>
     </div>
   );

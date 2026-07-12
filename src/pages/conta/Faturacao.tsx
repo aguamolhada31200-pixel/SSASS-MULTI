@@ -60,14 +60,14 @@ export default function Faturacao() {
     const blob = new Blob(["﻿" + [head, ...linhas].join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "faturas-decogest.csv";
+    a.download = "faturas-redegest.csv";
     a.click();
     toast.success("Faturas exportadas");
   };
 
   return (
     <div>
-      <PageHeader title="Faturação" subtitle="Gestão do plano decogest, método de pagamento e faturas." />
+      <PageHeader title="Faturação" subtitle="Gestão do plano redegest, método de pagamento e faturas." />
 
       {/* A) Plano atual */}
       <div className="mb-6 rounded-xl border border-gold/30 bg-gradient-to-br from-accent/60 to-card p-5 shadow-sm">
@@ -182,7 +182,7 @@ export default function Faturacao() {
         {/* F) Código promocional */}
         <SectionCard title="Código promocional" icon={Tag}>
           <div className="flex gap-2">
-            <input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="Ex.: DECOGEST10" className={inputCls} />
+            <input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="Ex.: REDEGEST10" className={inputCls} />
             <Button variant="outline" size="sm" onClick={() => { aplicarPromo(promo) ? toast.success("Código aplicado ✨") : toast.error("Código inválido"); setPromo(""); }}>Aplicar</Button>
           </div>
           {plano.promo && (
@@ -191,7 +191,7 @@ export default function Faturacao() {
         </SectionCard>
 
         {/* D) Dados de faturação */}
-        <SectionCard title="Dados de faturação" icon={Building2} desc="Estes dados aparecem nas faturas que o decogest emite para si.">
+        <SectionCard title="Dados de faturação" icon={Building2} desc="Estes dados aparecem nas faturas que o redegest emite para si.">
           <DadosFaturacaoForm />
         </SectionCard>
 

@@ -756,7 +756,7 @@ export const useListingsStore = create<ListingsState>()(
       resetSeed: () => set({ listings: SEED }),
     }),
     {
-      name: "decogest-listings",
+      name: "redegest-listings",
       version: 8,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { listings?: Listing[] } | undefined;

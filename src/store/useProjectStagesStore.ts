@@ -340,7 +340,7 @@ export const useProjectStagesStore = create<ProjectStagesState>()(
       resetSeed: () => set({ projects: SEED_PROJECTS, stages: SEED_STAGES }),
     }),
     {
-      name: "decogest-project-stages",
+      name: "redegest-project-stages",
       version: 2,
       // v2: etapas seed alinhadas com o estado real dos imóveis (Studio AL e
       // Príncipe Real concluídos; T3 Coimbra em Obras). Substitui projetos/etapas
