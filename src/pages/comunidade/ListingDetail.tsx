@@ -31,6 +31,8 @@ import { useSavedStore } from "@/store/useSavedStore";
 import { useInterestsStore } from "@/store/useInterestsStore";
 import { useConversationsStore } from "@/store/useConversationsStore";
 import { useModalStore } from "@/store/useModalStore";
+import { useGaleriaStore } from "@/store/useGaleriaStore";
+import { ComparacaoCard } from "@/components/galeria/ComparacaoCard";
 import {
   investimentoTotalReab,
   roiReab,
@@ -163,6 +165,9 @@ export default function ListingDetail() {
           {listing.type === "reabilitacao" && <CorpoReab listing={listing} />}
           {listing.type === "cedencia" && <CorpoCedencia listing={listing} author={author} />}
           {listing.type === "arrendamento" && <CorpoArrendamento listing={listing} />}
+
+          {/* Trabalhos anteriores — prova visual, dá confiança a quem vai pôr capital */}
+          {listing.type === "reabilitacao" && <TrabalhosAnteriores authorId={listing.authorId} />}
         </div>
 
         {/* Sidebar */}
@@ -726,6 +731,32 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
         </div>
       </Secao>
     </>
+  );
+}
+
+/**
+ * Trabalhos anteriores do autor do anúncio — até 3 comparações antes/depois
+ * partilháveis (destaques primeiro). Prova visual de execução.
+ */
+function TrabalhosAnteriores({ authorId }: { authorId?: string }) {
+  const comparacoes = useGaleriaStore((s) => s.comparacoes);
+  if (!authorId) return null;
+  const trabalhos = comparacoes
+    .filter((c) => c.criadoPor === authorId && c.visibilidade === "partilhavel_na_rede")
+    .sort((a, b) => Number(b.destaque) - Number(a.destaque) || (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 3);
+  if (trabalhos.length === 0) return null;
+  return (
+    <Card>
+      <CardContent>
+        <SectionHeader title="Trabalhos anteriores deste investidor" />
+        <div className={cn("grid gap-4", trabalhos.length > 1 && "sm:grid-cols-2", trabalhos.length > 2 && "xl:grid-cols-3")}>
+          {trabalhos.map((c) => (
+            <ComparacaoCard key={c.id} c={c} readOnly />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

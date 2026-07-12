@@ -93,6 +93,7 @@ export default function ObraDetalhe() {
   const properties = usePropertiesStore((s) => s.properties);
   const profiles = useProfilesStore((s) => s.profiles);
   const openObraForm = useModalStore((s) => s.openObraForm);
+  const openGaleriaForm = useModalStore((s) => s.openGaleriaForm);
 
   const [tab, setTab] = useState<TabKey>("Fases");
 
@@ -219,7 +220,17 @@ export default function ObraDetalhe() {
                     </Button>
                   )}
                   {obra.estado !== "concluida" && (
-                    <Button size="sm" variant="gold" onClick={() => marcarConcluida(obra.id)}>
+                    <Button
+                      size="sm"
+                      variant="gold"
+                      onClick={() => {
+                        marcarConcluida(obra.id);
+                        toast.success("Obra concluída 🎉", {
+                          description: "Quer criar um antes/depois com as fotos desta obra?",
+                          action: { label: "Criar", onClick: () => openGaleriaForm({ initialObraId: obra.id }) },
+                        });
+                      }}
+                    >
                       <CheckCircle2 size={14} /> Marcar concluída
                     </Button>
                   )}
@@ -1139,9 +1150,13 @@ function FotosTab({ obraId }: { obraId: string }) {
   const obra = useObrasStore((s) => s.obras.find((o) => o.id === obraId));
   const addFoto = useObrasStore((s) => s.addFoto);
   const removeFoto = useObrasStore((s) => s.removeFoto);
+  const despesas = useObrasStore((s) => s.despesas);
+  const openGaleriaForm = useModalStore((s) => s.openGaleriaForm);
   const [url, setUrl] = useState("");
 
   if (!obra) return null;
+
+  const totalFotos = obra.fotos.length + despesas.filter((d) => d.obraId === obraId).reduce((a, d) => a + (d.fotos?.length ?? 0), 0);
 
   const onAdd = () => {
     if (!url.trim()) return;
@@ -1168,6 +1183,11 @@ function FotosTab({ obraId }: { obraId: string }) {
         <Button size="sm" variant="outline" onClick={onAdd}>
           <ImagePlus size={14} /> Adicionar foto
         </Button>
+        {totalFotos > 0 && (
+          <Button size="sm" variant="gold" onClick={() => openGaleriaForm({ initialObraId: obraId })}>
+            <Star size={14} /> Criar antes/depois com estas fotos
+          </Button>
+        )}
       </div>
 
       {obra.fotos.length === 0 ? (

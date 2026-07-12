@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import {
   FileBarChart,
   Wrench,
-  Images,
   Smartphone,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -20,6 +19,7 @@ import Colaborativa from "@/pages/comunidade/Colaborativa";
 import ProjectRoom from "@/pages/comunidade/ProjectRoom";
 import CentroDeComando from "@/pages/comunidade/CentroDeComando";
 import ObraDetalhe from "@/pages/comunidade/ObraDetalhe";
+import GaleriaAntesDepois from "@/pages/comunidade/GaleriaAntesDepois";
 import Mensagens from "@/pages/Mensagens";
 import Estudantes from "@/pages/pessoas/Estudantes";
 import InquilinosList from "@/pages/pessoas/InquilinosList";
@@ -76,22 +76,7 @@ export default function App() {
         <Route path="comunidade/colaborativa" element={<Colaborativa />} />
         <Route path="comunidade/colaborativa/obras" element={<CentroDeComando />} />
         <Route path="obra/:id" element={<ObraDetalhe />} />
-        <Route
-          path="comunidade/colaborativa/galeria"
-          element={
-            <Placeholder
-              title="Galeria antes/depois"
-              subtitle="Comparações visuais das remodelações"
-              icon={Images}
-              fase="Fase 3 — Colaboração"
-              bullets={[
-                "Slider arrastável entre foto 'antes' e 'depois'",
-                "Filtros por projeto/imóvel/obra",
-                "Categoria e custo por comparação · lightbox",
-              ]}
-            />
-          }
-        />
+        <Route path="comunidade/colaborativa/galeria" element={<GaleriaAntesDepois />} />
         <Route path="comunidade/colaborativa/:id" element={<ProjectRoom />} />
 
         {/* Pessoas */}

@@ -69,6 +69,10 @@ interface ModalState {
   interestForm: { open: boolean; listingId: string | null };
   openInterest: (listingId: string) => void;
   closeInterest: () => void;
+
+  galeriaForm: { open: boolean; editingId: string | null; initialObraId: string | null };
+  openGaleriaForm: (params?: { editingId?: string | null; initialObraId?: string | null }) => void;
+  closeGaleriaForm: () => void;
 }
 
 export const useModalStore = create<ModalState>((set) => ({
@@ -155,4 +159,15 @@ export const useModalStore = create<ModalState>((set) => ({
   interestForm: { open: false, listingId: null },
   openInterest: (listingId) => set({ interestForm: { open: true, listingId } }),
   closeInterest: () => set({ interestForm: { open: false, listingId: null } }),
+
+  galeriaForm: { open: false, editingId: null, initialObraId: null },
+  openGaleriaForm: (params = {}) =>
+    set({
+      galeriaForm: {
+        open: true,
+        editingId: params.editingId ?? null,
+        initialObraId: params.initialObraId ?? null,
+      },
+    }),
+  closeGaleriaForm: () => set({ galeriaForm: { open: false, editingId: null, initialObraId: null } }),
 }));
