@@ -43,7 +43,6 @@ import {
   valorMercadoAtualReab,
   valorMercadoPosObrasReab,
   retornoEntradaReab,
-  folgaFinanceiraReab,
   margemSegurancaReab,
   nivelSegurancaReab,
   NIVEL_SEGURANCA_LABEL,
@@ -426,7 +425,6 @@ function CorpoReab({ listing }: { listing: L }) {
   const roi = roiReab(listing);
   const lucroParceiro = lucroParceiroReab(listing);
   const retEntrada = retornoEntradaReab(listing);
-  const uplift = mercadoAtual > 0 ? ((mercadoPos - mercadoAtual) / mercadoAtual) * 100 : 0;
   const capitalProcurado = listing.capitalProcurado ?? 0;
   const invPct = splitParceiroPct(listing);
   const promPct = splitPromotorPct(listing);
@@ -481,15 +479,6 @@ function CorpoReab({ listing }: { listing: L }) {
             <MetricCard label="Valor de mercado atual" value={eur(mercadoAtual)} />
             <MetricCard label="Desconto obtido" value={eur(listing.valorNegociado ?? 0)} tone={listing.valorNegociado ? "success" : undefined} />
           </div>
-
-          {mercadoAtual > 0 && mercadoPos > mercadoAtual && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-gold/20 bg-gradient-to-r from-accent to-card px-4 py-2.5 text-sm">
-              <Sparkles size={14} className="text-gold-dark" />
-              <span className="text-muted">Uplift esperado após obras:</span>
-              <span className="num font-semibold text-gold-dark">+{pct(uplift)}</span>
-              <span className="text-muted">({eur(mercadoPos - mercadoAtual)})</span>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -569,7 +558,6 @@ const SEG_UI: Record<NivelSeguranca, { emoji: string; text: string; bar: string;
  */
 function MargemSeguranca({ listing }: { listing: L }) {
   const margem = margemSegurancaReab(listing);
-  const folga = folgaFinanceiraReab(listing);
   const nivel = nivelSegurancaReab(margem);
   const ui = SEG_UI[nivel];
   const fill = Math.max(0, Math.min(100, (margem / 30) * 100));
@@ -590,10 +578,6 @@ function MargemSeguranca({ listing }: { listing: L }) {
           <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-line/60">
             <div className={cn("h-full rounded-full transition-all", ui.bar)} style={{ width: `${fill}%` }} />
           </div>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <MetricCard label="Folga financeira" value={eur(folga)} tone={folga >= 0 ? "success" : "danger"} highlighted />
-          <MetricCard label="Valor de mercado pós-obras" value={eur(valorMercadoPosObrasReab(listing))} />
         </div>
       </CardContent>
     </Card>

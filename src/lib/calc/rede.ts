@@ -133,7 +133,7 @@ export function nivelSegurancaReab(margemPct: number): NivelSeguranca {
 }
 
 export const NIVEL_SEGURANCA_LABEL: Record<NivelSeguranca, string> = {
-  muito_segura: "Muito segura",
+  muito_segura: "Excelente",
   boa: "Boa",
   atencao: "Atenção",
   risco: "Elevado risco",

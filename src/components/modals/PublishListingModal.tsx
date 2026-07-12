@@ -746,10 +746,7 @@ function CamposReab({
               <span className={cn("text-sm font-semibold", segUi.text)}>{segUi.emoji} {NIVEL_SEGURANCA_LABEL[nivelSeg]}</span>
               <span className="text-[11px] text-muted">Margem de segurança</span>
             </span>
-            <span className="flex items-center gap-3">
-              <span className={cn("num text-sm font-bold", segUi.text)}>{pct(margem)}</span>
-              <span className="text-[11px] text-muted">Folga {eur(lucro)}</span>
-            </span>
+            <span className={cn("num text-sm font-bold", segUi.text)}>{pct(margem)}</span>
           </div>
         )}
       </div>
