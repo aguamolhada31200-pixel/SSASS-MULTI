@@ -678,11 +678,15 @@ function CamposReab({
   );
 }
 
-/** Cabeçalho de agrupamento visual dos campos do formulário — título + linha separadora. */
+/** Cabeçalho de agrupamento visual dos campos do formulário — ponto + título dourado + linha separadora. */
 function CamposSecao({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-3 border-b border-line pb-1.5 text-xs font-medium uppercase tracking-wider text-muted">{title}</p>
+      <div className="mb-3 flex items-center gap-2">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+        <p className="font-display text-xs font-semibold uppercase tracking-[0.14em] text-gold-dark">{title}</p>
+        <span className="h-px flex-1 bg-line" />
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">{children}</div>
     </div>
   );
