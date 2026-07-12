@@ -43,6 +43,11 @@ import {
   valorMercadoAtualReab,
   valorMercadoPosObrasReab,
   retornoEntradaReab,
+  folgaFinanceiraReab,
+  margemSegurancaReab,
+  nivelSegurancaReab,
+  NIVEL_SEGURANCA_LABEL,
+  type NivelSeguranca,
   ctaCedencia,
   lucroCedencia,
   roiCedencia,
@@ -488,6 +493,9 @@ function CorpoReab({ listing }: { listing: L }) {
         </CardContent>
       </Card>
 
+      {/* ─────── Margem de Segurança — folga da operação sobre o preço de venda ─────── */}
+      {valorMercadoPosObrasReab(listing) > 0 && <MargemSeguranca listing={listing} />}
+
       {/* ─────── BLOCO 2 — Rentabilidade do INVESTIDOR ─────── */}
       <Card className="border-gold/30 bg-gradient-to-br from-gold/[0.04] to-card">
         <CardContent>
@@ -544,6 +552,51 @@ function SplitParceria({ invPct, promPct, capital, lucroParceiro }: { invPct: nu
         <span className="num font-bold text-success">{eur(lucroParceiro)}</span> para si.
       </p>
     </div>
+  );
+}
+
+const SEG_UI: Record<NivelSeguranca, { emoji: string; text: string; bar: string; chipBg: string; chipBorder: string }> = {
+  muito_segura: { emoji: "🟢", text: "text-success", bar: "bg-success", chipBg: "bg-success/10", chipBorder: "border-success/30" },
+  boa: { emoji: "🟡", text: "text-gold-dark", bar: "bg-gold", chipBg: "bg-gold/10", chipBorder: "border-gold/40" },
+  atencao: { emoji: "🟠", text: "text-warning", bar: "bg-warning", chipBg: "bg-warning/10", chipBorder: "border-warning/30" },
+  risco: { emoji: "🔴", text: "text-danger", bar: "bg-danger", chipBg: "bg-danger/10", chipBorder: "border-danger/30" },
+};
+
+/**
+ * Margem de Segurança — folga da operação sobre o PREÇO DE VENDA (não sobre o
+ * investimento). Margem = (Valor pós-obras − Investimento Total) / Valor pós-obras.
+ * A barra usa uma escala 0–30% (acima disso enche); o chip classifica o nível.
+ */
+function MargemSeguranca({ listing }: { listing: L }) {
+  const margem = margemSegurancaReab(listing);
+  const folga = folgaFinanceiraReab(listing);
+  const nivel = nivelSegurancaReab(margem);
+  const ui = SEG_UI[nivel];
+  const fill = Math.max(0, Math.min(100, (margem / 30) * 100));
+  return (
+    <Card>
+      <CardContent>
+        <SectionHeader title="Margem de Segurança" />
+        <div className="rounded-2xl border border-line bg-bg/40 p-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Margem de segurança</p>
+              <p className={cn("num font-display text-3xl font-bold", ui.text)}>{pct(margem)}</p>
+            </div>
+            <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold", ui.chipBg, ui.chipBorder, ui.text)}>
+              {ui.emoji} {NIVEL_SEGURANCA_LABEL[nivel]}
+            </span>
+          </div>
+          <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-line/60">
+            <div className={cn("h-full rounded-full transition-all", ui.bar)} style={{ width: `${fill}%` }} />
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <MetricCard label="Folga financeira" value={eur(folga)} tone={folga >= 0 ? "success" : "danger"} highlighted />
+          <MetricCard label="Valor de mercado pós-obras" value={eur(valorMercadoPosObrasReab(listing))} />
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

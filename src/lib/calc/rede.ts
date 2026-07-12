@@ -103,6 +103,43 @@ export function retornoEntradaReab(l: Listing): number {
 }
 
 /**
+ * Folga Financeira (reabilitação) = Valor de Mercado Pós-Obras − Investimento Total.
+ * Numericamente igual ao lucro pós-obras, mas noutra ótica: a almofada em euros
+ * até ao break-even (quanto o preço de venda pode cair sem gerar prejuízo).
+ */
+export function folgaFinanceiraReab(l: Listing): number {
+  return lucroReab(l);
+}
+
+/**
+ * Margem de Segurança (%) = (Folga Financeira ÷ Valor de Mercado Pós-Obras) × 100.
+ * Mede a folga sobre o PREÇO DE VENDA (não sobre o investimento, como o ROI) —
+ * quanto o valor de venda pode descer antes de o negócio deixar de dar lucro.
+ */
+export function margemSegurancaReab(l: Listing): number {
+  const pos = valorMercadoPosObrasReab(l);
+  if (pos <= 0) return 0;
+  return (folgaFinanceiraReab(l) / pos) * 100;
+}
+
+export type NivelSeguranca = "muito_segura" | "boa" | "atencao" | "risco";
+
+/** Classificação da margem de segurança: >20% muito segura · 15–20% boa · 10–15% atenção · <10% risco. */
+export function nivelSegurancaReab(margemPct: number): NivelSeguranca {
+  if (margemPct >= 20) return "muito_segura";
+  if (margemPct >= 15) return "boa";
+  if (margemPct >= 10) return "atencao";
+  return "risco";
+}
+
+export const NIVEL_SEGURANCA_LABEL: Record<NivelSeguranca, string> = {
+  muito_segura: "Muito segura",
+  boa: "Boa",
+  atencao: "Atenção",
+  risco: "Elevado risco",
+};
+
+/**
  * Preço acordado (CPCV) = Valor do Imóvel − Valor Negociado.
  * O "valor negociado" é o desconto conseguido (quanto se baixou ao preço do imóvel),
  * por isso o preço efetivamente acordado é o valor do imóvel menos esse desconto.

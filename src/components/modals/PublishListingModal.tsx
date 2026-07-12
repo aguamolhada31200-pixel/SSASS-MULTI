@@ -27,6 +27,10 @@ import {
   roiReab,
   lucroParceiroReab,
   retornoEntradaReab,
+  margemSegurancaReab,
+  nivelSegurancaReab,
+  NIVEL_SEGURANCA_LABEL,
+  type NivelSeguranca,
   arrendamentoAuto,
   ctaCedencia,
   lucroCedencia,
@@ -593,6 +597,13 @@ function CalcTile({ label, value, tone, hint }: { label: string; value: string; 
   );
 }
 
+const SEG_UI: Record<NivelSeguranca, { emoji: string; text: string; chipBg: string; chipBorder: string }> = {
+  muito_segura: { emoji: "🟢", text: "text-success", chipBg: "bg-success/10", chipBorder: "border-success/30" },
+  boa: { emoji: "🟡", text: "text-gold-dark", chipBg: "bg-gold/10", chipBorder: "border-gold/40" },
+  atencao: { emoji: "🟠", text: "text-warning", chipBg: "bg-warning/10", chipBorder: "border-warning/30" },
+  risco: { emoji: "🔴", text: "text-danger", chipBg: "bg-danger/10", chipBorder: "border-danger/30" },
+};
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function CamposReab({
   register,
@@ -625,6 +636,9 @@ function CamposReab({
   const roi = roiReab(draft);
   const lucroParceiro = lucroParceiroReab(draft);
   const retorno = retornoEntradaReab(draft);
+  const margem = margemSegurancaReab(draft);
+  const nivelSeg = nivelSegurancaReab(margem);
+  const segUi = SEG_UI[nivelSeg];
 
   const calcularImpostosAuto = () => {
     if (precoAcordado <= 0) return;
@@ -726,6 +740,18 @@ function CamposReab({
           <CalcTile label={`Lucro do investidor (${invPct}%)`} value={posObras > 0 ? eur(lucroParceiro) : "—"} tone={posObras > 0 ? (lucroParceiro >= 0 ? "success" : "danger") : undefined} />
           <CalcTile label="Retorno sobre a entrada" value={posObras > 0 && capital > 0 ? pct(retorno) : "—"} tone="gold" hint={posObras > 0 && capital > 0 && values.tempoAteVenda ? `(em ${values.tempoAteVenda})` : undefined} />
         </div>
+        {posObras > 0 && (
+          <div className={cn("mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2", segUi.chipBg, segUi.chipBorder)}>
+            <span className="flex items-center gap-2">
+              <span className={cn("text-sm font-semibold", segUi.text)}>{segUi.emoji} {NIVEL_SEGURANCA_LABEL[nivelSeg]}</span>
+              <span className="text-[11px] text-muted">Margem de segurança</span>
+            </span>
+            <span className="flex items-center gap-3">
+              <span className={cn("num text-sm font-bold", segUi.text)}>{pct(margem)}</span>
+              <span className="text-[11px] text-muted">Folga {eur(lucro)}</span>
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1146,6 +1172,7 @@ function SummaryFinanceReab({ v }: { v: FormValues }) {
   const lucro = lucroReab(draft);
   const roi = roiReab(draft);
   const retorno = retornoEntradaReab(draft);
+  const margem = margemSegurancaReab(draft);
   return (
     <SummarySection title="Números da operação — Compra e Revenda">
       {valorImovel > 0 && <SummaryRow k="Valor do imóvel (CPCV)" v={eur(valorImovel)} />}
@@ -1159,6 +1186,9 @@ function SummaryFinanceReab({ v }: { v: FormValues }) {
       {posObras > 0 && <SummaryRow k="Valor de mercado pós-obras" v={eur(posObras)} />}
       {posObras > 0 && <SummaryRow k="Lucro estimado pós-obras" v={eur(lucro)} />}
       {posObras > 0 && investimentoTotal > 0 && <SummaryRow k="ROI da operação prevista" v={pct(roi)} />}
+      {posObras > 0 && (
+        <SummaryRow k="Margem de segurança" v={`${pct(margem)} · ${NIVEL_SEGURANCA_LABEL[nivelSegurancaReab(margem)]}`} />
+      )}
       {capital > 0 && <SummaryRow k="Capital procurado" v={eur(capital)} />}
       {v.split && <SummaryRow k="Divisão do lucro" v={`Investidor ${parseInvestidorPct(v.split)}% · Promotor ${100 - parseInvestidorPct(v.split)}%`} />}
       {capital > 0 && posObras > 0 && (
