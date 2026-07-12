@@ -12,6 +12,7 @@ import {
   ENERGY_SCALE,
   TIPO_CEDENCIA_LABEL,
   TIPO_IMOVEL_LABEL,
+  type Listing,
   type ListingType,
   type Tipologia,
   type EstadoImovel,
@@ -20,8 +21,12 @@ import {
 } from "@/store/useListingsStore";
 import { CURRENT_USER_ID } from "@/store/useProfilesStore";
 import {
+  ctaReab,
   investimentoTotalReab,
+  lucroReab,
   roiReab,
+  lucroParceiroReab,
+  retornoEntradaReab,
   arrendamentoAuto,
   ctaCedencia,
   lucroCedencia,
@@ -557,6 +562,37 @@ function parseInvestidorPct(s?: string): number {
   return isFinite(v) && v >= 0 && v <= 100 ? Math.round(v) : 50;
 }
 
+/**
+ * Constrói um Listing a partir dos valores do formulário (reabilitação) para
+ * reutilizar os mesmos helpers de cálculo da página do anúncio — garante que os
+ * indicadores do modal (CTA, Lucro, ROI, Retorno) batem certo com o que o
+ * investidor vê depois de publicado.
+ */
+function reabDraft(v: FormValues): Listing {
+  return {
+    valorImovel: Number(v.valorImovel) || 0,
+    impostos: Number(v.impostos) || 0,
+    orcamentoObras: Number(v.orcamentoObras) || 0,
+    outrosCustos: Number(v.outrosCustos) || 0,
+    valorMercadoAtual: Number(v.valorMercadoAtual) || 0,
+    valorMercadoPosObras: Number(v.valorMercadoPosObras) || 0,
+    capitalProcurado: Number(v.capitalProcurado) || 0,
+    split: v.split,
+  } as Listing;
+}
+
+/** Tile só-de-leitura para indicadores calculados no modal (mesmo look da página do anúncio). */
+function CalcTile({ label, value, tone, hint }: { label: string; value: string; tone?: "gold" | "success" | "danger"; hint?: string }) {
+  const color = tone === "gold" ? "text-gold-dark" : tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-ink";
+  return (
+    <div className="rounded-lg border border-line/60 bg-card p-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">{label}</p>
+      <p className={cn("num mt-0.5 text-sm font-bold", color)}>{value}</p>
+      {hint && <p className="mt-0.5 text-[10px] font-medium text-muted">{hint}</p>}
+    </div>
+  );
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function CamposReab({
   register,
@@ -578,10 +614,17 @@ function CamposReab({
   const valorImovel = Number(values.valorImovel) || 0;
   const valorNegociado = Number(values.valorNegociado) || 0; // desconto conseguido
   const precoAcordado = Math.max(0, valorImovel - valorNegociado);
-  const impostos = Number(values.impostos) || 0;
-  const orcamento = Number(values.orcamentoObras) || 0;
-  const outros = Number(values.outrosCustos) || 0;
-  const investimentoTotal = valorImovel + impostos + orcamento + outros;
+  const capital = Number(values.capitalProcurado) || 0;
+  const posObras = Number(values.valorMercadoPosObras) || 0;
+
+  // Indicadores calculados com os MESMOS helpers da página do anúncio (paridade garantida).
+  const draft = reabDraft(values);
+  const cta = ctaReab(draft);
+  const investimentoTotal = investimentoTotalReab(draft);
+  const lucro = lucroReab(draft);
+  const roi = roiReab(draft);
+  const lucroParceiro = lucroParceiroReab(draft);
+  const retorno = retornoEntradaReab(draft);
 
   const calcularImpostosAuto = () => {
     if (precoAcordado <= 0) return;
@@ -631,13 +674,6 @@ function CamposReab({
         <Field label="Venda prevista (opcional)" className="sm:col-span-2">
           <input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 6 meses" />
         </Field>
-
-        <Field label="Investimento Total (auto)" className="sm:col-span-2">
-          <div className="flex items-center rounded-lg border border-gold/40 bg-gold/5">
-            <input readOnly value={investimentoTotal ? eur(investimentoTotal) : "—"} className="num h-10 w-full bg-transparent px-3 text-sm font-semibold text-gold-dark outline-none" />
-          </div>
-          <p className="mt-1 text-[10px] text-muted">= Valor do imóvel + Impostos + Orçamento de obras + Outros custos</p>
-        </Field>
       </CamposSecao>
 
       <CamposSecao title="Parceria">
@@ -674,6 +710,23 @@ function CamposReab({
           </p>
         </div>
       </CamposSecao>
+
+      {/* Indicadores automáticos — os mesmos números que o investidor vê na página do anúncio */}
+      <div className="rounded-xl border border-gold/30 bg-gradient-to-br from-gold/[0.04] to-card p-3">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+          <p className="font-display text-xs font-bold uppercase tracking-[0.14em] text-gold-dark">Indicadores automáticos</p>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <CalcTile label="CTA · Custo Total da Aquisição" value={valorImovel > 0 ? eur(cta) : "—"} />
+          <CalcTile label="Investimento Total" value={investimentoTotal > 0 ? eur(investimentoTotal) : "—"} tone="gold" />
+          <CalcTile label="Lucro estimado pós-obras" value={posObras > 0 ? eur(lucro) : "—"} tone={posObras > 0 ? (lucro >= 0 ? "success" : "danger") : undefined} />
+          <CalcTile label="ROI da operação prevista" value={posObras > 0 && investimentoTotal > 0 ? pct(roi) : "—"} tone="gold" />
+          <CalcTile label={`Lucro do investidor (${invPct}%)`} value={posObras > 0 ? eur(lucroParceiro) : "—"} tone={posObras > 0 ? (lucroParceiro >= 0 ? "success" : "danger") : undefined} />
+          <CalcTile label="Retorno sobre a entrada" value={posObras > 0 && capital > 0 ? pct(retorno) : "—"} tone="gold" hint={posObras > 0 && capital > 0 && values.tempoAteVenda ? `(em ${values.tempoAteVenda})` : undefined} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -1079,27 +1132,38 @@ function SummaryRow({ k, v, multiline }: { k: string; v: string | number; multil
 }
 
 function SummaryFinanceReab({ v }: { v: FormValues }) {
+  const draft = reabDraft(v);
   const valorImovel = Number(v.valorImovel) || 0;
   const impostos = Number(v.impostos) || 0;
   const orcamento = Number(v.orcamentoObras) || 0;
   const outros = Number(v.outrosCustos) || 0;
-  const investimentoTotal = valorImovel + impostos + orcamento + outros;
   const mercadoAtual = Number(v.valorMercadoAtual) || 0;
   const posObras = Number(v.valorMercadoPosObras) || 0;
   const desconto = Number(v.valorNegociado) || 0;
   const capital = Number(v.capitalProcurado) || 0;
+  const cta = ctaReab(draft);
+  const investimentoTotal = investimentoTotalReab(draft);
+  const lucro = lucroReab(draft);
+  const roi = roiReab(draft);
+  const retorno = retornoEntradaReab(draft);
   return (
     <SummarySection title="Números da operação — Compra e Revenda">
       {valorImovel > 0 && <SummaryRow k="Valor do imóvel (CPCV)" v={eur(valorImovel)} />}
       {desconto > 0 && <SummaryRow k="Desconto obtido" v={eur(desconto)} />}
       {impostos > 0 && <SummaryRow k="Impostos (IMT + IS + Registos)" v={eur(impostos)} />}
+      {cta > 0 && <SummaryRow k="CTA · Custo Total da Aquisição" v={eur(cta)} />}
       {orcamento > 0 && <SummaryRow k="Orçamento das obras" v={eur(orcamento)} />}
       {outros > 0 && <SummaryRow k="Outros custos" v={eur(outros)} />}
       {investimentoTotal > 0 && <SummaryRow k="Investimento Total" v={eur(investimentoTotal)} />}
       {mercadoAtual > 0 && <SummaryRow k="Valor de mercado atual" v={eur(mercadoAtual)} />}
       {posObras > 0 && <SummaryRow k="Valor de mercado pós-obras" v={eur(posObras)} />}
+      {posObras > 0 && <SummaryRow k="Lucro estimado pós-obras" v={eur(lucro)} />}
+      {posObras > 0 && investimentoTotal > 0 && <SummaryRow k="ROI da operação prevista" v={pct(roi)} />}
       {capital > 0 && <SummaryRow k="Capital procurado" v={eur(capital)} />}
       {v.split && <SummaryRow k="Divisão do lucro" v={`Investidor ${parseInvestidorPct(v.split)}% · Promotor ${100 - parseInvestidorPct(v.split)}%`} />}
+      {capital > 0 && posObras > 0 && (
+        <SummaryRow k="Retorno sobre a entrada" v={`${pct(retorno)}${v.tempoAteVenda ? ` (em ${v.tempoAteVenda})` : ""}`} />
+      )}
       {v.prazoObras && <SummaryRow k="Prazo das obras" v={v.prazoObras} />}
       {v.tempoAteVenda && <SummaryRow k="Venda prevista" v={v.tempoAteVenda} />}
     </SummarySection>
