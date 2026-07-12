@@ -103,6 +103,7 @@ const schema = z
       req(!!v.valorImovel && v.valorImovel > 0, "valorImovel", "Obrigatório");
       req(!!v.capitalProcurado && v.capitalProcurado > 0, "capitalProcurado", "Obrigatório");
       req(!!v.valorMercadoPosObras && v.valorMercadoPosObras > 0, "valorMercadoPosObras", "Obrigatório");
+      req(!!v.tempoAteVenda && v.tempoAteVenda.trim().length > 0, "tempoAteVenda", "Obrigatório");
     } else if (v.type === "cedencia") {
       req(!!v.valorCedencia && v.valorCedencia > 0, "valorCedencia", "Obrigatório");
       req(!!v.tipoCedencia, "tipoCedencia", "Obrigatório");
@@ -685,7 +686,7 @@ function CamposReab({
         <Num label="Valor de mercado atual (opcional, sem obras)" reg={register("valorMercadoAtual")} suffix="€" />
         <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
 
-        <Field label="Venda prevista (opcional)" className="sm:col-span-2">
+        <Field label="Venda prevista" error={errors.tempoAteVenda?.message} className="sm:col-span-2">
           <input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 6 meses" />
         </Field>
       </CamposSecao>

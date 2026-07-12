@@ -43,8 +43,27 @@ export default function RedeInvestidores() {
 
   const tabParam = params.get("tab");
   const tab: RedeTab = tabParam === "guardados" || tabParam === "investidores" ? tabParam : "anuncios";
-  const setTab = (t: RedeTab) => setParams(t === "anuncios" ? {} : { tab: t }, { replace: true });
-  const [categoria, setCategoria] = useState<"todas" | ListingType>("todas");
+
+  const catParam = params.get("cat");
+  const categoria: "todas" | ListingType =
+    catParam === "reabilitacao" || catParam === "cedencia" || catParam === "arrendamento" ? catParam : "todas";
+
+  // Guardar tab + categoria na URL para o filtro persistir ao voltar (seta do navegador).
+  const patchParams = (patch: Record<string, string | null>) =>
+    setParams(
+      (prev) => {
+        const nextP = new URLSearchParams(prev);
+        for (const [k, val] of Object.entries(patch)) {
+          if (val == null || val === "") nextP.delete(k);
+          else nextP.set(k, val);
+        }
+        return nextP;
+      },
+      { replace: true }
+    );
+
+  const setTab = (t: RedeTab) => patchParams({ tab: t === "anuncios" ? null : t });
+  const setCategoria = (c: "todas" | ListingType) => patchParams({ cat: c === "todas" ? null : c });
   const [capital, setCapital] = useState<CapitalFiltro>("todos");
   const [distrito, setDistrito] = useState("todos");
   const [cidade, setCidade] = useState("todos");
