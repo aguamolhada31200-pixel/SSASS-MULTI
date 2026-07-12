@@ -538,9 +538,9 @@ function Field({ label, error, className, children }: { label: string; error?: s
   );
 }
 
-function Num({ label, reg, error, suffix }: { label: string; reg: UseFormRegisterReturn; error?: string; suffix?: string }) {
+function Num({ label, reg, error, suffix, className }: { label: string; reg: UseFormRegisterReturn; error?: string; suffix?: string; className?: string }) {
   return (
-    <Field label={label} error={error}>
+    <Field label={label} error={error} className={className}>
       <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
         <input type="number" step="any" {...reg} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
         {suffix && <span className="px-3 text-sm text-muted">{suffix}</span>}
@@ -591,75 +591,99 @@ function CamposReab({
   };
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <Num label="Valor do imóvel (CPCV)" reg={register("valorImovel")} suffix="€" error={errors.valorImovel?.message} />
-      <Field label="Desconto obtido (opcional)">
-        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-          <input type="number" step="any" {...register("valorNegociado")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
-          <span className="px-3 text-sm text-muted">€</span>
-        </div>
-        <p className="mt-1 text-[10px] text-muted">
-          = quanto baixou ao valor do imóvel {precoAcordado > 0 ? `· preço acordado ${eur(precoAcordado)}` : ""}
-        </p>
-      </Field>
+    <div className="space-y-5">
+      <CamposSecao title="Aquisição">
+        <Num label="Valor do imóvel (CPCV)" reg={register("valorImovel")} suffix="€" error={errors.valorImovel?.message} />
+        <Field label="Desconto obtido (opcional)">
+          <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
+            <input type="number" step="any" {...register("valorNegociado")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
+            <span className="px-3 text-sm text-muted">€</span>
+          </div>
+          <p className="mt-1 text-[10px] text-muted">
+            = quanto baixou ao valor do imóvel {precoAcordado > 0 ? `· preço acordado ${eur(precoAcordado)}` : ""}
+          </p>
+        </Field>
 
-      <Field label="Impostos (IMT + IS + Registos)">
-        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-          <input type="number" step="any" {...register("impostos")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
-          <span className="px-3 text-sm text-muted">€</span>
-        </div>
-        <button type="button" onClick={calcularImpostosAuto} className="mt-1 text-[11px] text-secondary hover:underline">
-          ⚡ Calcular automaticamente (IMT HS + IS 0,8% + Registo)
-        </button>
-      </Field>
-      <Num label="Orçamento de obras" reg={register("orcamentoObras")} suffix="€" error={errors.orcamentoObras?.message} />
-      <Num label="Outros custos (opcional)" reg={register("outrosCustos")} suffix="€" />
+        <Field label="Impostos (IMT + IS + Registos)" className="sm:col-span-2">
+          <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
+            <input type="number" step="any" {...register("impostos")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
+            <span className="px-3 text-sm text-muted">€</span>
+          </div>
+          <button type="button" onClick={calcularImpostosAuto} className="mt-1 text-[11px] text-secondary hover:underline">
+            ⚡ Calcular automaticamente (IMT HS + IS 0,8% + Registo)
+          </button>
+        </Field>
 
-      <Field label="Investimento Total (auto)" className="sm:col-span-2">
-        <div className="flex items-center rounded-lg border border-gold/40 bg-gold/5">
-          <input readOnly value={investimentoTotal ? eur(investimentoTotal) : "—"} className="num h-10 w-full bg-transparent px-3 text-sm font-semibold text-gold-dark outline-none" />
-        </div>
-        <p className="mt-1 text-[10px] text-muted">= Valor do imóvel + Impostos + Orçamento de obras + Outros custos</p>
-      </Field>
+        <Num label="Outros custos (opcional)" reg={register("outrosCustos")} suffix="€" className="sm:col-span-2" />
+      </CamposSecao>
 
-      <Num label="Valor de mercado atual (opcional, sem obras)" reg={register("valorMercadoAtual")} suffix="€" />
-      <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
+      <CamposSecao title="Obra">
+        <Num label="Orçamento de obras" reg={register("orcamentoObras")} suffix="€" error={errors.orcamentoObras?.message} className="sm:col-span-2" />
+        <Field label="Prazo estimado das obras (opcional)" className="sm:col-span-2">
+          <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 10 meses" />
+        </Field>
+      </CamposSecao>
 
-      <Field label="Prazo estimado das obras (opcional)"><input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 10 meses" /></Field>
-      <Field label="Tempo estimado até à venda (opcional)"><input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 18 meses" /></Field>
+      <CamposSecao title="Resultado esperado">
+        <Num label="Valor de mercado atual (opcional, sem obras)" reg={register("valorMercadoAtual")} suffix="€" />
+        <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
 
-      <Num label="Capital procurado" reg={register("capitalProcurado")} suffix="€" error={errors.capitalProcurado?.message} />
+        <Field label="Tempo estimado até à venda (opcional)" className="sm:col-span-2">
+          <input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 18 meses" />
+        </Field>
 
-      {/* Divisão do lucro — deixa claro quanto o INVESTIDOR recebe */}
-      <div className="sm:col-span-2">
-        <span className="mb-1 block text-xs font-medium text-muted">Divisão do lucro — quanto oferece ao investidor?</span>
-        <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={5}
-            value={invPct}
-            onChange={(e) => setInv(Number(e.target.value))}
-            className="flex-1 accent-[#C8A664]"
-          />
-          <div className="flex items-center rounded-lg border border-line bg-card">
+        <Field label="Investimento Total (auto)" className="sm:col-span-2">
+          <div className="flex items-center rounded-lg border border-gold/40 bg-gold/5">
+            <input readOnly value={investimentoTotal ? eur(investimentoTotal) : "—"} className="num h-10 w-full bg-transparent px-3 text-sm font-semibold text-gold-dark outline-none" />
+          </div>
+          <p className="mt-1 text-[10px] text-muted">= Valor do imóvel + Impostos + Orçamento de obras + Outros custos</p>
+        </Field>
+      </CamposSecao>
+
+      <CamposSecao title="Parceria">
+        <Num label="Capital procurado" reg={register("capitalProcurado")} suffix="€" error={errors.capitalProcurado?.message} className="sm:col-span-2" />
+
+        {/* Divisão do lucro — deixa claro quanto o INVESTIDOR recebe */}
+        <div className="sm:col-span-2">
+          <span className="mb-1 block text-xs font-medium text-muted">Divisão do lucro — quanto oferece ao investidor?</span>
+          <div className="flex items-center gap-3">
             <input
-              type="number"
+              type="range"
               min={0}
               max={100}
+              step={5}
               value={invPct}
               onChange={(e) => setInv(Number(e.target.value))}
-              className="h-9 w-14 bg-transparent px-2 text-center text-sm outline-none"
+              className="flex-1 accent-[#C8A664]"
             />
-            <span className="px-2 text-sm text-muted">%</span>
+            <div className="flex items-center rounded-lg border border-line bg-card">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={invPct}
+                onChange={(e) => setInv(Number(e.target.value))}
+                className="h-9 w-14 bg-transparent px-2 text-center text-sm outline-none"
+              />
+              <span className="px-2 text-sm text-muted">%</span>
+            </div>
           </div>
+          <p className="mt-1.5 flex items-center justify-between text-[11px]">
+            <span className="font-semibold text-gold-dark">Investidor recebe {invPct}%</span>
+            <span className="text-muted">Você (promotor) fica com {100 - invPct}%</span>
+          </p>
         </div>
-        <p className="mt-1.5 flex items-center justify-between text-[11px]">
-          <span className="font-semibold text-gold-dark">Investidor recebe {invPct}%</span>
-          <span className="text-muted">Você (promotor) fica com {100 - invPct}%</span>
-        </p>
-      </div>
+      </CamposSecao>
+    </div>
+  );
+}
+
+/** Cabeçalho de agrupamento visual dos campos do formulário — título + linha separadora. */
+function CamposSecao({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-3 border-b border-line pb-1.5 text-xs font-medium uppercase tracking-wider text-muted">{title}</p>
+      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
     </div>
   );
 }
