@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   CalendarClock,
+  CalendarRange,
   Plus,
   Search as SearchIcon,
-  LayoutGrid,
   List as ListIcon,
-  GitBranch,
-  Check,
-  Lock,
-  TriangleAlert,
   Building2,
+  Hourglass,
+  Wallet,
+  Flag,
+  TriangleAlert,
   X,
   ArrowRight,
 } from "lucide-react";
@@ -19,28 +19,48 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { StatCard } from "@/components/StatCard";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { useExampleData } from "@/store/useExampleData";
 import {
   useProjectStagesStore,
-  STAGE_TEMPLATES,
   STAGE_COUNT,
-  STATUS_LABEL,
-  progressoProjeto,
   etapaAtual,
   diasNaEtapa,
   projetoParado,
   prazoUltrapassado,
   type InvestmentProject,
   type Stage,
-  type StageStatus,
   type InvestMode,
 } from "@/store/useProjectStagesStore";
-import { usePropertiesStore, PROP_TYPE_LABEL } from "@/store/usePropertiesStore";
+import { usePropertiesStore, PROP_TYPE_LABEL, type Property } from "@/store/usePropertiesStore";
+import { custoEsperaMes, custoEsperaDia } from "@/lib/calc/espera";
+import { eur, dataPTShort, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type Vista = "timeline" | "kanban" | "lista";
+type Vista = "progresso" | "cronograma";
+
+// As 11 etapas agrupadas em 4 fases legíveis.
+const FASES = [
+  { nome: "Preparar", de: 1, ate: 3 },
+  { nome: "Comprar", de: 4, ate: 7 },
+  { nome: "Transformar", de: 8, ate: 9 },
+  { nome: "Rentabilizar", de: 10, ate: 11 },
+] as const;
+
+interface Row {
+  project: InvestmentProject;
+  stages: Stage[];
+  atual: Stage | undefined;
+  property?: Property;
+  concluido: boolean;
+  paradoDias: number | null;
+  atrasado: boolean;
+  esperaMes: number;
+  esperaDia: number;
+  acumulado: number;
+  mesesRestantes: number;
+  atencao: boolean;
+}
 
 export default function CalendarioInvestimento() {
   const { enabled } = useExampleData();
@@ -48,12 +68,11 @@ export default function CalendarioInvestimento() {
   const allStages = useProjectStagesStore((s) => s.stages);
   const addProject = useProjectStagesStore((s) => s.addProject);
   const properties = usePropertiesStore((s) => s.properties);
+  const navigate = useNavigate();
 
-  const [vista, setVista] = useState<Vista>("timeline");
+  const [vista, setVista] = useState<Vista>("progresso");
   const [q, setQ] = useState("");
-  const [fEtapa, setFEtapa] = useState<"todas" | number>("todas");
-  const [fStatus, setFStatus] = useState<"todos" | StageStatus>("todos");
-  const [fModo, setFModo] = useState<"todos" | InvestMode>("todos");
+  const [soAtencao, setSoAtencao] = useState(false);
   const [showNew, setShowNew] = useState(false);
 
   const stagesByProject = useMemo(() => {
@@ -71,36 +90,56 @@ export default function CalendarioInvestimento() {
 
   const lista = enabled ? projects : [];
 
-  const rows = useMemo(() => {
-    return lista
-      .map((p) => {
-        const stages = stagesByProject.get(p.id) ?? [];
-        const atual = etapaAtual(stages);
-        return { project: p, stages, atual };
-      })
-      .filter(({ project, atual }) => {
-        if (q && !project.nome.toLowerCase().includes(q.toLowerCase())) return false;
-        if (fModo !== "todos" && project.modo !== fModo) return false;
-        if (fEtapa !== "todas" && atual?.stageNumber !== fEtapa) return false;
-        if (fStatus !== "todos" && atual?.status !== fStatus) return false;
-        return true;
-      });
-  }, [lista, stagesByProject, q, fModo, fEtapa, fStatus]);
-
-  // KPIs
-  const kpis = useMemo(() => {
-    let procura = 0, obras = 0, render = 0, bloqueados = 0;
-    for (const p of lista) {
-      const stages = stagesByProject.get(p.id) ?? [];
+  // Todas as derivações financeiras por projeto (uma vez, aqui).
+  const rows = useMemo<Row[]>(() => {
+    return lista.map((project) => {
+      const stages = stagesByProject.get(project.id) ?? [];
       const atual = etapaAtual(stages);
-      if (stages.some((s) => s.status === "bloqueada")) bloqueados++;
-      if (!atual) continue;
-      if (atual.stageNumber === 3) procura++;
-      if (atual.stageNumber === 8) obras++;
-      if (atual.stageNumber >= 10) render++;
+      const property = project.propertyId ? propMap.get(project.propertyId) : undefined;
+      const concluido = stages.length > 0 && stages.every((s) => s.status === "concluida");
+      const paradoDias = projetoParado(stages);
+      const atrasado = prazoUltrapassado(stages);
+      const esperaMes = concluido ? 0 : custoEsperaMes(property);
+      const esperaDia = concluido ? 0 : custoEsperaDia(property);
+      const dias = diasNaEtapa(atual) ?? 0;
+      const acumulado = paradoDias !== null ? esperaDia * dias : 0;
+      const mesesRestantes = stages.filter((s) => s.status !== "concluida").length; // ~1 mês por etapa
+      const atencao = paradoDias !== null || atrasado || atual?.status === "bloqueada";
+      return { project, stages, atual, property, concluido, paradoDias, atrasado, esperaMes, esperaDia, acumulado, mesesRestantes, atencao };
+    });
+  }, [lista, stagesByProject, propMap]);
+
+  const filtradas = useMemo(
+    () =>
+      rows.filter((r) => {
+        if (q && !r.project.nome.toLowerCase().includes(q.toLowerCase())) return false;
+        if (soAtencao && !r.atencao) return false;
+        return true;
+      }),
+    [rows, q, soAtencao]
+  );
+
+  // Topo: frase + 3 cards
+  const parados = rows.filter((r) => r.paradoDias !== null);
+  const custoParadosMes = parados.reduce((s, r) => s + r.esperaMes, 0);
+  const semRetorno = rows.filter((r) => !r.concluido);
+  const capitalEmpatado = semRetorno.reduce(
+    (s, r) => s + (r.property?.entrada ?? 0) + r.stages.reduce((c, st) => c + (st.custoReal ?? 0), 0),
+    0
+  );
+  const esperaMesTotal = semRetorno.reduce((s, r) => s + r.esperaMes, 0);
+  const esperaDiaTotal = semRetorno.reduce((s, r) => s + r.esperaDia, 0);
+  const nAtencao = rows.filter((r) => r.atencao).length;
+
+  const proximoMarco = useMemo(() => {
+    let best: { nome: string; projeto: string; dias: number } | null = null;
+    for (const r of rows) {
+      if (r.concluido || !r.atual?.dataFimPrevista) continue;
+      const dias = Math.round((new Date(`${r.atual.dataFimPrevista}T00:00:00`).getTime() - Date.now()) / 86400000);
+      if (!best || dias < best.dias) best = { nome: r.atual.stageName, projeto: r.project.nome, dias };
     }
-    return { ativos: lista.length, procura, obras, render, bloqueados };
-  }, [lista, stagesByProject]);
+    return best;
+  }, [rows]);
 
   const onCreate = (nome: string, modo: InvestMode, propertyId?: string) => {
     const id = addProject({ nome, modo, propertyId });
@@ -109,13 +148,11 @@ export default function CalendarioInvestimento() {
     navigate(`/financas/calendario-investimento/${id}`);
   };
 
-  const navigate = useNavigate();
-
   return (
     <>
       <PageHeader
         title="Calendário do Investimento"
-        subtitle={enabled ? `${lista.length} projetos · 11 etapas do ciclo de investimento` : "Da simulação ao primeiro inquilino"}
+        subtitle={enabled ? `${lista.length} projetos em carteira` : "Da simulação ao primeiro inquilino"}
         showExampleToggle
         actions={
           <Button onClick={() => setShowNew(true)}>
@@ -134,77 +171,95 @@ export default function CalendarioInvestimento() {
         />
       ) : (
         <>
-          {/* KPIs */}
-          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <StatCard label="Projetos ativos" value={String(kpis.ativos)} icon={CalendarClock} />
-            <StatCard label="Em procura" value={String(kpis.procura)} icon={SearchIcon} iconTone="warning" />
-            <StatCard label="Em obras" value={String(kpis.obras)} icon={Building2} iconTone="warning" />
-            <StatCard label="A render" value={String(kpis.render)} icon={Check} iconTone="success" />
-            <StatCard label="Bloqueados" value={String(kpis.bloqueados)} hint={kpis.bloqueados > 0 ? "Requerem atenção" : "Tudo a fluir"} hintTone={kpis.bloqueados > 0 ? "danger" : "success"} icon={TriangleAlert} iconTone={kpis.bloqueados > 0 ? "danger" : "default"} />
+          {/* Frase do topo — o estado da carteira em linguagem humana */}
+          <p className="mb-5 max-w-3xl font-display text-2xl font-bold leading-snug text-ink sm:text-[28px]">
+            {parados.length > 0 ? (
+              <>
+                {parados.length === 1 ? "1 projeto parado está" : `${parados.length} projetos parados estão`} a
+                custar-lhe <span className="num text-danger">{eur(custoParadosMes)}</span> por mês.
+              </>
+            ) : (
+              <>{lista.length === 1 ? "1 projeto" : `${lista.length} projetos`} no caminho certo.</>
+            )}
+          </p>
+
+          {/* 3 cards */}
+          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatCard
+              label="Capital empatado"
+              value={eur(capitalEmpatado)}
+              hint={semRetorno.length > 0 ? plural(semRetorno.length, "projeto sem retorno", "projetos sem retorno") : "todos a render"}
+              hintTone={semRetorno.length > 0 ? "default" : "success"}
+              icon={Wallet}
+            />
+            <StatCard
+              label="Custo de espera mensal"
+              value={eur(esperaMesTotal)}
+              hint={esperaMesTotal > 0 ? `${eur(esperaDiaTotal)}/dia` : "sem custos de espera"}
+              hintTone={esperaMesTotal > 0 ? "danger" : "success"}
+              icon={Hourglass}
+              iconTone={esperaMesTotal > 0 ? "danger" : "success"}
+            />
+            <StatCard
+              label="Próximo marco"
+              value={proximoMarco?.nome ?? "—"}
+              hint={
+                proximoMarco
+                  ? `${proximoMarco.projeto} · ${proximoMarco.dias >= 0 ? `em ${proximoMarco.dias} dias` : `atrasado ${-proximoMarco.dias}d`}`
+                  : "sem marcos pendentes"
+              }
+              hintTone={proximoMarco && proximoMarco.dias < 0 ? "danger" : "default"}
+              icon={Flag}
+              iconTone="gold"
+            />
           </div>
 
-          {/* Barra de controlo */}
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          {/* Barra de controlo: pesquisa + 2 chips + vista */}
+          <div className="mb-5 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 rounded-xl border border-line bg-card px-3">
               <SearchIcon size={15} className="text-muted" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pesquisar projeto…" className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted sm:w-48" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Pesquisar projeto…"
+                className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted sm:w-44"
+              />
             </div>
-            <select value={String(fEtapa)} onChange={(e) => setFEtapa(e.target.value === "todas" ? "todas" : Number(e.target.value))} className={selectCls}>
-              <option value="todas">Etapa: Todas</option>
-              {STAGE_TEMPLATES.map((t, i) => (
-                <option key={i} value={i + 1}>{i + 1}. {t.nome}</option>
-              ))}
-            </select>
-            <select value={fStatus} onChange={(e) => setFStatus(e.target.value as typeof fStatus)} className={selectCls}>
-              <option value="todos">Status: Todos</option>
-              <option value="em_curso">Em curso</option>
-              <option value="pendente">Pendente</option>
-              <option value="concluida">Concluída</option>
-              <option value="bloqueada">Bloqueada</option>
-            </select>
-            <select value={fModo} onChange={(e) => setFModo(e.target.value as typeof fModo)} className={selectCls}>
-              <option value="todos">Modo: Todos</option>
-              <option value="arrendamento">Arrendamento</option>
-              <option value="flip">Flip</option>
-            </select>
+            <FiltroChip active={!soAtencao} onClick={() => setSoAtencao(false)}>
+              Todos
+            </FiltroChip>
+            <FiltroChip active={soAtencao} tone="danger" onClick={() => setSoAtencao(true)}>
+              <TriangleAlert size={13} /> Precisa de atenção{nAtencao > 0 && <span className="num">({nAtencao})</span>}
+            </FiltroChip>
 
-            <div className="sm:ml-auto inline-flex rounded-lg border border-line bg-card p-0.5">
-              <VistaBtn icon={GitBranch} label="Timeline" active={vista === "timeline"} onClick={() => setVista("timeline")} />
-              <VistaBtn icon={LayoutGrid} label="Kanban" active={vista === "kanban"} onClick={() => setVista("kanban")} />
-              <VistaBtn icon={ListIcon} label="Lista" active={vista === "lista"} onClick={() => setVista("lista")} />
+            <div className="ml-auto inline-flex rounded-lg border border-line bg-card p-0.5">
+              <VistaBtn icon={ListIcon} label="Progresso" active={vista === "progresso"} onClick={() => setVista("progresso")} />
+              <VistaBtn icon={CalendarRange} label="Cronograma" active={vista === "cronograma"} onClick={() => setVista("cronograma")} />
             </div>
           </div>
 
-          {rows.length === 0 ? (
+          {filtradas.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-line bg-card/50 px-6 py-16 text-center text-sm text-muted">
-              Nenhum projeto corresponde aos filtros.
+              {soAtencao ? "Nenhum projeto precisa de atenção. 👌" : "Nenhum projeto corresponde à pesquisa."}
             </p>
-          ) : vista === "timeline" ? (
-            <TimelineView rows={rows} propMap={propMap} />
-          ) : vista === "kanban" ? (
-            <KanbanView rows={rows} propMap={propMap} />
+          ) : vista === "progresso" ? (
+            <ProgressoView rows={filtradas} propMap={propMap} />
           ) : (
-            <ListaView rows={rows} propMap={propMap} />
+            <CronogramaView rows={filtradas} />
           )}
         </>
       )}
 
-      {showNew && (
-        <NovoInvestimento
-          properties={properties}
-          onClose={() => setShowNew(false)}
-          onCreate={onCreate}
-        />
-      )}
+      {showNew && <NovoInvestimento properties={properties} onClose={() => setShowNew(false)} onCreate={onCreate} />}
     </>
   );
 }
 
-const selectCls = "h-9 rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary";
-
 // ───────────────────── Helpers visuais ─────────────────────
 
-function resolveCover(project: InvestmentProject, propMap: Map<string, ReturnType<typeof usePropertiesStore.getState>["properties"][number]>) {
+type PropMap = Map<string, Property>;
+
+function resolveCover(project: InvestmentProject, propMap: PropMap) {
   if (project.propertyId) {
     const p = propMap.get(project.propertyId);
     if (p) return { foto: p.photos[0]?.url, cidade: p.city, tipo: PROP_TYPE_LABEL[p.type], nome: p.name };
@@ -212,7 +267,7 @@ function resolveCover(project: InvestmentProject, propMap: Map<string, ReturnTyp
   return { foto: project.fotoUrl, cidade: "Sem imóvel (em procura)", tipo: project.modo === "flip" ? "Flip" : "Arrendamento", nome: project.nome };
 }
 
-function VistaBtn({ icon: Icon, label, active, onClick }: { icon: typeof GitBranch; label: string; active: boolean; onClick: () => void }) {
+function VistaBtn({ icon: Icon, label, active, onClick }: { icon: typeof ListIcon; label: string; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm", active ? "bg-primary text-white" : "text-muted")}>
       <Icon size={14} /> <span className="hidden sm:inline">{label}</span>
@@ -220,77 +275,66 @@ function VistaBtn({ icon: Icon, label, active, onClick }: { icon: typeof GitBran
   );
 }
 
-function StageDot({ stage, onClick }: { stage: Stage; onClick: () => void }) {
-  const base = "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-transform hover:scale-110";
-  const cls =
-    stage.status === "concluida" ? "border-success bg-success text-white"
-      : stage.status === "em_curso" ? "border-primary bg-primary text-white animate-pulse"
-        : stage.status === "bloqueada" ? "border-danger bg-danger text-white"
-          : "border-line bg-card text-muted";
+function FiltroChip({ active, tone, onClick, children }: { active: boolean; tone?: "danger"; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className={cn(base, cls)} title={`${stage.stageNumber}. ${stage.stageName} · ${STATUS_LABEL[stage.status]}`}>
-      {stage.status === "concluida" ? <Check size={14} /> : stage.status === "bloqueada" ? <Lock size={12} /> : stage.stageNumber}
+    <button
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors",
+        active
+          ? tone === "danger"
+            ? "border-danger/40 bg-danger/10 text-danger"
+            : "border-primary bg-primary text-white"
+          : "border-line bg-card text-muted hover:bg-accent hover:text-ink"
+      )}
+    >
+      {children}
     </button>
   );
 }
 
-type Row = { project: InvestmentProject; stages: Stage[]; atual: Stage | undefined };
-type PropMap = Map<string, ReturnType<typeof usePropertiesStore.getState>["properties"][number]>;
+// ───────────────────── Vista Progresso ─────────────────────
 
-// ───────────────────── Timeline ─────────────────────
-
-function TimelineView({ rows, propMap }: { rows: Row[]; propMap: PropMap }) {
+function ProgressoView({ rows, propMap }: { rows: Row[]; propMap: PropMap }) {
   const navigate = useNavigate();
   return (
-    <div className="space-y-4">
-      {rows.map(({ project, stages, atual }) => {
-        const info = resolveCover(project, propMap);
-        const prog = progressoProjeto(stages);
-        const parado = projetoParado(stages);
-        const atrasado = prazoUltrapassado(stages);
-        const dias = diasNaEtapa(atual);
+    <div className="space-y-3">
+      {rows.map((r) => {
+        const info = resolveCover(r.project, propMap);
+        const critico = r.paradoDias !== null;
         return (
-          <Card key={project.id}>
-            <CardContent>
+          <Card key={r.project.id} className={cn("cursor-pointer transition-shadow hover:shadow-md", critico && "border-l-4 border-l-danger")}>
+            <CardContent className="p-4 sm:p-5" onClick={() => navigate(`/financas/calendario-investimento/${r.project.id}`)}>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-                {/* Info */}
-                <Link to={`/financas/calendario-investimento/${project.id}`} className="flex w-full items-center gap-3 lg:w-64 lg:shrink-0">
-                  <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-accent">
-                    {info.foto ? <img src={info.foto} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-muted"><Building2 size={18} /></div>}
+                {/* Esquerda: identidade */}
+                <div className="flex w-full items-center gap-3 lg:w-60 lg:shrink-0">
+                  <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-accent">
+                    {info.foto ? (
+                      <img src={info.foto} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted"><Building2 size={18} /></div>
+                    )}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-display text-base font-semibold text-ink">{info.nome}</p>
                     <p className="truncate text-xs text-muted">{info.cidade}</p>
-                  </div>
-                </Link>
-
-                {/* Stepper horizontal */}
-                <div className="min-w-0 flex-1 overflow-x-auto">
-                  <div className="flex items-center gap-0 pb-1">
-                    {stages.map((s, i) => (
-                      <div key={s.id} className="flex items-center">
-                        <StageDot stage={s} onClick={() => navigate(`/financas/calendario-investimento/${project.id}?etapa=${s.stageNumber}`)} />
-                        {i < stages.length - 1 && (
-                          <span className={cn("h-0.5 w-6 sm:w-8", s.status === "concluida" ? "bg-success" : "bg-line")} />
-                        )}
-                      </div>
-                    ))}
+                    <span className="mt-1 inline-flex rounded-full border border-line bg-bg/50 px-2 py-0.5 text-[10px] font-medium text-muted">
+                      {r.project.modo === "flip" ? "Flip" : "Arrendamento"}
+                    </span>
                   </div>
                 </div>
 
-                {/* Estado */}
-                <div className="flex shrink-0 items-center gap-4 lg:w-56 lg:flex-col lg:items-end">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-ink">{atual ? `${atual.stageNumber}. ${atual.stageName}` : "Concluído 🎉"}</p>
-                    <p className="num text-xs text-muted">
-                      {prog}% concluído{dias !== null ? ` · ${dias}d na etapa` : ""}
-                    </p>
-                  </div>
-                  {(parado || atrasado) && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-danger/12 px-2 py-0.5 text-[11px] font-medium text-danger">
-                      <TriangleAlert size={11} /> {parado ? `Parado ${parado}d` : "Prazo ultrapassado"}
-                    </span>
-                  )}
+                {/* Centro: fases */}
+                <div className="min-w-0 flex-1">
+                  <FaseBar stages={r.stages} atualNum={r.atual?.stageNumber} />
+                  <p className="mt-1.5 text-xs text-muted">
+                    {r.atual ? `Etapa ${r.atual.stageNumber} de ${STAGE_COUNT} · ${r.atual.stageName}` : "Ciclo completo"}
+                  </p>
+                </div>
+
+                {/* Direita: veredito financeiro */}
+                <div className="shrink-0 lg:w-56 lg:border-l lg:border-line/60 lg:pl-5 lg:text-right">
+                  <Veredito r={r} />
                 </div>
               </div>
             </CardContent>
@@ -301,130 +345,168 @@ function TimelineView({ rows, propMap }: { rows: Row[]; propMap: PropMap }) {
   );
 }
 
-// ───────────────────── Kanban ─────────────────────
-
-function KanbanView({ rows, propMap }: { rows: Row[]; propMap: PropMap }) {
-  const navigate = useNavigate();
-  const setStageStatus = useProjectStagesStore((s) => s.setStageStatus);
-  const stagesOf = useProjectStagesStore((s) => s.stagesOf);
-
-  const moverPara = (projectId: string, etapaDestino: number) => {
-    const stages = stagesOf(projectId);
-    for (const s of stages) {
-      if (s.stageNumber < etapaDestino && s.status !== "concluida") setStageStatus(s.id, "concluida");
-      else if (s.stageNumber === etapaDestino) setStageStatus(s.id, "em_curso");
-      else if (s.stageNumber > etapaDestino && s.status !== "pendente") setStageStatus(s.id, "pendente");
-    }
-    toast.success(`Movido para etapa ${etapaDestino}`);
-  };
-
+function FaseBar({ stages, atualNum }: { stages: Stage[]; atualNum?: number }) {
   return (
-    <div className="overflow-x-auto pb-3">
-      <div className="flex gap-3" style={{ minWidth: STAGE_COUNT * 220 }}>
-        {STAGE_TEMPLATES.map((t, i) => {
-          const n = i + 1;
-          const cards = rows.filter((r) => r.atual?.stageNumber === n);
-          return (
-            <div
-              key={n}
-              className="w-[210px] shrink-0 rounded-2xl border border-line bg-bg/50 p-2"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                const pid = e.dataTransfer.getData("text/plain");
-                if (pid) moverPara(pid, n);
-              }}
-            >
-              <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
-                {n}. {t.nome} <span className="text-muted/60">· {cards.length}</span>
-              </p>
-              <div className="space-y-2">
-                {cards.map(({ project, atual, stages }) => {
-                  const info = resolveCover(project, propMap);
-                  return (
-                    <div
-                      key={project.id}
-                      draggable
-                      onDragStart={(e) => e.dataTransfer.setData("text/plain", project.id)}
-                      onClick={() => navigate(`/financas/calendario-investimento/${project.id}`)}
-                      className="cursor-pointer rounded-xl border border-line bg-card p-2.5 shadow-sm transition-shadow hover:shadow-md"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-10 shrink-0 overflow-hidden rounded bg-accent">
-                          {info.foto ? <img src={info.foto} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-muted"><Building2 size={12} /></div>}
-                        </div>
-                        <p className="min-w-0 flex-1 truncate text-xs font-medium text-ink">{info.nome}</p>
-                      </div>
-                      <div className="mt-1.5 flex items-center justify-between">
-                        <StatusBadge status={atual?.status ?? "pendente"} />
-                        <span className="num text-[10px] text-muted">{progressoProjeto(stages)}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-                {cards.length === 0 && <p className="py-3 text-center text-[11px] text-muted/60">—</p>}
-              </div>
+    <div className="flex gap-1.5">
+      {FASES.map((f) => {
+        const grupo = stages.filter((s) => s.stageNumber >= f.de && s.stageNumber <= f.ate);
+        const done = grupo.length > 0 && grupo.every((s) => s.status === "concluida");
+        const atual = atualNum !== undefined && atualNum >= f.de && atualNum <= f.ate;
+        // preenchimento parcial dentro da fase atual (½ crédito pela etapa em curso)
+        const fill = grupo.length > 0
+          ? (grupo.filter((s) => s.status === "concluida").length + grupo.filter((s) => s.status === "em_curso").length * 0.5) / grupo.length
+          : 0;
+        return (
+          <div key={f.nome} style={{ width: `${((f.ate - f.de + 1) / STAGE_COUNT) * 100}%` }}>
+            <div className={cn("relative h-2.5 overflow-hidden rounded-full", done ? "bg-primary" : atual ? "bg-gold/20" : "bg-accent")}>
+              {atual && <div className="absolute inset-y-0 left-0 animate-pulse rounded-full bg-gold" style={{ width: `${Math.max(fill * 100, 12)}%` }} />}
             </div>
-          );
-        })}
-      </div>
+            <p className={cn("mt-1 hidden truncate text-[10px] sm:block", atual ? "font-semibold text-gold-dark" : done ? "text-muted" : "text-muted/60")}>
+              {f.nome}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-// ───────────────────── Lista ─────────────────────
+function Veredito({ r }: { r: Row }) {
+  if (r.concluido) {
+    const renda = r.property?.rendaMensal ?? 0;
+    if (renda > 0)
+      return (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-success">✓ A render</p>
+          <p className="font-display text-2xl font-bold text-success">
+            <span className="num">{eur(renda)}</span>
+            <span className="text-sm font-medium">/mês</span>
+          </p>
+        </div>
+      );
+    return (
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-success">✓ Concluído</p>
+        <p className="font-display text-xl font-bold text-ink">Ciclo completo</p>
+      </div>
+    );
+  }
+  if (r.paradoDias !== null)
+    return (
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-danger">● Parado há {r.paradoDias} dias</p>
+        <p className="font-display text-2xl font-bold text-danger">
+          <span className="text-sm font-medium">já custou </span>
+          <span className="num">{eur(r.acumulado)}</span>
+        </p>
+        {r.esperaDia > 0 && <p className="num text-xs text-muted">custa-lhe {eur(r.esperaDia)}/dia</p>}
+      </div>
+    );
+  return (
+    <div>
+      <p className={cn("text-[10px] font-semibold uppercase tracking-wider", r.atrasado ? "text-warning" : "text-muted")}>
+        {r.atrasado ? "Prazo ultrapassado" : "Em curso"}
+      </p>
+      <p className="font-display text-2xl font-bold text-ink">
+        Faltam ~<span className="num">{r.mesesRestantes}</span> {r.mesesRestantes === 1 ? "mês" : "meses"}
+      </p>
+      <p className="num text-xs text-muted">
+        {r.project.modo === "flip" ? "até à venda" : "até render"}
+        {r.esperaDia > 0 && ` · ${eur(r.esperaDia)}/dia`}
+      </p>
+    </div>
+  );
+}
 
-function ListaView({ rows, propMap }: { rows: Row[]; propMap: PropMap }) {
+// ───────────────────── Vista Cronograma ─────────────────────
+
+const MARCOS = new Set([6, 7, 8, 10, 11]); // CPCV · Escritura · Obras · Mercado · Inquilino/Venda
+
+interface Evento {
+  date: string;
+  feito: boolean;
+  atrasado: boolean;
+  nome: string;
+  projeto: string;
+  projectId: string;
+  stageNumber: number;
+}
+
+function CronogramaView({ rows }: { rows: Row[] }) {
   const navigate = useNavigate();
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  const eventos = useMemo<Evento[]>(() => {
+    const out: Evento[] = [];
+    for (const r of rows) {
+      for (const s of r.stages) {
+        if (!MARCOS.has(s.stageNumber)) continue;
+        const feito = s.status === "concluida";
+        const date = feito ? s.dataFimReal ?? s.dataFimPrevista : s.dataFimPrevista;
+        if (!date) continue;
+        out.push({ date, feito, atrasado: !feito && date < hoje, nome: s.stageName, projeto: r.project.nome, projectId: r.project.id, stageNumber: s.stageNumber });
+      }
+    }
+    return out.sort((a, b) => a.date.localeCompare(b.date));
+  }, [rows, hoje]);
+
+  // Feitos primeiro, depois «Hoje», depois os que faltam — legível mesmo com datas fora de ordem.
+  const ordenados = [...eventos.filter((e) => e.feito), ...eventos.filter((e) => !e.feito)];
+  const primeiroFuturo = ordenados.findIndex((e) => !e.feito);
+  const proxIdx = ordenados.findIndex((e) => !e.feito && e.date >= hoje);
+
+  if (ordenados.length === 0)
+    return <p className="rounded-2xl border border-dashed border-line bg-card/50 px-6 py-16 text-center text-sm text-muted">Sem marcos com datas definidas.</p>;
+
+  const items: React.ReactNode[] = [];
+  ordenados.forEach((e, i) => {
+    if (i === primeiroFuturo) items.push(<HojeDivider key="hoje" />);
+    items.push(
+      <li
+        key={`${e.projectId}-${e.stageNumber}`}
+        className="group relative cursor-pointer pb-5"
+        onClick={() => navigate(`/financas/calendario-investimento/${e.projectId}?etapa=${e.stageNumber}`)}
+      >
+        <span
+          className={cn(
+            "absolute -left-[30px] top-1 h-3 w-3 rounded-full border-2",
+            e.feito ? "border-success bg-success" : e.atrasado ? "border-danger bg-danger" : i === proxIdx ? "border-gold bg-gold" : "border-line bg-card"
+          )}
+        />
+        <p className="num text-[11px] text-muted">
+          {dataPTShort(e.date)}
+          <span className={cn("ml-1.5", e.feito ? "text-success" : e.atrasado ? "font-medium text-danger" : i === proxIdx ? "font-medium text-gold-dark" : "")}>
+            {e.feito ? "· concluído" : e.atrasado ? "· atrasado" : "· previsto"}
+          </span>
+        </p>
+        <p className="text-sm font-medium text-ink group-hover:text-primary">
+          {e.nome} <span className="font-normal text-muted">· {e.projeto}</span>
+        </p>
+      </li>
+    );
+  });
+  if (primeiroFuturo === -1) items.push(<HojeDivider key="hoje" />);
+
   return (
     <Card>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="bg-bg/40 text-[11px] uppercase tracking-wider text-muted">
-              <tr>
-                <th className="px-4 py-2.5 text-left font-semibold">Projeto</th>
-                <th className="px-4 py-2.5 text-left font-semibold">Etapa atual</th>
-                <th className="px-4 py-2.5 text-left font-semibold">Status</th>
-                <th className="px-4 py-2.5 text-right font-semibold">Dias na etapa</th>
-                <th className="px-4 py-2.5 text-left font-semibold">Próxima ação</th>
-                <th className="px-4 py-2.5 text-left font-semibold">Prazo previsto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ project, stages, atual }) => {
-                const info = resolveCover(project, propMap);
-                const dias = diasNaEtapa(atual);
-                const proxima = atual?.checklist.find((c) => !c.feito)?.texto ?? (atual ? "Concluir etapa" : "—");
-                return (
-                  <tr key={project.id} onClick={() => navigate(`/financas/calendario-investimento/${project.id}`)} className="cursor-pointer border-t border-line/40 hover:bg-bg/40">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-ink">{info.nome}</p>
-                      <p className="text-[11px] text-muted">{info.cidade}</p>
-                    </td>
-                    <td className="px-4 py-3">{atual ? `${atual.stageNumber}. ${atual.stageName}` : "Concluído"}</td>
-                    <td className="px-4 py-3"><StatusBadge status={atual?.status ?? "concluida"} /></td>
-                    <td className="num px-4 py-3 text-right">{dias !== null ? `${dias}d` : "—"}</td>
-                    <td className="px-4 py-3 text-muted">{proxima}</td>
-                    <td className="num px-4 py-3 text-xs text-muted">{atual?.dataFimPrevista ?? "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <CardContent className="p-5 sm:p-6">
+        <ol className="relative ml-2 border-l-2 border-line pl-6">{items}</ol>
       </CardContent>
     </Card>
   );
 }
 
-function StatusBadge({ status }: { status: StageStatus }) {
-  const map: Record<StageStatus, "success" | "info" | "warning" | "danger" | "neutral"> = {
-    concluida: "success",
-    em_curso: "info",
-    pendente: "neutral",
-    bloqueada: "danger",
-  };
-  return <Badge tone={map[status]}>{STATUS_LABEL[status]}</Badge>;
+function HojeDivider() {
+  return (
+    <li className="relative pb-5">
+      <span className="absolute -left-[33px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-gold bg-gold/20">
+        <span className="h-1.5 w-1.5 rounded-full bg-gold-dark" />
+      </span>
+      <span className="inline-flex rounded-full bg-gold/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-gold-dark">
+        Hoje · <span className="num ml-1">{dataPTShort(new Date())}</span>
+      </span>
+    </li>
+  );
 }
 
 // ───────────────────── Novo investimento ─────────────────────
@@ -434,7 +516,7 @@ function NovoInvestimento({
   onClose,
   onCreate,
 }: {
-  properties: ReturnType<typeof usePropertiesStore.getState>["properties"];
+  properties: Property[];
   onClose: () => void;
   onCreate: (nome: string, modo: InvestMode, propertyId?: string) => void;
 }) {

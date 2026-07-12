@@ -33,9 +33,10 @@ import {
   type Stage,
   type StageStatus,
 } from "@/store/useProjectStagesStore";
-import { usePropertiesStore, PROP_TYPE_LABEL } from "@/store/usePropertiesStore";
+import { usePropertiesStore, PROP_TYPE_LABEL, type Property } from "@/store/usePropertiesStore";
 import { useDocumentsStore, DOC_CATEGORIAS, type DocCategoria } from "@/store/useDocumentsStore";
 import { useModalStore } from "@/store/useModalStore";
+import { custoEsperaMes, custoEsperaDia } from "@/lib/calc/espera";
 import { eur, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -115,6 +116,9 @@ export default function ProjetoCalendario() {
         </CardContent>
       </Card>
 
+      {/* Custo de espera */}
+      {property && <CustoEsperaPanel property={property} modo={project.modo} concluido={prog === 100} />}
+
       {/* Conteúdo: stepper + detalhe */}
       <div className="mt-5 grid gap-5 lg:grid-cols-[300px_1fr]">
         {/* Stepper vertical */}
@@ -155,6 +159,37 @@ export default function ProjetoCalendario() {
         )}
       </div>
     </>
+  );
+}
+
+function CustoEsperaPanel({ property, modo, concluido }: { property: Property; modo: "arrendamento" | "flip"; concluido: boolean }) {
+  if (concluido) {
+    if (property.rendaMensal <= 0) return null;
+    return (
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-success/30 bg-success/8 px-5 py-4">
+        <p className="font-display text-lg font-bold text-success">✓ A render</p>
+        <p className="font-display text-lg font-bold text-success">
+          <span className="num">{eur(property.rendaMensal)}</span>/mês
+        </p>
+      </div>
+    );
+  }
+  const mes = custoEsperaMes(property);
+  const dia = custoEsperaDia(property);
+  if (mes <= 0) return null;
+  return (
+    <div className="mt-5 rounded-2xl border border-danger/25 bg-danger/5 px-5 py-4">
+      <p className="font-display text-lg font-bold text-ink">
+        Este projeto custa-lhe <span className="num text-danger">{eur(dia)}</span>/dia enquanto não{" "}
+        {modo === "flip" ? "vender" : "render"}.
+      </p>
+      <p className="num mt-1.5 text-xs text-muted">
+        prestação {eur(property.prestacaoMensal)} · IMI {eur(property.imiAnual / 12)} · condomínio {eur(property.condominioMensal)} · seguro {eur(property.seguroAnual / 12)}
+        {property.outrasMensais > 0 && <> · outras {eur(property.outrasMensais)}</>}
+        {" → "}
+        <span className="font-semibold text-danger">{eur(mes)}/mês</span>
+      </p>
+    </div>
   );
 }
 
