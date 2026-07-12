@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Plus,
   Download,
@@ -96,8 +97,11 @@ export default function Contabilidade() {
   const properties = usePropertiesStore((s) => s.properties);
   const openExpenseForm = useModalStore((s) => s.openExpenseForm);
 
-  const [periodo, setPeriodo] = useState<Periodo>("ano");
-  const [propertyId, setPropertyId] = useState<string>("todos");
+  // Deep-link (ex.: Balanço/IRS → "Ver movimentos"): ?imovel=<id>&periodo=ano
+  const [searchParams] = useSearchParams();
+  const periodoParam = searchParams.get("periodo") as Periodo | null;
+  const [periodo, setPeriodo] = useState<Periodo>(periodoParam && periodoParam in PERIODO_LABEL ? periodoParam : "ano");
+  const [propertyId, setPropertyId] = useState<string>(searchParams.get("imovel") ?? "todos");
   const [categoria, setCategoria] = useState<string>("todas");
   const [tipo, setTipo] = useState<"todos" | TipoMov>("todos");
   const [busca, setBusca] = useState("");

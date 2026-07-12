@@ -40,7 +40,8 @@ export interface Transaction {
   reciboUrl?: string;
   recorrente: boolean;
   periodicidade?: Periodicidade;
-  deduzivelIrs: boolean;
+  /** true = dedutível · false = não dedutível · undefined = POR CLASSIFICAR (Balanço/IRS). */
+  deduzivelIrs?: boolean;
   notas?: string;
   createdAt: string;
 }
@@ -80,7 +81,8 @@ function tx(p: {
     descricao: p.descricao,
     recorrente: p.recorrente ?? false,
     periodicidade: p.periodicidade,
-    deduzivelIrs: p.deduzivelIrs ?? false,
+    // sem ?? false — despesas sem flag ficam "por classificar" no Balanço/IRS
+    deduzivelIrs: p.deduzivelIrs,
     createdAt: `${p.data}T08:00:00.000Z`,
   };
 }
@@ -303,6 +305,47 @@ function buildSeed(): Transaction[] {
     })
   );
 
+  // ── Julho (mês corrente): rendas e condomínios já vencidos ──
+  out.push(
+    tx({ tipo: "receita", propertyId: "seed-arroios", categoria: "Renda", valor: 1350, data: "2026-07-05", descricao: "Renda mensal · Inquilino", recorrente: true, periodicidade: "mensal" }),
+    tx({ tipo: "despesa", propertyId: "seed-arroios", categoria: "Condomínio", valor: 45, data: "2026-07-10", descricao: "Quota de condomínio", recorrente: true, periodicidade: "mensal", deduzivelIrs: true }),
+    tx({ tipo: "receita", propertyId: "seed-porto-al", categoria: "Receita AL", valor: 1100, data: "2026-07-05", descricao: "Receita AL · mensal", recorrente: true, periodicidade: "mensal" }),
+    tx({ tipo: "despesa", propertyId: "seed-porto-al", categoria: "Condomínio", valor: 35, data: "2026-07-10", descricao: "Quota de condomínio", recorrente: true, periodicidade: "mensal", deduzivelIrs: true }),
+    tx({ tipo: "receita", propertyId: "seed-principe-real", categoria: "Renda", valor: 1850, data: "2026-07-08", descricao: "Renda mensal · Sofia Rocha", recorrente: true, periodicidade: "mensal" }),
+    tx({ tipo: "despesa", propertyId: "seed-principe-real", categoria: "Condomínio", valor: 80, data: "2026-07-10", descricao: "Quota de condomínio", recorrente: true, periodicidade: "mensal", deduzivelIrs: true }),
+    tx({ tipo: "despesa", propertyId: "seed-coimbra", categoria: "Condomínio", valor: 50, data: "2026-07-10", descricao: "Quota de condomínio", recorrente: true, periodicidade: "mensal", deduzivelIrs: true })
+  );
+
+  // ── Juros do crédito — NÃO dedutíveis em categoria F ──
+  out.push(
+    tx({ tipo: "despesa", propertyId: "seed-arroios", categoria: "Juros do crédito", valor: 1070, data: "2026-01-15", descricao: "Juros do crédito habitação · 1.º semestre", deduzivelIrs: false }),
+    tx({ tipo: "despesa", propertyId: "seed-arroios", categoria: "Juros do crédito", valor: 1070, data: "2026-07-01", descricao: "Juros do crédito habitação · 2.º semestre", deduzivelIrs: false }),
+    tx({ tipo: "despesa", propertyId: "seed-principe-real", categoria: "Juros do crédito", valor: 1200, data: "2026-03-20", descricao: "Juros do crédito habitação · 1.º semestre", deduzivelIrs: false }),
+    tx({ tipo: "despesa", propertyId: "seed-principe-real", categoria: "Juros do crédito", valor: 1200, data: "2026-07-01", descricao: "Juros do crédito habitação · 2.º semestre", deduzivelIrs: false }),
+    tx({ tipo: "despesa", propertyId: "seed-coimbra", categoria: "Juros do crédito", valor: 400, data: "2026-05-02", descricao: "Juros do crédito · desde a escritura", deduzivelIrs: false }),
+    tx({ tipo: "despesa", propertyId: "seed-coimbra", categoria: "Juros do crédito", valor: 400, data: "2026-07-01", descricao: "Juros do crédito habitação", deduzivelIrs: false })
+  );
+
+  // ── Mobiliário — NÃO dedutível ──
+  out.push(
+    tx({ tipo: "despesa", propertyId: "seed-coimbra", categoria: "Outros", valor: 800, data: "2026-05-10", descricao: "Mobiliário — cama e sofá", deduzivelIrs: false })
+  );
+
+  // ── Por classificar (sem flag) — alimentam o painel do Balanço/IRS ──
+  out.push(
+    tx({ tipo: "despesa", propertyId: "seed-arroios", categoria: "Contabilista", valor: 250, data: "2026-04-10", descricao: "Avença contabilista — IRS e obrigações" }),
+    tx({ tipo: "despesa", propertyId: "seed-arroios", categoria: "Outros", valor: 95, data: "2026-05-22", descricao: "Inspeção — deteção de fugas" }),
+    tx({ tipo: "despesa", propertyId: "seed-principe-real", categoria: "Comissão de gestão", valor: 830, data: "2026-02-05", descricao: "Comissão de mediação — novo contrato" }),
+    tx({ tipo: "despesa", propertyId: "seed-principe-real", categoria: "Outros", valor: 335, data: "2026-06-20", descricao: "Material de limpeza pós-obra" }),
+    tx({ tipo: "despesa", propertyId: "seed-porto-al", categoria: "Manutenção/Reparações", valor: 140, data: "2026-03-08", descricao: "Substituição de fechadura" }),
+    tx({ tipo: "despesa", propertyId: "seed-coimbra", categoria: "Manutenção/Reparações", valor: 480, data: "2026-06-15", descricao: "Reparação do telhado — infiltração" })
+  );
+  for (const m of MESES) {
+    out.push(
+      tx({ tipo: "despesa", propertyId: "seed-coimbra", categoria: "Água/Luz/Gás", valor: 35, data: `2026-${m}-20`, descricao: "Eletricidade — consumo da obra" })
+    );
+  }
+
   return out.sort((a, b) => (a.data < b.data ? 1 : -1));
 }
 
@@ -341,12 +384,13 @@ export const useTransactionsStore = create<TransactionsState>()(
     }),
     {
       name: "redegest-transactions",
-      version: 3,
+      version: 4,
       // v2: movimentos do Príncipe Real (rendas + despesas). Ids determinísticos → merge idempotente.
       // v3: receitas do Studio AL passam de "Renda" para "Receita AL" (cat. B ≠ cat. F).
+      // v4: seeds do Balanço/IRS — julho, juros do crédito, mobiliário e despesas por classificar.
       migrate: (persisted: unknown, version: number) => {
         const state = (persisted ?? {}) as { transactions?: Transaction[] };
-        if (state.transactions && version < 2) {
+        if (state.transactions && (version < 2 || version < 4)) {
           const presentes = new Set(state.transactions.map((t) => t.id));
           SEED.forEach((s) => { if (!presentes.has(s.id)) state.transactions!.push(s); });
         }

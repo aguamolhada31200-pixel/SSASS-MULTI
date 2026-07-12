@@ -98,7 +98,7 @@ export function ExpenseFormModal() {
           reciboUrl: t.reciboUrl ?? "",
           recorrente: t.recorrente,
           periodicidade: t.periodicidade,
-          deduzivelIrs: t.deduzivelIrs,
+          deduzivelIrs: t.deduzivelIrs ?? false, // pode vir "por classificar" (undefined)
           notas: t.notas ?? "",
         });
         return;

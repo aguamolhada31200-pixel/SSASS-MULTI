@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import {
-  FileBarChart,
   Wrench,
   Smartphone,
 } from "lucide-react";
@@ -28,6 +27,7 @@ import CalculadoraRentabilidade from "@/pages/financas/CalculadoraRentabilidade"
 import Contabilidade from "@/pages/financas/Contabilidade";
 import CalendarioInvestimento from "@/pages/financas/CalendarioInvestimento";
 import ProjetoCalendario from "@/pages/financas/ProjetoCalendario";
+import BalancoIRS from "@/pages/financas/BalancoIRS";
 import PastaDigital from "@/pages/documentos/PastaDigital";
 import ContratoDetalhe from "@/pages/contratos/ContratoDetalhe";
 import AssistenteIA from "@/pages/ia/AssistenteIA";
@@ -89,21 +89,7 @@ export default function App() {
         <Route path="financas/calendario-investimento/:projectId" element={<ProjetoCalendario />} />
         <Route path="financas/calculadora-rentabilidade" element={<CalculadoraRentabilidade />} />
         <Route path="financas/contabilidade" element={<Contabilidade />} />
-        <Route
-          path="financas/balanco-irs"
-          element={
-            <Placeholder
-              title="Balanço / IRS"
-              subtitle="Resumo anual da Categoria F"
-              icon={FileBarChart}
-              fase="Fase 1 — MVP operacional"
-              bullets={[
-                "Resumo por imóvel: rendimento, despesas dedutíveis, líquido",
-                "Estimativa informativa + exportação de relatório · aviso legal",
-              ]}
-            />
-          }
-        />
+        <Route path="financas/balanco-irs" element={<BalancoIRS />} />
 
         {/* Documentos */}
         <Route path="documentos" element={<PastaDigital />} />

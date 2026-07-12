@@ -16,6 +16,7 @@ export type DocCategoria =
   | "Licenças"
   | "Plantas"
   | "Certificados"
+  | "Fiscal"
   | "Outros";
 
 export const DOC_CATEGORIAS: DocCategoria[] = [
@@ -29,6 +30,7 @@ export const DOC_CATEGORIAS: DocCategoria[] = [
   "Licenças",
   "Plantas",
   "Certificados",
+  "Fiscal",
   "Outros",
 ];
 
@@ -39,6 +41,7 @@ export function sugerirCategoria(nome: string): DocCategoria {
   if (/contrato|arrend|cpcv|aditamento/.test(n)) return "Contratos";
   if (/escritur/.test(n)) return "Escrituras";
   if (/\bcc\b|cart[aã]o|cidad[aã]o|passaporte|identifica/.test(n)) return "CC/Documentos";
+  if (/irs|anexo f|fiscal|modelo 3/.test(n)) return "Fiscal";
   if (/fatura|recibo|invoice|or[çc]amento/.test(n)) return "Faturas";
   if (/seguro|ap[oó]lice|multirrisco/.test(n)) return "Seguros";
   if (/imi|liquida[çc][aã]o/.test(n)) return "IMI";
