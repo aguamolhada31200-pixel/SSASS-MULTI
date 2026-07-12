@@ -628,8 +628,8 @@ function CamposReab({
         <Num label="Valor de mercado atual (opcional, sem obras)" reg={register("valorMercadoAtual")} suffix="€" />
         <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
 
-        <Field label="Tempo estimado até à venda (opcional)" className="sm:col-span-2">
-          <input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 18 meses" />
+        <Field label="Venda prevista (opcional)" className="sm:col-span-2">
+          <input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 6 meses" />
         </Field>
 
         <Field label="Investimento Total (auto)" className="sm:col-span-2">
@@ -1101,7 +1101,7 @@ function SummaryFinanceReab({ v }: { v: FormValues }) {
       {capital > 0 && <SummaryRow k="Capital procurado" v={eur(capital)} />}
       {v.split && <SummaryRow k="Divisão do lucro" v={`Investidor ${parseInvestidorPct(v.split)}% · Promotor ${100 - parseInvestidorPct(v.split)}%`} />}
       {v.prazoObras && <SummaryRow k="Prazo das obras" v={v.prazoObras} />}
-      {v.tempoAteVenda && <SummaryRow k="Tempo até à venda" v={v.tempoAteVenda} />}
+      {v.tempoAteVenda && <SummaryRow k="Venda prevista" v={v.tempoAteVenda} />}
     </SummarySection>
   );
 }

@@ -221,7 +221,7 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-function MetricCard({ label, value, tone, highlighted }: { label: string; value: string; tone?: "gold" | "success" | "danger"; highlighted?: boolean }) {
+function MetricCard({ label, value, tone, highlighted, hint }: { label: string; value: string; tone?: "gold" | "success" | "danger"; highlighted?: boolean; hint?: string }) {
   const color = tone === "gold" ? "text-gold-dark" : tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-ink";
   const dot = tone === "gold" ? "bg-gold" : tone === "success" ? "bg-success" : tone === "danger" ? "bg-danger" : "bg-secondary";
   return (
@@ -231,6 +231,7 @@ function MetricCard({ label, value, tone, highlighted }: { label: string; value:
         {label}
       </p>
       <p className={cn("mt-1 num text-base font-bold", color)}>{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] font-medium text-muted">{hint}</p>}
     </div>
   );
 }
@@ -442,9 +443,6 @@ function CorpoReab({ listing }: { listing: L }) {
       <Card>
         <CardContent>
           <SectionHeader title="Composição do investimento" />
-          <p className="mb-4 text-sm text-muted">
-            A operação imobiliária como um todo — responde à pergunta "este projeto é um bom investimento?".
-          </p>
 
           {/* Decomposição linha a linha */}
           <div className="space-y-1 rounded-2xl border border-line bg-bg/40 p-4">
@@ -473,7 +471,8 @@ function CorpoReab({ listing }: { listing: L }) {
             <MetricCard label="Valor de mercado pós-obras" value={eur(mercadoPos)} tone="success" highlighted />
             <MetricCard label="Lucro estimado pós-obras" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} />
             <MetricCard label="ROI da operação prevista" value={pct(roi)} tone="gold" highlighted />
-            <MetricCard label="Prazo estimado das obras" value={listing.prazoObras ?? listing.tempoAteVenda ?? "—"} />
+            <MetricCard label="Prazo estimado das obras" value={listing.prazoObras ?? "—"} />
+            <MetricCard label="Venda prevista" value={listing.tempoAteVenda ?? "—"} />
             <MetricCard label="Valor de mercado atual" value={eur(mercadoAtual)} />
             <MetricCard label="Desconto obtido" value={eur(listing.valorNegociado ?? 0)} tone={listing.valorNegociado ? "success" : undefined} />
           </div>
@@ -500,7 +499,7 @@ function CorpoReab({ listing }: { listing: L }) {
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <MetricCard label="Capital procurado" value={eur(capitalProcurado)} tone="gold" highlighted />
             <MetricCard label={`A sua parte do lucro (${invPct}%)`} value={eur(lucroParceiro)} tone={lucroParceiro >= 0 ? "success" : "danger"} highlighted />
-            <MetricCard label="Retorno sobre a entrada" value={pct(retEntrada)} tone="gold" highlighted />
+            <MetricCard label="Retorno sobre a entrada" value={pct(retEntrada)} tone="gold" highlighted hint={listing.tempoAteVenda ? `(em ${listing.tempoAteVenda})` : undefined} />
           </div>
         </CardContent>
       </Card>
