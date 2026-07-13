@@ -138,9 +138,12 @@ export default function ListingDetail() {
       <div className="relative z-10 mx-auto -mt-8 max-w-6xl px-4 sm:px-6">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {heroMetrics.map((m) => (
-            <div key={m.k} className="rounded-xl border border-line bg-card p-4 shadow-sm">
-              <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-muted">{m.k}</p>
-              <p className={cn("num mt-1 text-xl font-semibold", m.hero ? "text-gold-dark" : "text-ink")}>{m.v}</p>
+            <div key={m.k} className="rounded-2xl border border-gold/15 bg-gradient-to-br from-accent to-card p-4 shadow-sm">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-secondary/70">
+                <span className={cn("h-1.5 w-1.5 rounded-full", m.hero ? "bg-gold" : "bg-secondary")} />
+                {m.k}
+              </p>
+              <p className={cn("mt-1 num text-xl font-bold", m.hero ? "text-gold-dark" : "text-ink")}>{m.v}</p>
             </div>
           ))}
         </div>
@@ -222,13 +225,17 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-/* Cor só onde significa algo: success = ganho real, danger = perda real. O resto é texto normal. */
+/* Formato antigo (tile) · regras de cor novas: verde=ganho real, vermelho=perda; o resto é texto normal. */
 function MetricCard({ label, value, tone, highlighted, hint }: { label: string; value: string; tone?: "gold" | "success" | "danger"; highlighted?: boolean; hint?: string }) {
   const color = tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-ink";
+  const dot = tone === "gold" ? "bg-gold" : tone === "success" ? "bg-success" : tone === "danger" ? "bg-danger" : "bg-secondary";
   return (
-    <div className="rounded-xl border border-line bg-card p-3">
-      <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-muted">{label}</p>
-      <p className={cn("num mt-1 font-semibold", color, highlighted ? "text-xl" : "text-base")}>{value}</p>
+    <div className={cn("rounded-xl border border-line/60 p-3", highlighted ? "bg-gradient-to-br from-accent to-card" : "bg-bg/40")}>
+      <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
+        <span className={cn("inline-block h-1.5 w-1.5 rounded-full", dot)} />
+        {label}
+      </p>
+      <p className={cn("mt-1 num text-base font-bold", color)}>{value}</p>
       {hint && <p className="mt-0.5 text-[11px] font-medium text-muted">{hint}</p>}
     </div>
   );
@@ -409,17 +416,6 @@ function Secao({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-/** Linha de definição: label à esquerda (muted), valor à direita (semibold, tabular). */
-function DefRow({ label, value, tone, strong }: { label: string; value: React.ReactNode; tone?: "success" | "danger"; strong?: boolean }) {
-  const color = tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-ink";
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#F0E6D8] py-2 last:border-b-0">
-      <span className="text-[13px] text-muted">{label}</span>
-      <span className={cn("num text-right font-semibold", color, strong ? "text-lg" : "text-sm")}>{value}</span>
-    </div>
-  );
-}
-
 function CorpoReab({ listing }: { listing: L }) {
   const cta = ctaReab(listing);
   const inv = investimentoTotalReab(listing);
@@ -437,11 +433,13 @@ function CorpoReab({ listing }: { listing: L }) {
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div>
-          {listing.tipoImovel && <DefRow label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} />}
-          <DefRow label="Tipologia" value={listing.tipologia} />
-          <DefRow label="Área útil" value={`${listing.areaUtil} m²`} />
-          <DefRow label="Estado" value={listing.estado} />
+        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
+          {listing.tipoImovel && (
+            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
+          )}
+          <MetricCard label="Tipologia" value={listing.tipologia} />
+          <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
+          <MetricCard label="Estado" value={listing.estado} />
         </div>
       </Secao>
 
@@ -451,24 +449,36 @@ function CorpoReab({ listing }: { listing: L }) {
           <SectionHeader title="Composição do investimento" />
 
           {/* Decomposição linha a linha */}
-          <div>
-            <DefRow label="Valor do imóvel (CPCV)" value={eur(listing.valorImovel ?? 0)} />
-            <DefRow label="Impostos (IMT + IS + Registos)" value={eur(impostos)} />
-            <DefRow label="CTA · Custo Total da Aquisição" value={eur(cta)} />
-            <DefRow label="Orçamento das obras previstas" value={eur(listing.orcamentoObras ?? 0)} />
-            {(listing.outrosCustos ?? 0) > 0 && <DefRow label="Outros custos do projeto" value={eur(listing.outrosCustos ?? 0)} />}
-            <DefRow label="Investimento Total" value={eur(inv)} strong />
+          <div className="space-y-1 rounded-2xl border border-line bg-bg/40 p-4">
+            <CtaRow label="Valor do imóvel (CPCV)" value={listing.valorImovel ?? 0} />
+            <CtaRow label="Impostos (IMT + IS + Registos)" value={impostos} />
+            <div className="my-2 flex items-center justify-between border-t border-line pt-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                CTA · Custo Total da Aquisição
+              </span>
+              <span className="num font-display text-lg font-bold text-gold-dark">{eur(cta)}</span>
+            </div>
+            <CtaRow label="Orçamento das obras previstas" value={listing.orcamentoObras ?? 0} />
+            {(listing.outrosCustos ?? 0) > 0 && (
+              <CtaRow label="Outros custos do projeto" value={listing.outrosCustos ?? 0} />
+            )}
+            <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Investimento Total
+              </span>
+              <span className="num font-display text-2xl font-bold text-gold-dark">{eur(inv)}</span>
+            </div>
           </div>
 
           {/* Mercado, ROI e prazo — indicadores do PROJETO */}
-          <div className="mt-4 border-t border-line pt-2">
-            <DefRow label="Valor de mercado atual" value={eur(mercadoAtual)} />
-            <DefRow label="Valor de mercado pós-obras" value={eur(mercadoPos)} />
-            {(listing.valorNegociado ?? 0) > 0 && <DefRow label="Desconto obtido" value={eur(listing.valorNegociado ?? 0)} tone="success" />}
-            <DefRow label="Prazo estimado das obras" value={listing.prazoObras ?? "—"} />
-            <DefRow label="Venda prevista" value={listing.tempoAteVenda ?? "—"} />
-            <DefRow label="ROI da operação prevista" value={pct(roi)} />
-            <DefRow label="Lucro estimado pós-obras" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} strong />
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <MetricCard label="Valor de mercado pós-obras" value={eur(mercadoPos)} tone="success" highlighted />
+            <MetricCard label="Lucro estimado pós-obras" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} />
+            <MetricCard label="ROI da operação prevista" value={pct(roi)} tone="gold" highlighted />
+            <MetricCard label="Prazo estimado das obras" value={listing.prazoObras ?? "—"} />
+            <MetricCard label="Venda prevista" value={listing.tempoAteVenda ?? "—"} />
+            <MetricCard label="Valor de mercado atual" value={eur(mercadoAtual)} />
+            <MetricCard label="Desconto obtido" value={eur(listing.valorNegociado ?? 0)} tone={listing.valorNegociado ? "success" : undefined} />
           </div>
         </CardContent>
       </Card>
@@ -477,7 +487,7 @@ function CorpoReab({ listing }: { listing: L }) {
       {valorMercadoPosObrasReab(listing) > 0 && <MargemSeguranca listing={listing} />}
 
       {/* ─────── BLOCO 2 — Rentabilidade do INVESTIDOR ─────── */}
-      <Card className="border-gold/30">
+      <Card className="border-gold/30 bg-gradient-to-br from-gold/[0.04] to-card">
         <CardContent>
           <SectionHeader title="Rentabilidade do investidor" />
 
@@ -501,7 +511,7 @@ function CorpoReab({ listing }: { listing: L }) {
  */
 function SplitParceria({ invPct, promPct, capital, lucroParceiro }: { invPct: number; promPct: number; capital: number; lucroParceiro: number }) {
   return (
-    <div className="rounded-xl border border-line p-4">
+    <div className="rounded-2xl border border-gold/30 bg-bg/40 p-4">
       <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
         <Handshake size={13} className="text-gold-dark" /> Divisão do lucro da parceria
       </p>
@@ -556,7 +566,7 @@ function MargemSeguranca({ listing }: { listing: L }) {
     <Card>
       <CardContent>
         <SectionHeader title="Margem de Segurança" />
-        <div className="rounded-xl border border-line p-4">
+        <div className="rounded-2xl border border-line bg-bg/40 p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Margem de segurança</p>
@@ -590,14 +600,16 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div>
-          {listing.tipoImovel && <DefRow label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} />}
-          <DefRow label="Tipologia" value={listing.tipologia} />
-          <DefRow label="Área útil" value={`${listing.areaUtil} m²`} />
-          <DefRow label="Estado" value={listing.estado} />
+        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
+          {listing.tipoImovel && (
+            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
+          )}
+          <MetricCard label="Tipologia" value={listing.tipologia} />
+          <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
+          <MetricCard label="Estado" value={listing.estado} />
         </div>
         {listing.tipoCedencia && (
-          <div className="mt-3 inline-flex items-center rounded bg-gold/10 px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-gold-dark">
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-gold/15 px-3 py-1.5 text-sm font-semibold text-gold-dark">
             {TIPO_CEDENCIA_LABEL[listing.tipoCedencia]}
           </div>
         )}
@@ -606,32 +618,55 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
       <Card>
         <CardContent>
           <SectionHeader title="Viabilidade do negócio" />
+          <p className="mb-4 text-sm text-muted">Decomposição do Custo Total da Aquisição (CTA)</p>
 
-          {/* Decomposição do CTA linha a linha */}
-          <div>
-            <DefRow label="Valor da Cedência" value={eur(listing.valorCedencia ?? 0)} />
-            <DefRow label="Restante a Pagar ao Promitente Vendedor" value={eur(restante)} />
-            <DefRow label="Impostos (IMT + IS + Registo)" value={eur(listing.impostos ?? 0)} />
-            <DefRow label="CTA · Custo Total da Aquisição" value={eur(cta)} strong />
-            {comObras && obra > 0 && <DefRow label="Valor previsto das obras" value={eur(obra)} />}
+          {/* Decomposição linha a linha */}
+          <div className="space-y-1 rounded-2xl border border-line bg-bg/40 p-4">
+            <CtaRow label="Valor da Cedência" value={listing.valorCedencia ?? 0} />
+            <CtaRow label="Restante a Pagar ao Promitente Vendedor" value={restante} />
+            <CtaRow label="Impostos (IMT + IS + Registo)" value={listing.impostos ?? 0} />
+            <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                CTA · Custo Total da Aquisição
+              </span>
+              <span className="num font-display text-2xl font-bold text-gold-dark">{eur(cta)}</span>
+            </div>
           </div>
 
-          {/* Indicadores e detalhes */}
-          <div className="mt-4 border-t border-line pt-2">
-            <DefRow label="Capital Necessário" value={eur(capitalNecessario)} />
-            {!comObras && <DefRow label="Valor de mercado atual" value={eur(listing.valorVendaPrevisto ?? 0)} />}
-            {(listing.valorNegociado ?? 0) > 0 && <DefRow label="Desconto Obtido" value={eur(listing.valorNegociado ?? 0)} />}
-            {listing.valorImovel ? <DefRow label="Valor do Imóvel (CPCV)" value={eur(listing.valorImovel)} /> : null}
-            <DefRow label="Sinal pago pelo cedente" value={eur(listing.sinalPagoCedente ?? 0)} />
-            <DefRow label="Margem de Segurança" value={listing.margemSeguranca ?? "—"} />
-            <DefRow label="Término do CPCV" value={listing.terminoCpcv ? dataPT(listing.terminoCpcv) : (listing.prazoAteEscritura ?? "—")} />
+          {comObras && obra > 0 && (
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-line/60 bg-bg/40 px-4 py-3">
+              <span className="text-sm text-muted">Valor previsto das obras</span>
+              <span className="num text-sm font-semibold text-ink">{eur(obra)}</span>
+            </div>
+          )}
+
+          {/* Indicadores principais — adaptam-se ao cenário (com/sem obras) */}
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="Capital Necessário" value={eur(capitalNecessario)} tone="gold" highlighted />
             {!comObras && (
               <>
-                <DefRow label="Retorno s/ Entrada" value={pct(retEntrada)} />
-                <DefRow label="ROI da operação" value={pct(roi)} />
-                <DefRow label="Lucro Estimado" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} strong />
+                <MetricCard label="Lucro Estimado" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} highlighted />
+                <MetricCard label="Retorno s/ Entrada" value={pct(retEntrada)} tone="gold" highlighted />
+                <MetricCard label="ROI da operação" value={pct(roi)} tone="gold" highlighted />
               </>
             )}
+          </div>
+
+          {/* Detalhes */}
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {!comObras && (
+              <MetricCard label="Valor de mercado atual" value={eur(listing.valorVendaPrevisto ?? 0)} tone="success" />
+            )}
+            <MetricCard label="Desconto Obtido" value={eur(listing.valorNegociado ?? 0)} />
+            {listing.valorImovel ? (
+              <MetricCard label="Valor do Imóvel (CPCV)" value={eur(listing.valorImovel)} />
+            ) : null}
+            <MetricCard label="Sinal pago pelo cedente" value={eur(listing.sinalPagoCedente ?? 0)} />
+            <MetricCard label="Margem de Segurança" value={listing.margemSeguranca ?? "—"} />
+            <MetricCard
+              label="Término do CPCV"
+              value={listing.terminoCpcv ? dataPT(listing.terminoCpcv) : (listing.prazoAteEscritura ?? "—")}
+            />
           </div>
         </CardContent>
       </Card>
@@ -645,20 +680,35 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
             </p>
 
             {/* Decomposição do Investimento Total */}
-            <div>
-              <DefRow label="CTA · Custo Total da Aquisição" value={eur(cta)} />
-              <DefRow label="Valor previsto das obras" value={eur(obra)} />
-              <DefRow label="Investimento Total" value={eur(investimentoTotalCedencia(listing))} strong />
+            <div className="space-y-1 rounded-2xl border border-line bg-bg/40 p-4">
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-sm text-muted">CTA · Custo Total da Aquisição</span>
+                <span className="num text-sm font-semibold text-ink">{eur(cta)}</span>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-sm text-muted">Valor previsto das obras</span>
+                <span className="num text-sm font-semibold text-ink">{eur(obra)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between border-t border-line pt-3">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  Investimento Total
+                </span>
+                <span className="num font-display text-2xl font-bold text-gold-dark">
+                  {eur(investimentoTotalCedencia(listing))}
+                </span>
+              </div>
             </div>
 
             {/* Indicadores pós-obras */}
-            <div className="mt-4 border-t border-line pt-2">
-              <DefRow label="Valor de mercado atual" value={eur(listing.valorVendaPrevisto ?? 0)} />
-              <DefRow label="Valor de mercado pós-obras" value={eur(posObras)} />
-              {listing.prazoObras ? <DefRow label="Prazo estimado das obras" value={listing.prazoObras} /> : null}
-              <DefRow label="ROI pós-obras" value={pct(roi)} />
-              <DefRow label="Retorno s/ Entrada" value={pct(retEntrada)} />
-              <DefRow label="Lucro estimado pós-obras" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} strong />
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <MetricCard label="Valor de mercado pós-obras" value={eur(posObras)} tone="success" highlighted />
+              <MetricCard label="Lucro estimado pós-obras" value={eur(lucro)} tone={lucro >= 0 ? "success" : "danger"} highlighted />
+              <MetricCard label="ROI pós-obras" value={pct(roi)} tone="gold" highlighted />
+              <MetricCard label="Retorno s/ Entrada" value={pct(retEntrada)} tone="gold" highlighted />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <MetricCard label="Valor de mercado atual" value={eur(listing.valorVendaPrevisto ?? 0)} />
+              {listing.prazoObras ? <MetricCard label="Prazo estimado das obras" value={listing.prazoObras} /> : null}
             </div>
           </CardContent>
         </Card>
@@ -706,30 +756,40 @@ function TrabalhosAnteriores({ authorId }: { authorId?: string }) {
   );
 }
 
+function CtaRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-sm text-muted">{label}</span>
+      <span className="num text-sm font-semibold text-ink">{eur(value)}</span>
+    </div>
+  );
+}
+
 function CorpoArrendamento({ listing }: { listing: L }) {
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div>
-          {listing.tipoImovel && <DefRow label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} />}
-          <DefRow label="Tipologia" value={listing.tipologia} />
-          <DefRow label="Área útil" value={`${listing.areaUtil} m²`} />
-          <DefRow label="Estado" value={listing.estado} />
+        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
+          {listing.tipoImovel && (
+            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
+          )}
+          <MetricCard label="Tipologia" value={listing.tipologia} />
+          <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
+          <MetricCard label="Estado" value={listing.estado} />
         </div>
       </Secao>
 
       <Card>
         <CardContent>
           <SectionHeader title="Viabilidade do negócio" />
-          <div>
-            <DefRow label="Preço do imóvel" value={eur(listing.precoImovel ?? 0)} />
-            <DefRow label="Capital necessário" value={eur(listing.capitalNecessario ?? 0)} />
-            <DefRow label="Receita mensal" value={eur(listing.rendaMensal ?? 0)} tone="success" />
-          </div>
-          <div className="mt-4 border-t border-line pt-2">
-            <DefRow label="Yield líquido" value={pct(listing.yieldLiquido ?? 0)} strong />
-            <DefRow label="Rentabilidade s/ capital" value={pct(listing.rentabilidadeCapital ?? 0)} />
-            <DefRow label="ROI" value={pct(listing.roi ?? 0)} />
+          <p className="mb-4 text-sm text-muted">Indicadores financeiros</p>
+          <div className="grid grid-cols-3 gap-3">
+            <MetricCard label="Preço do imóvel" value={eur(listing.precoImovel ?? 0)} />
+            <MetricCard label="Capital necessário" value={eur(listing.capitalNecessario ?? 0)} tone="gold" highlighted />
+            <MetricCard label="Receita mensal" value={eur(listing.rendaMensal ?? 0)} tone="success" />
+            <MetricCard label="Yield líquido" value={pct(listing.yieldLiquido ?? 0)} tone="gold" highlighted />
+            <MetricCard label="Rentab. s/ capital" value={pct(listing.rentabilidadeCapital ?? 0)} highlighted />
+            <MetricCard label="ROI" value={pct(listing.roi ?? 0)} tone="gold" highlighted />
           </div>
         </CardContent>
       </Card>
