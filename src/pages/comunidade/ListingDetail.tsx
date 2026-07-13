@@ -56,6 +56,7 @@ import {
   capitalNecessarioCedencia,
   comObrasCedencia,
   investimentoTotalCedencia,
+  margemSegurancaCedencia,
 } from "@/lib/calc/rede";
 import { metricasHero } from "@/components/rede/metrics";
 import { eur, pct, dataPT, plural } from "@/lib/format";
@@ -348,16 +349,31 @@ function Galeria({ listing, showExact }: { listing: L; showExact: boolean }) {
           <div className="aspect-video bg-ink/5"><img src={listing.floorPlanUrl} alt="Planta" className="h-full w-full object-contain" /></div>
         )}
 
-        {aba === "mapa" && (
-          <div className="relative flex aspect-video items-center justify-center bg-gradient-to-br from-[#F5ECD7] to-[#E8D5BE]">
-            <div className="azulejo absolute inset-0 opacity-[0.08]" />
-            <div className="relative text-center">
-              <MapPin size={36} className="mx-auto text-primary" />
-              <p className="mt-2 font-display text-lg font-semibold text-ink">{listing.city}</p>
-              <p className="text-sm text-muted">{showExact ? listing.exactAddress : `${listing.district} · zona aproximada`}</p>
+        {aba === "mapa" && (() => {
+          // Sem morada exata (vista pública) → centra na cidade/distrito (zona aproximada).
+          // Com morada exata (autor) → centra na morada. Embed do Google Maps sem API key.
+          const morada = showExact && listing.exactAddress?.trim();
+          const query = morada
+            ? `${listing.exactAddress}, ${listing.city}, Portugal`
+            : `${listing.city}, ${listing.district}, Portugal`;
+          const zoom = morada ? 16 : 12;
+          return (
+            <div className="relative aspect-video bg-ink/5">
+              <iframe
+                title={`Mapa · ${listing.city}`}
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=${zoom}&output=embed`}
+                className="h-full w-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+              {!morada && (
+                <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border border-white/20 bg-ink/60 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                  <MapPin size={12} /> Zona aproximada · {listing.district}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {aba === "energia" && (
           <div className="p-6">
@@ -484,7 +500,7 @@ function CorpoReab({ listing }: { listing: L }) {
       </Card>
 
       {/* ─────── Margem de Segurança — folga da operação sobre o preço de venda ─────── */}
-      {valorMercadoPosObrasReab(listing) > 0 && <MargemSeguranca listing={listing} />}
+      {valorMercadoPosObrasReab(listing) > 0 && <MargemSeguranca margem={margemSegurancaReab(listing)} />}
 
       {/* ─────── BLOCO 2 — Rentabilidade do INVESTIDOR ─────── */}
       <Card className="border-gold/30 bg-gradient-to-br from-gold/[0.04] to-card">
@@ -553,12 +569,11 @@ const SEG_UI: Record<NivelSeguranca, { dot: string; text: string; bar: string; c
 };
 
 /**
- * Margem de Segurança — folga da operação sobre o PREÇO DE VENDA (não sobre o
- * investimento). Margem = (Valor pós-obras − Investimento Total) / Valor pós-obras.
+ * Margem de Segurança — folga da operação sobre o valor de venda de referência.
+ * Reutilizável: recebe a margem já calculada (Compra e Revenda ou Cedência).
  * A barra usa uma escala 0–30% (acima disso enche); o chip classifica o nível.
  */
-function MargemSeguranca({ listing }: { listing: L }) {
-  const margem = margemSegurancaReab(listing);
+function MargemSeguranca({ margem }: { margem: number }) {
   const nivel = nivelSegurancaReab(margem);
   const ui = SEG_UI[nivel];
   const fill = Math.max(0, Math.min(100, (margem / 30) * 100));
@@ -662,7 +677,6 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
               <MetricCard label="Valor do Imóvel (CPCV)" value={eur(listing.valorImovel)} />
             ) : null}
             <MetricCard label="Sinal pago pelo cedente" value={eur(listing.sinalPagoCedente ?? 0)} />
-            <MetricCard label="Margem de Segurança" value={listing.margemSeguranca ?? "—"} />
             <MetricCard
               label="Término do CPCV"
               value={listing.terminoCpcv ? dataPT(listing.terminoCpcv) : (listing.prazoAteEscritura ?? "—")}
@@ -671,13 +685,13 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
         </CardContent>
       </Card>
 
+      {/* Margem de Segurança — folga sobre o valor de venda (atual sem obras / pós-obras com obras) */}
+      <MargemSeguranca margem={margemSegurancaCedencia(listing)} />
+
       {comObras && (
         <Card>
           <CardContent>
             <SectionHeader title="Situação Após Revenda" />
-            <p className="mb-4 text-sm text-muted">
-              Investimento Total = CTA + Valor previsto das obras. ROI pós-obras = Lucro pós-obras / Investimento Total.
-            </p>
 
             {/* Decomposição do Investimento Total */}
             <div className="space-y-1 rounded-2xl border border-line bg-bg/40 p-4">

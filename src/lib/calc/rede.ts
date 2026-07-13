@@ -250,6 +250,36 @@ export function retornoEntradaCedencia(l: Listing): number {
   return (lucroCedencia(l) / cap) * 100;
 }
 
+/** Valor de mercado ATUAL da cedência (referência quando não há obras). */
+export function valorMercadoAtualCedencia(l: Pick<Listing, "valorVendaPrevisto">): number {
+  return l.valorVendaPrevisto ?? 0;
+}
+
+/**
+ * Folga financeira da cedência (€):
+ *  · sem obras: Valor de Mercado Atual − CTA
+ *  · com obras: Valor de Mercado Pós-Obras − (CTA + Obras + Outros Custos)
+ */
+export function folgaCedencia(l: Listing): number {
+  if (comObrasCedencia(l)) {
+    const invTotal = ctaCedencia(l) + (l.obra ?? 0) + (l.outrosCustos ?? 0);
+    return valorMercadoPosObrasCedencia(l) - invTotal;
+  }
+  return valorMercadoAtualCedencia(l) - ctaCedencia(l);
+}
+
+/**
+ * Margem de Segurança da cedência (%) — folga sobre o valor de venda de referência.
+ *  · sem obras: base = Valor de Mercado Atual
+ *  · com obras: base = Valor de Mercado Pós-Obras
+ * Classifica-se com nivelSegurancaReab (mesma escala do Compra e Revenda).
+ */
+export function margemSegurancaCedencia(l: Listing): number {
+  const base = comObrasCedencia(l) ? valorMercadoPosObrasCedencia(l) : valorMercadoAtualCedencia(l);
+  if (base <= 0) return 0;
+  return (folgaCedencia(l) / base) * 100;
+}
+
 /** @deprecated Usado por código antigo — devolve agora o Capital Necessário. */
 export function capitalCedencia(l: Listing): number {
   return capitalNecessarioCedencia(l);

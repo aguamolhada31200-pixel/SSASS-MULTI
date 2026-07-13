@@ -324,6 +324,13 @@ export function PublishListingModal() {
     setStep((s) => Math.min(s + 1, 3));
   };
 
+  // Se o Publicar disparar com o form inválido, leva o utilizador ao passo Detalhes
+  // e diz porquê — o botão nunca fica "morto" sem feedback.
+  const onInvalidSubmit = () => {
+    toast.error("Faltam campos obrigatórios", { description: "Volte ao passo Detalhes e preencha os campos assinalados a vermelho." });
+    setStep(1);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={closeListingForm}>
       <div
@@ -333,13 +340,13 @@ export function PublishListingModal() {
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="font-display text-lg font-semibold text-ink">{editingId ? "Editar anúncio" : "Publicar anúncio"}</h2>
-            <p className="text-xs text-muted">Passo {step + 1} de 4 · {["Categoria", "Detalhes", "Contacto", "Resumo e confirmação"][step]}</p>
+            <p className="text-xs text-muted">Passo {step + 1} de 4 · {["Categoria", "Detalhes", "Visibilidade", "Resumo e confirmação"][step]}</p>
           </div>
           <button onClick={closeListingForm} className="text-muted hover:text-ink"><X size={20} /></button>
         </div>
 
         <div className="flex gap-1.5 px-5 pt-4">
-          {["Categoria", "Detalhes", "Contacto", "Resumo"].map((s, i) => (
+          {["Categoria", "Detalhes", "Visibilidade", "Resumo"].map((s, i) => (
             <div key={s} className="flex-1">
               <div className={cn("h-1.5 rounded-full transition-colors", i <= step ? "bg-gold" : "bg-line")} />
               <p className={cn("mt-1 text-[10px]", i === step ? "font-medium text-gold-dark" : "text-muted")}>{s}</p>
@@ -347,7 +354,7 @@ export function PublishListingModal() {
           ))}
         </div>
 
-        <form onSubmit={handleSubmit(onValid as (v: FormValues) => void)} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={handleSubmit(onValid as (v: FormValues) => void, onInvalidSubmit)} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto p-5">
             {/* STEP 0 — categoria */}
             {step === 0 && (
@@ -450,17 +457,16 @@ export function PublishListingModal() {
                   {errors.galleryUrls?.message && <p className="mt-1 text-xs text-danger">{errors.galleryUrls.message}</p>}
                 </div>
 
-                {/* Planta */}
-                <Field label="Planta (opcional)">
-                  <div className="flex items-center gap-2">
-                    <input {...register("floorPlanUrl")} className={inputCls} placeholder="URL da planta…" />
-                    <label className="inline-flex h-10 cursor-pointer items-center gap-1 rounded-lg border border-line bg-card px-3 text-sm text-muted hover:bg-accent">
-                      <ImagePlus size={14} />
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f, "floor"); e.target.value = ""; }} />
-                    </label>
-                  </div>
-                  {floorPlan && <p className="mt-1 text-[11px] text-muted">📐 Planta anexada</p>}
-                </Field>
+                {/* Planta — mesma estrutura das fotos do imóvel */}
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-muted">Planta (opcional)</p>
+                  <PlantaUploader
+                    url={floorPlan}
+                    onAddUrl={(u) => setValue("floorPlanUrl", u.trim(), { shouldDirty: true })}
+                    onFile={(f) => onFile(f, "floor")}
+                    onRemove={() => setValue("floorPlanUrl", "", { shouldDirty: true })}
+                  />
+                </div>
 
                 {/* Campos type-aware */}
                 <div className="rounded-xl border border-line bg-bg p-4">
@@ -483,30 +489,21 @@ export function PublishListingModal() {
               </div>
             )}
 
-            {/* STEP 2 — contacto e visibilidade */}
+            {/* STEP 2 — visibilidade */}
             {step === 2 && (
               <div className="space-y-5">
                 <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Como quer ser contactado?</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="Preferência de contacto">
-                      <select {...register("contactPreference")} className={inputCls}>
-                        <option value="mensagem">Mensagem na plataforma</option>
-                        <option value="email">Email</option>
-                        <option value="telefone">Telefone</option>
-                      </select>
-                    </Field>
-                    <Field label="Visibilidade">
-                      <select {...register("visibility")} className={inputCls}>
-                        <option value="public">Público (todos)</option>
-                        <option value="verified">Só investidores verificados</option>
-                      </select>
-                    </Field>
-                  </div>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Quem pode ver o anúncio?</p>
+                  <Field label="Visibilidade">
+                    <select {...register("visibility")} className={inputCls}>
+                      <option value="public">Público (todos)</option>
+                      <option value="verified">Só investidores verificados</option>
+                    </select>
+                  </Field>
                 </div>
 
                 <div className="rounded-xl border border-line bg-bg/60 p-4 text-xs text-muted">
-                  <p className="font-medium text-ink">💡 O passo seguinte é um resumo para confirmar tudo antes de publicar.</p>
+                  <p className="font-medium text-ink">O passo seguinte é um resumo para confirmar tudo antes de publicar.</p>
                   <p className="mt-1">A morada exata só é partilhada depois do investidor manifestar interesse.</p>
                 </div>
               </div>
@@ -670,7 +667,7 @@ function CamposReab({
             <span className="px-3 text-sm text-muted">€</span>
           </div>
           <button type="button" onClick={calcularImpostosAuto} className="mt-1 text-[11px] text-secondary hover:underline">
-            ⚡ Calcular automaticamente (IMT HS + IS 0,8% + Registo)
+            Calcular automaticamente (IMT HS + IS 0,8% + Registo)
           </button>
         </Field>
 
@@ -841,7 +838,7 @@ function CamposCedencia({
           onClick={calcularImpostosAuto}
           className="mt-1 text-[11px] text-secondary hover:underline"
         >
-          ⚡ Calcular automaticamente (IMT HS + IS 0,8% + Registo)
+          Calcular automaticamente (IMT HS + IS 0,8% + Registo)
         </button>
       </Field>
 
@@ -909,9 +906,6 @@ function CamposCedencia({
       </Field>
       <Field label="Término do CPCV">
         <input type="date" {...register("terminoCpcv")} className={inputCls} />
-      </Field>
-      <Field label="Margem de segurança" className="sm:col-span-2">
-        <input {...register("margemSeguranca")} className={inputCls} placeholder="Alta / Média / Baixa" />
       </Field>
     </div>
   );
@@ -1113,13 +1107,9 @@ function SummaryStep({ v }: { v: FormValues }) {
         <SummaryFinanceArrendamento v={v} />
       )}
 
-      <SummarySection title="Contacto e visibilidade">
+      <SummarySection title="Visibilidade">
         <SummaryRow
-          k="Preferência de contacto"
-          v={v.contactPreference === "mensagem" ? "Mensagem na plataforma" : v.contactPreference === "email" ? "Email" : "Telefone"}
-        />
-        <SummaryRow
-          k="Visibilidade"
+          k="Quem pode ver"
           v={v.visibility === "public" ? "Público (todos)" : "Só investidores verificados"}
         />
       </SummarySection>
@@ -1191,6 +1181,9 @@ function SummaryFinanceReab({ v }: { v: FormValues }) {
       )}
       {capital > 0 && <SummaryRow k="Capital procurado" v={eur(capital)} />}
       {v.split && <SummaryRow k="Divisão do lucro" v={`Investidor ${parseInvestidorPct(v.split)}% · Promotor ${100 - parseInvestidorPct(v.split)}%`} />}
+      {posObras > 0 && (
+        <SummaryRow k={`Lucro do investidor (${parseInvestidorPct(v.split ?? "")}%)`} v={eur(lucroParceiroReab(draft))} />
+      )}
       {capital > 0 && posObras > 0 && (
         <SummaryRow k="Retorno sobre a entrada" v={`${pct(retorno)}${v.tempoAteVenda ? ` (em ${v.tempoAteVenda})` : ""}`} />
       )}
@@ -1232,6 +1225,53 @@ function SummaryFinanceArrendamento({ v }: { v: FormValues }) {
       {capital > 0 && <SummaryRow k="Capital necessário" v={eur(capital)} />}
       {renda > 0 && <SummaryRow k="Renda mensal" v={eur(renda)} />}
     </SummarySection>
+  );
+}
+
+/** Uploader da planta — mesma linguagem visual das fotos (thumbnail + remover). */
+function PlantaUploader({
+  url,
+  onAddUrl,
+  onFile,
+  onRemove,
+}: {
+  url?: string;
+  onAddUrl: (u: string) => void;
+  onFile: (f: File) => void;
+  onRemove: () => void;
+}) {
+  const [val, setVal] = useState("");
+  const add = () => { if (val.trim()) { onAddUrl(val); setVal(""); } };
+  if (url)
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-line bg-card p-2">
+        <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line">
+          <img src={url} alt="Planta" className="h-full w-full object-cover" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-ink">Planta anexada</p>
+          <p className="text-[11px] text-muted">Aparece no separador «Planta» do anúncio.</p>
+          <button type="button" onClick={onRemove} className="mt-1.5 inline-flex items-center gap-1 rounded p-1 text-[11px] text-muted hover:bg-danger/10 hover:text-danger" title="Remover planta">
+            <Trash2 size={14} /> Remover
+          </button>
+        </div>
+      </div>
+    );
+  return (
+    <div className="flex gap-2">
+      <input
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        placeholder="Colar URL da planta…"
+        className={inputCls}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+      />
+      <Button type="button" variant="outline" onClick={add}><Plus size={15} /></Button>
+      <label className="inline-flex h-10 cursor-pointer items-center gap-1 rounded-lg border border-line bg-card px-3 text-sm text-muted hover:bg-accent">
+        <ImagePlus size={14} />
+        <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+      </label>
+    </div>
   );
 }
 

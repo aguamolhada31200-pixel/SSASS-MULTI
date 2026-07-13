@@ -366,6 +366,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     district: "Lisboa",
     city: "Lisboa",
     exactAddress: "Rua de Belém 142, 2.º",
+    tipoImovel: "apartamento",
     tipologia: "T2",
     areaUtil: 88,
     estado: "a recuperar",
@@ -405,6 +406,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     district: "Porto",
     city: "Porto",
     exactAddress: "Av. da Boavista 1284, 5.º",
+    tipoImovel: "apartamento",
     tipologia: "T4",
     areaUtil: 165,
     estado: "a recuperar",
@@ -445,6 +447,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     district: "Lisboa",
     city: "Lisboa",
     exactAddress: "Rua do Areeiro 38, 3.º",
+    tipoImovel: "apartamento",
     tipologia: "T3",
     areaUtil: 105,
     estado: "a recuperar",
@@ -486,6 +489,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     district: "Aveiro",
     city: "Aveiro",
     exactAddress: "Rua Direita 88, 2.º",
+    tipoImovel: "apartamento",
     tipologia: "T1",
     areaUtil: 48,
     estado: "a recuperar",
@@ -757,7 +761,7 @@ export const useListingsStore = create<ListingsState>()(
     }),
     {
       name: "redegest-listings",
-      version: 8,
+      version: 9,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { listings?: Listing[] } | undefined;
         if (state?.listings && version < 5) {
@@ -767,9 +771,10 @@ export const useListingsStore = create<ListingsState>()(
             galleryUrls: normalizeListingPhotos(l.galleryUrls as unknown),
           }));
         }
-        if (state?.listings && version < 8) {
+        if (state?.listings && version < 9) {
           // v6: cedência com/sem obras. v7: anúncio do utilizador (vista autor).
           // v8: reabilitação — valorMercadoAtual/PosObras, impostos consolidados, prazoObras.
+          // v9: tipo de imóvel nas cedências que faltavam (Belém, Boavista, Areeiro, Aveiro).
           // Refresca os seeds mantendo anúncios criados pelo utilizador.
           const seedIds = new Set(SEED.map((l) => l.id));
           const userListings = state.listings.filter((l) => !seedIds.has(l.id));
