@@ -13,6 +13,14 @@ import {
   Hourglass,
   MessageCircle,
   Handshake,
+  Hammer,
+  KeyRound,
+  ShieldCheck,
+  Wallet,
+  Users,
+  TrendingUp,
+  Building2,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ListingCard } from "@/components/rede/ListingCard";
@@ -56,6 +64,24 @@ const ORDENAR_LABEL: Record<Ordenar, string> = {
 };
 
 type RedeTab = "anuncios" | "investidores" | "guardados";
+
+const UNSPLASH = (id: string, w = 1200, q = 72) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=${q}`;
+const HERO_IMG = UNSPLASH("1505691938895-1758d7feb511", 1800, 68);
+const CATEGORIA_IMG: Record<ListingType, string> = {
+  reabilitacao: UNSPLASH("1503387762-592deb58ef4e", 800),
+  cedencia: UNSPLASH("1560448204-e02f11c3d0e2", 800),
+  arrendamento: UNSPLASH("1502672260266-1c1ef2d93688", 800),
+};
+const CATEGORIA_ICON: Record<ListingType, typeof Hammer> = {
+  reabilitacao: Hammer,
+  cedencia: Handshake,
+  arrendamento: KeyRound,
+};
+const CATEGORIA_DESC: Record<ListingType, string> = {
+  reabilitacao: "Capital para comprar, recuperar e revender com margem.",
+  cedencia: "Entre num negócio antes da escritura, com desconto.",
+  arrendamento: "Imóveis prontos a render — rendimento passivo.",
+};
 
 /** Dias até ao término do CPCV (null se não definido). */
 function diasAteFecho(l: Listing): number | null {
@@ -130,7 +156,9 @@ export default function RedeInvestidores() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [visiveis, setVisiveis] = useState(9);
 
-  // Sticky: sentinela logo após o hero — quando sai de vista, a barra "colou".
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  // Sticky: sentinela logo após a faixa de estatísticas — quando sai de vista, a barra "colou".
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [stuck, setStuck] = useState(false);
   useEffect(() => {
@@ -144,9 +172,14 @@ export default function RedeInvestidores() {
   const baseListings = enabled ? listings.filter((l) => l.status !== "closed") : [];
   const savedGuardados = baseListings.filter((l) => savedIds.includes(l.id));
 
-  // Linha de liquidez do hero — calculada em tempo real dos anúncios ativos.
+  // Estatísticas em tempo real dos anúncios ativos.
   const ativos = baseListings.filter((l) => l.estadoAnuncio === "ativo");
   const capitalAtivo = ativos.reduce((s, l) => s + capitalDoAnuncio(l), 0);
+  const roiMedio = useMemo(() => {
+    const vals = ativos.map(roiDoAnuncio).filter((v) => v > 0);
+    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+  }, [ativos]);
+  const contagemPorTipo = (t: ListingType) => ativos.filter((l) => l.type === t).length;
 
   const interessesPorAnuncio = useMemo(() => {
     const m = new Map<string, number>();
@@ -157,8 +190,8 @@ export default function RedeInvestidores() {
   // "Fecham em breve": ativos com escritura <30 dias OU ≥2 interesses reais. Máx. 3.
   const fechamEmBreve = useMemo(() => {
     return ativos
-      .map((l) => ({ l, dias: diasAteFecho(l), n: interessesPorAnuncio.get(l.id) ?? 0 }))
-      .filter((x) => (x.dias !== null && x.dias >= 0 && x.dias < 30) || x.n >= 2)
+      .map((l) => ({ l, dias: diasAteFecho(l), nInt: interessesPorAnuncio.get(l.id) ?? 0 }))
+      .filter((x) => (x.dias !== null && x.dias >= 0 && x.dias < 30) || x.nInt >= 2)
       .sort((a, b) => (a.dias ?? 9999) - (b.dias ?? 9999))
       .slice(0, 3);
   }, [ativos, interessesPorAnuncio]);
@@ -222,8 +255,9 @@ export default function RedeInvestidores() {
     (estados.length > 0 ? 1 : 0);
 
   const haFiltro = activeFilters > 0 || categoria !== "todas" || busca.trim().length > 0;
+  // Modo descoberta: a home "de montra" (sem filtros) mostra as secções de marketing.
+  const descoberta = tab === "anuncios" && !haFiltro;
 
-  // Reset da paginação quando qualquer filtro/ordenação muda.
   useEffect(() => {
     setVisiveis(9);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -246,7 +280,14 @@ export default function RedeInvestidores() {
   const toggleEstado = (e: EstadoAnuncio) =>
     setEstados((cur) => (cur.includes(e) ? cur.filter((x) => x !== e) : [...cur, e]));
 
-  // Chips removíveis dos filtros ativos (por cima da grelha).
+  const irParaGrelha = () => gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const escolherCategoria = (c: "todas" | ListingType) => {
+    setTab("anuncios");
+    setCategoria(c);
+    setTimeout(irParaGrelha, 60);
+  };
+
   const chipsAtivos: { label: string; clear: () => void }[] = [
     ...(capital !== "todos" ? [{ label: CAPITAL_PILLS.find((c) => c.key === capital)!.label, clear: () => setCapital("todos") }] : []),
     ...(distrito !== "todos" ? [{ label: distrito, clear: () => setDistrito("todos") }] : []),
@@ -259,31 +300,46 @@ export default function RedeInvestidores() {
     ...(retEntradaMin > 0 ? [{ label: `Ret. entrada ≥ ${retEntradaMin}%`, clear: () => setRetEntradaMin(0) }] : []),
   ];
 
-  // "Como funciona": só para utilizador novo (0 guardados e 0 interesses enviados).
-  const utilizadorNovo = savedIds.length === 0 && !interests.some((i) => i.userId === CURRENT_USER_ID);
-
   const directoryProfiles = profiles.filter((p) => p.id !== CURRENT_USER_ID);
+  const verificados = directoryProfiles.filter((p) => p.isVerified).length;
+  const destaqueInvestidores = useMemo(
+    () => [...directoryProfiles].sort((a, b) => b.rating * b.numAvaliacoes - a.rating * a.numAvaliacoes).slice(0, 8),
+    [directoryProfiles]
+  );
+
+  const anunciosPorAutor = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of ativos) m.set(l.authorId, (m.get(l.authorId) ?? 0) + 1);
+    return m;
+  }, [ativos]);
 
   return (
     <div className="-mx-4 -my-6 sm:-mx-6 lg:-mx-8">
-      {/* Hero compacto */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#2E1A0E] via-[#5C3D2E] to-[#3a2417] px-4 pb-14 pt-7 text-sidebar-text sm:px-10">
-        <div className="azulejo absolute inset-0 opacity-[0.06]" />
-        <div className="relative mx-auto max-w-6xl">
-          <h1 className="text-[26px] font-semibold leading-tight text-[#F5ECD7]">Capital encontra negócio.</h1>
-          <p className="mt-1 text-[13px] font-normal text-gold-soft">
-            {ativos.length} {ativos.length === 1 ? "oportunidade ativa" : "oportunidades ativas"} ·{" "}
-            <span className="num">{capitalCurto(capitalAtivo)}</span> em capital procurado
+      {/* ───────── HERO fotográfico ───────── */}
+      <div className="relative overflow-hidden text-sidebar-text">
+        <img src={HERO_IMG} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#2E1A0E]/95 via-[#5C3D2E]/90 to-[#3a2417]/85" />
+        <div className="azulejo absolute inset-0 opacity-[0.07]" />
+        <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-14">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-gold-soft">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Marketplace de investimento imobiliário
+          </span>
+          <h1 className="mt-4 max-w-2xl text-[30px] font-semibold leading-[1.1] text-[#F9F1E2] sm:text-[40px]">
+            Onde o capital encontra o negócio certo.
+          </h1>
+          <p className="mt-3 max-w-xl text-sm text-sidebar-text/75 sm:text-[15px]">
+            Parcerias, cedências de posição e imóveis a render — direto entre investidores, sem intermediários.
           </p>
 
-          <div className="glass mt-4 flex max-w-2xl flex-col gap-2 rounded-xl border border-white/15 p-1.5 sm:flex-row sm:items-center">
+          {/* Pesquisa */}
+          <div className="mt-6 flex max-w-2xl flex-col gap-2 rounded-xl border border-white/15 bg-white/95 p-1.5 shadow-lg sm:flex-row sm:items-center">
             <div className="flex flex-1 items-center gap-2 px-3">
-              <Search size={16} className="text-sidebar-text/60" />
+              <Search size={18} className="text-muted" />
               <input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Cidade, distrito ou tipo de negócio"
-                className="h-9 w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+                className="h-10 w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted"
               />
               {busca && (
                 <button onClick={() => setBusca("")} className="text-muted hover:text-ink">
@@ -291,21 +347,45 @@ export default function RedeInvestidores() {
                 </button>
               )}
             </div>
-            <Button variant="gold" size="sm" className="sm:w-auto" onClick={() => setTab("anuncios")}>
-              Procurar
+            <Button variant="gold" className="sm:w-auto" onClick={() => { setTab("anuncios"); irParaGrelha(); }}>
+              Explorar oportunidades
             </Button>
+          </div>
+
+          {/* Confiança */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-sidebar-text/70">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck size={15} className="text-gold-soft" /> <span className="num">{verificados}</span> investidores verificados
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Building2 size={15} className="text-gold-soft" /> <span className="num">{ativos.length}</span> negócios ativos
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Wallet size={15} className="text-gold-soft" /> <span className="num">{capitalCurto(capitalAtivo)}</span> em procura
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Sentinela do sticky */}
+      {/* ───────── Faixa de estatísticas (sobrepõe o hero) ───────── */}
+      {enabled && (
+        <div className="relative z-10 mx-auto -mt-10 max-w-6xl px-4 sm:px-6">
+          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-line bg-card p-4 shadow-md sm:grid-cols-4 sm:p-5">
+            <EstatItem icon={Building2} label="Oportunidades ativas" value={String(ativos.length)} />
+            <EstatItem icon={Wallet} label="Capital procurado" value={capitalCurto(capitalAtivo)} />
+            <EstatItem icon={TrendingUp} label="ROI médio" value={pct(roiMedio, 0)} />
+            <EstatItem icon={Users} label="Investidores" value={String(profiles.length)} />
+          </div>
+        </div>
+      )}
+
       <div ref={sentinelRef} className="h-px" />
 
-      {/* Barra sticky: tabs + chips de categoria + ordenar + filtros */}
-      <div className={cn("sticky top-0 z-30 -mt-8 transition-colors", stuck && "border-b border-line bg-bg/95 shadow-sm backdrop-blur-sm")}>
+      {/* ───────── Barra sticky: tabs + categorias + ordenar + filtros ───────── */}
+      <div className={cn("sticky top-0 z-30 mt-6 transition-colors", stuck && "border-b border-line bg-bg/95 shadow-sm backdrop-blur-sm")}>
         <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-md">
+            <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-sm">
               {(["anuncios", "investidores", "guardados"] as const).map((t) => (
                 <button
                   key={t}
@@ -369,9 +449,20 @@ export default function RedeInvestidores() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {tab === "anuncios" ? (
           <>
+            {/* Categorias de entrada — só na montra */}
+            {enabled && descoberta && (
+              <div className="mb-8">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
+                    <CategoriaCard key={t} tipo={t} count={contagemPorTipo(t)} onClick={() => escolherCategoria(t)} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Chips dos filtros ativos (removíveis) */}
             {chipsAtivos.length > 0 && (
               <div className="mb-4 flex flex-wrap items-center gap-1.5">
@@ -386,8 +477,38 @@ export default function RedeInvestidores() {
               </div>
             )}
 
-            {/* Contador de resultados */}
-            <div className="mb-4 flex items-center gap-2 text-[13px] text-muted">
+            {/* Fecham em breve */}
+            {enabled && fechamEmBreve.length > 0 && (
+              <div className="mb-8">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">
+                    <Hourglass size={14} className="text-warning" /> Fecham em breve
+                  </h2>
+                  <button onClick={() => { setOrdenar("fechar"); irParaGrelha(); }} className="text-xs font-medium text-secondary hover:underline">
+                    ver todos →
+                  </button>
+                </div>
+                <div className="flex gap-5 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3">
+                  {fechamEmBreve.map(({ l, dias, nInt }) => (
+                    <div key={l.id} className="relative w-[280px] shrink-0 sm:w-auto">
+                      <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning shadow-sm">
+                        {dias !== null && dias >= 0 && dias < 30 ? (
+                          <>
+                            <Hourglass size={11} /> {dias} {dias === 1 ? "dia" : "dias"}
+                          </>
+                        ) : (
+                          `${nInt} interessados`
+                        )}
+                      </span>
+                      <ListingCard listing={l} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Cabeçalho da grelha */}
+            <div ref={gridRef} className="mb-4 flex items-center gap-2 text-[13px] text-muted">
               {enabled ? (
                 haFiltro ? (
                   <>
@@ -397,40 +518,14 @@ export default function RedeInvestidores() {
                     </button>
                   </>
                 ) : (
-                  `${baseListings.length} oportunidades`
+                  <span className="text-[13px] font-semibold uppercase tracking-[0.06em]">
+                    Todas as oportunidades <span className="font-normal normal-case text-muted">· {baseListings.length}</span>
+                  </span>
                 )
               ) : (
                 "Sem dados de exemplo"
               )}
             </div>
-
-            {/* Fecham em breve — urgência real (datas/interesses que existem nos dados) */}
-            {enabled && fechamEmBreve.length > 0 && (
-              <div className="mb-7">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">Fecham em breve</h2>
-                  <button onClick={() => setOrdenar("fechar")} className="text-xs font-medium text-secondary hover:underline">
-                    ver todos →
-                  </button>
-                </div>
-                <div className="flex gap-5 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3">
-                  {fechamEmBreve.map(({ l, dias, n }) => (
-                    <div key={l.id} className="relative w-[280px] shrink-0 sm:w-auto">
-                      <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning shadow-sm">
-                        {dias !== null && dias >= 0 && dias < 30 ? (
-                          <>
-                            <Hourglass size={11} /> {dias} {dias === 1 ? "dia" : "dias"}
-                          </>
-                        ) : (
-                          `${n} interessados`
-                        )}
-                      </span>
-                      <ListingCard listing={l} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Grelha */}
             {!enabled ? (
@@ -461,12 +556,45 @@ export default function RedeInvestidores() {
               </>
             )}
 
-            {/* Como funciona — só para utilizador novo (sem guardados nem interesses) */}
-            {utilizadorNovo && (
-              <div className="mt-10 grid gap-6 border-t border-line/60 pt-8 sm:grid-cols-3">
-                <ComoFuncionaCol icon={<Search size={16} className="text-muted" />} titulo="Encontre" texto="Filtre por capital disponível e zona." />
-                <ComoFuncionaCol icon={<MessageCircle size={16} className="text-muted" />} titulo="Contacte" texto="Fale diretamente com o dono do negócio." />
-                <ComoFuncionaCol icon={<Handshake size={16} className="text-muted" />} titulo="Negoceie" texto="Sem intermediários, sem comissões." />
+            {/* Investidores em destaque — só na montra */}
+            {enabled && descoberta && destaqueInvestidores.length > 0 && (
+              <div className="mt-12">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">Investidores em destaque</h2>
+                  <button onClick={() => setTab("investidores")} className="text-xs font-medium text-secondary hover:underline">
+                    ver diretório →
+                  </button>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {destaqueInvestidores.map((p) => (
+                    <InvestidorChip key={p.id} profile={p} anuncios={anunciosPorAutor.get(p.id) ?? 0} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Porquê a REDEGEST — banda de confiança (montra) */}
+            {descoberta && (
+              <div className="mt-12 grid gap-6 rounded-2xl border border-line bg-card p-6 sm:grid-cols-3 sm:p-8">
+                <ValorProp icon={ShieldCheck} titulo="Identidades verificadas" texto="Cada investidor com selo passou por verificação de identidade na plataforma." />
+                <ValorProp icon={MessageCircle} titulo="Contacto direto" texto="Fale diretamente com o dono do negócio — a morada exata é partilhada após o interesse." />
+                <ValorProp icon={Wallet} titulo="Sem comissões" texto="A REDEGEST liga capital a negócio. Sem intermediários, sem taxas de sucesso." />
+              </div>
+            )}
+
+            {/* CTA publicar — montra */}
+            {descoberta && (
+              <div className="relative mt-8 overflow-hidden rounded-2xl bg-gradient-to-br from-[#2E1A0E] via-[#5C3D2E] to-[#3a2417] px-6 py-8 text-sidebar-text sm:px-10">
+                <div className="azulejo absolute inset-0 opacity-[0.06]" />
+                <div className="relative flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+                  <div>
+                    <h3 className="text-xl font-semibold text-[#F9F1E2]">Tem um negócio imobiliário?</h3>
+                    <p className="mt-1 text-sm text-sidebar-text/75">Publique e encontre o capital certo — em minutos, sem comissões.</p>
+                  </div>
+                  <Button variant="gold" onClick={() => openListingForm()}>
+                    <Plus size={16} /> Publicar anúncio
+                  </Button>
+                </div>
               </div>
             )}
           </>
@@ -477,7 +605,7 @@ export default function RedeInvestidores() {
         )}
       </div>
 
-      {/* Drawer de filtros (lateral direito · bottom sheet em mobile) */}
+      {/* Drawer de filtros */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50" onMouseDown={() => setDrawerOpen(false)}>
           <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
@@ -532,24 +660,8 @@ export default function RedeInvestidores() {
               <div>
                 <Label>Retorno mínimo</Label>
                 <div className="space-y-3 rounded-lg border border-line p-3">
-                  <SliderRow
-                    label="ROI mínimo"
-                    value={roiMin}
-                    display={roiMin === 0 ? "Qualquer" : pct(roiMin, 0)}
-                    min={0}
-                    max={30}
-                    step={5}
-                    onChange={setRoiMin}
-                  />
-                  <SliderRow
-                    label="Prazo máximo"
-                    value={prazoMax}
-                    display={prazoMax === 0 ? "Qualquer" : `${prazoMax} meses`}
-                    min={0}
-                    max={24}
-                    step={3}
-                    onChange={setPrazoMax}
-                  />
+                  <SliderRow label="ROI mínimo" value={roiMin} display={roiMin === 0 ? "Qualquer" : pct(roiMin, 0)} min={0} max={30} step={5} onChange={setRoiMin} />
+                  <SliderRow label="Prazo máximo" value={prazoMax} display={prazoMax === 0 ? "Qualquer" : `${prazoMax} meses`} min={0} max={24} step={3} onChange={setPrazoMax} />
                 </div>
               </div>
 
@@ -633,15 +745,87 @@ export default function RedeInvestidores() {
   );
 }
 
-// ───────────────────────── Como funciona ─────────────────────────
+// ───────────────────────── Peças da montra ─────────────────────────
 
-function ComoFuncionaCol({ icon, titulo, texto }: { icon: React.ReactNode; titulo: string; texto: string }) {
+function EstatItem({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-secondary">
+        <Icon size={18} />
+      </span>
+      <div className="min-w-0">
+        <p className="num text-xl font-semibold leading-tight text-ink">{value}</p>
+        <p className="truncate text-[11px] font-medium uppercase tracking-[0.04em] text-muted">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function CategoriaCard({ tipo, count, onClick }: { tipo: ListingType; count: number; onClick: () => void }) {
+  const Icon = CATEGORIA_ICON[tipo];
+  return (
+    <button onClick={onClick} className="group relative h-36 overflow-hidden rounded-2xl border border-line text-left">
+      <img src={CATEGORIA_IMG[tipo]} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+      <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/45 to-ink/15" />
+      <div className="relative flex h-full flex-col justify-between p-4">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white backdrop-blur-sm">
+          <Icon size={18} />
+        </span>
+        <div>
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-white">{TYPE_LABEL_SHORT[tipo]}</p>
+            <span className="num rounded-full bg-gold/90 px-2 py-0.5 text-[11px] font-bold text-sidebar">{count}</span>
+          </div>
+          <p className="mt-0.5 line-clamp-1 text-[12px] text-white/75">{CATEGORIA_DESC[tipo]}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function InvestidorChip({ profile, anuncios }: { profile: Profile; anuncios: number }) {
+  const initials = profile.fullName.split(" ").map((p) => p[0]).join("").slice(0, 2);
+  return (
+    <Link
+      to={`/comunidade/rede/${profile.id}`}
+      className="flex w-[220px] shrink-0 items-center gap-3 rounded-xl border border-line bg-card p-3 transition-shadow hover:shadow-md"
+    >
+      <div className={cn("h-11 w-11 shrink-0 overflow-hidden rounded-full", profile.isVerified && "ring-2 ring-gold ring-offset-1 ring-offset-card")}>
+        {profile.avatarUrl ? (
+          <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-secondary text-xs font-semibold text-white">{initials}</div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1 truncate text-sm font-medium text-ink">
+          {profile.fullName}
+          {profile.isVerified && <BadgeCheck size={13} className="shrink-0 text-gold-dark" />}
+        </p>
+        <p className="flex items-center gap-1 text-[11px] text-muted">
+          {profile.numAvaliacoes > 0 ? (
+            <>
+              <Star size={10} className="fill-gold text-gold" /> {profile.rating.toFixed(1)} · {anuncios} {anuncios === 1 ? "anúncio" : "anúncios"}
+            </>
+          ) : (
+            `${anuncios} ${anuncios === 1 ? "anúncio" : "anúncios"}`
+          )}
+        </p>
+      </div>
+      <ArrowRight size={15} className="shrink-0 text-muted" />
+    </Link>
+  );
+}
+
+function ValorProp({ icon: Icon, titulo, texto }: { icon: typeof ShieldCheck; titulo: string; texto: string }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="mt-0.5">{icon}</span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-gold-dark">
+        <Icon size={18} />
+      </span>
       <div>
         <p className="text-sm font-semibold text-ink">{titulo}</p>
-        <p className="text-[13px] text-muted">{texto}</p>
+        <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{texto}</p>
       </div>
     </div>
   );
