@@ -4,6 +4,8 @@ import {
   investimentoTotalReab,
   roiReab,
   splitParceiroPct,
+  lucroParceiroReab,
+  retornoEntradaReab,
   ctaCedencia,
   lucroCedencia,
   roiCedencia,
@@ -56,9 +58,9 @@ export function metricasHero(l: Listing): Metrica[] {
   if (l.type === "reabilitacao")
     return [
       { k: "Capital procurado", v: eur(l.capitalProcurado ?? 0), hero: true },
-      { k: "Investimento total", v: eur(investimentoTotalReab(l)) },
-      { k: "ROI esperado", v: pct(roiReab(l)) },
-      { k: "Até venda", v: l.tempoAteVenda ?? "—" },
+      { k: `A sua parte do lucro (${splitParceiroPct(l)}%)`, v: eur(lucroParceiroReab(l)) },
+      { k: "Retorno sobre a entrada", v: pct(retornoEntradaReab(l)) },
+      { k: "Venda prevista", v: l.tempoAteVenda ?? "—" },
     ];
   if (l.type === "cedencia")
     return [
