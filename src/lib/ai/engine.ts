@@ -77,7 +77,7 @@ function respPortfolio(ctx: AiContext): AiResponse {
     "| --- | --- | --- | --- |",
     linhas,
     "",
-    melhor && pior ? `🏆 Melhor desempenho: **${melhor.p.name}** (${eur(melhor.lucro)}). ⚠️ A melhorar: **${pior.p.name}** (${eur(pior.lucro)}).` : "",
+    melhor && pior ? `Melhor desempenho: **${melhor.p.name}** (${eur(melhor.lucro)}). A melhorar: **${pior.p.name}** (${eur(pior.lucro)}).` : "",
   ].join("\n");
 
   return {
@@ -99,7 +99,7 @@ function respRendas(ctx: AiContext): AiResponse {
   if (atrasos.length === 0) {
     return {
       content: [
-        "✅ **Não há rendas em atraso** este mês.",
+        "**Não há rendas em atraso** este mês.",
         "",
         ocupados.map((p) => `- ${p.name}: renda de **${eur(p.rendaMensal)}** recebida.`).join("\n"),
       ].join("\n"),
@@ -109,7 +109,7 @@ function respRendas(ctx: AiContext): AiResponse {
   const tenantDe = (pid: string) => ctx.tenants.find((t) => t.propertyId === pid)?.nomeCompleto ?? "—";
   return {
     content: [
-      `⚠️ **${atrasos.length} renda(s) por regularizar** em ${mesPT(mesAtual)}:`,
+      `**${atrasos.length} renda(s) por regularizar** em ${mesPT(mesAtual)}:`,
       "",
       "| Inquilino | Imóvel | Valor |",
       "| --- | --- | --- |",
@@ -147,7 +147,7 @@ function respImt(msg: string): AiResponse {
       `2. IMT (tabela ${finalidade}): **${eur(imt)}**`,
       `3. Imposto de Selo (0,8%): **${eur(is)}**`,
       "",
-      `💰 Total de impostos na compra: **${eur(imt + is)}**`,
+      `Total de impostos na compra: **${eur(imt + is)}**`,
       "",
       DISCLAIMER,
     ].join("\n"),

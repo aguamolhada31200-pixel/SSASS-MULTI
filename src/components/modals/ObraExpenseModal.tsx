@@ -133,7 +133,7 @@ export function ObraExpenseModal() {
     setValorComprovativo(valorLido);
     if (!valor) setValor(valorLido);
     if (!descricao) setDescricao(`Fornecimento ${fornDetetado}`);
-    toast.success("Comprovativo lido ✨", {
+    toast.success("Comprovativo lido", {
       description: `Fornecedor: ${fornDetetado} · Valor: ${eur(valorLido)}`,
     });
   };
@@ -221,7 +221,7 @@ export function ObraExpenseModal() {
         description: "Anexe o comprovativo mais tarde para subir a transparência.",
       });
     } else {
-      toast.success("Despesa registada e comprovada ✨", {
+      toast.success("Despesa registada e comprovada", {
         description: fotos.length > 0 ? `${fotos.length} foto${fotos.length === 1 ? "" : "s"} anexada${fotos.length === 1 ? "" : "s"}.` : undefined,
       });
     }

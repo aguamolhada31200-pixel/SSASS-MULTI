@@ -171,7 +171,7 @@ export function TenantFormModal() {
       closeTenantForm();
     } else {
       const id = add(payload);
-      toast.success("Inquilino registado ✨", { description: payload.nomeCompleto });
+      toast.success("Inquilino registado", { description: payload.nomeCompleto });
       closeTenantForm();
       navigate(`/pessoas/inquilinos/${id}`);
     }

@@ -149,7 +149,7 @@ function DecisaoCard({ decisao: d, project: p }: { decisao: Decisao; project: Co
       actorId: CURRENT_USER_ID,
       link: `/comunidade/colaborativa/${p.id}`,
     });
-    if (estado === "aprovada") toast.success("Maioria atingida — decisão aprovada ✨");
+    if (estado === "aprovada") toast.success("Maioria atingida — decisão aprovada");
     else if (estado === "rejeitada") toast("Decisão rejeitada", { description: "Aprovação já não era possível." });
     else toast.success(`Voto registado · ${labelVoto}`);
   };
@@ -425,7 +425,7 @@ function NovaDecisaoModal({ project: p, onClose }: { project: CollabProject; onC
       actorId: CURRENT_USER_ID,
       link: `/comunidade/colaborativa/${p.id}`,
     });
-    toast.success("Decisão proposta ✨", { description: "Todos os sócios foram notificados." });
+    toast.success("Decisão proposta", { description: "Todos os sócios foram notificados." });
     onClose();
   };
 

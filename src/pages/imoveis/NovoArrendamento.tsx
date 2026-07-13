@@ -386,7 +386,7 @@ export default function NovoArrendamento() {
         toast.success("Rascunho guardado", { description: input.identificador });
         navigate("/imoveis/arrendamentos");
       } else {
-        toast.success("Arrendamento criado ✨", {
+        toast.success("Arrendamento criado", {
           description: registou ? "Caução lançada em Finanças. Rendas previstas na tab Rendas." : "Rendas previstas disponíveis na tab Rendas.",
         });
         navigate(`/imoveis/arrendamentos/${newId}`);

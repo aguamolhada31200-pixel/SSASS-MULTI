@@ -78,7 +78,7 @@ export default function Perfil() {
   const guardar = () => {
     updatePrivado(p);
     setDirty(false);
-    toast.success("Dados privados atualizados ✨");
+    toast.success("Dados privados atualizados");
   };
 
   const ibanMasked = showIban ? p.iban : p.iban.replace(/\w(?=\w{4})/g, "•");

@@ -184,7 +184,7 @@ export function VotacaoPanel({
 
   const onVote = (valorVoto: "a_favor" | "contra") => {
     const estado = votar(tipo, itemId, CURRENT_USER_ID, valorVoto);
-    if (estado === "aplicado") toast.success("Decisão aprovada ✨ · sócios notificados");
+    if (estado === "aplicado") toast.success("Decisão aprovada · sócios notificados");
     else if (estado === "rejeitado") toast("Decisão rejeitada", { description: "Os sócios foram notificados." });
     else toast.success(`Voto registado · ${valorVoto === "a_favor" ? "a favor" : "contra"}`);
     onResolved?.();

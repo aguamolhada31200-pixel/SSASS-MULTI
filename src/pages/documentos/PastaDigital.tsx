@@ -1072,7 +1072,7 @@ function UploadModal({ onClose, initialNode }: { onClose: () => void; initialNod
         notas: notas || undefined,
       });
     });
-    toast.success(`${files.length} documento(s) carregado(s) ✨`);
+    toast.success(`${files.length} documento(s) carregado(s)`);
     onClose();
   };
 

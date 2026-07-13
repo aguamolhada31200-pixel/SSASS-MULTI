@@ -169,10 +169,10 @@ export function ExpenseFormModal() {
     };
     if (editingId) {
       update(editingId, payload);
-      toast.success("Movimento atualizado ✨");
+      toast.success("Movimento atualizado");
     } else {
       add(payload);
-      toast.success("Movimento registado ✨", {
+      toast.success("Movimento registado", {
         description: `${values.tipo === "receita" ? "Receita" : "Despesa"} · ${eur(values.valor)}`,
       });
     }

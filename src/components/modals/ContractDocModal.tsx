@@ -149,7 +149,7 @@ export function ContractDocModal() {
         patch.fileName = ficheiro.nome;
       }
       updateContract(editingId, patch);
-      toast.success("Contrato atualizado ✨");
+      toast.success("Contrato atualizado");
       closeContractDoc();
       navigate(`/contratos/${editingId}`);
       return;
@@ -169,7 +169,7 @@ export function ContractDocModal() {
       pasta: property ? `Imóveis/${property.name}/Contratos` : undefined,
     });
     updateContract(id, { documentId: docId });
-    toast.success("Documento de contrato guardado ✨");
+    toast.success("Documento de contrato guardado");
     closeContractDoc();
     navigate(`/contratos/${id}`);
   };

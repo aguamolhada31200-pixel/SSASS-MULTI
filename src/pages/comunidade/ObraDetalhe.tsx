@@ -225,7 +225,7 @@ export default function ObraDetalhe() {
                       variant="gold"
                       onClick={() => {
                         marcarConcluida(obra.id);
-                        toast.success("Obra concluída 🎉", {
+                        toast.success("Obra concluída", {
                           description: "Quer criar um antes/depois com as fotos desta obra?",
                           action: { label: "Criar", onClick: () => openGaleriaForm({ initialObraId: obra.id }) },
                         });
@@ -523,7 +523,7 @@ function FasesTab({ obraId, souGestor }: { obraId: string; souGestor: boolean })
             {showForm ? "Cancelar" : <><Plus size={14} /> Nova fase</>}
           </Button>
         ) : (
-          <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor ✨")}>
+          <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor")}>
             <Lock size={13} /> Solicitar fase
           </Button>
         )}
@@ -745,7 +745,7 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
               <Plus size={14} /> Nova despesa
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor ✨")}>
+            <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor")}>
               <Lock size={13} /> Solicitar despesa
             </Button>
           )}
@@ -756,7 +756,7 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
         <Card>
           <CardContent className="py-10 text-center text-muted">
             <Receipt size={26} className="mx-auto mb-2" />
-            <p className="text-sm">{soPorComprovar ? "Tudo comprovado ✨" : "Nenhuma despesa registada."}</p>
+            <p className="text-sm">{soPorComprovar ? "Tudo comprovado" : "Nenhuma despesa registada."}</p>
           </CardContent>
         </Card>
       ) : (
@@ -840,7 +840,7 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
                     )}
                     {d.aprovacao?.estado === "aplicado" && d.aprovacao.votos.length > 0 && (
                       <span className="text-success">
-                        ✓ Aprovada por {d.aprovacao.votos.filter((v) => v.valor === "a_favor").map((v) => nomeProprio(profiles.find((p) => p.id === v.userId)?.fullName)).join(", ")}
+                        Aprovada por {d.aprovacao.votos.filter((v) => v.valor === "a_favor").map((v) => nomeProprio(profiles.find((p) => p.id === v.userId)?.fullName)).join(", ")}
                       </span>
                     )}
                     {pendente && (
@@ -990,7 +990,7 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
             {showForm ? "Cancelar" : <><Plus size={14} /> Novo marco</>}
           </Button>
         ) : (
-          <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor ✨")}>
+          <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor")}>
             <Lock size={13} /> Solicitar marco
           </Button>
         )}

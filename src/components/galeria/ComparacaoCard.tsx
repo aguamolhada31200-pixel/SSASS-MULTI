@@ -173,7 +173,7 @@ export function ComparacaoCard({
                     <MenuItem
                       icon={Star}
                       label={c.destaque ? "Remover destaque" : "Destacar no perfil"}
-                      onClick={() => { setMenu(false); toggleDestaque(c.id); toast.success(c.destaque ? "Destaque removido" : "Em destaque ⭐"); }}
+                      onClick={() => { setMenu(false); toggleDestaque(c.id); toast.success(c.destaque ? "Destaque removido" : "Em destaque"); }}
                     />
                     <MenuItem
                       icon={partilhavel ? Lock : Globe}
@@ -181,7 +181,7 @@ export function ComparacaoCard({
                       onClick={() => {
                         setMenu(false);
                         setVisibilidade(c.id, partilhavel ? "privada" : "partilhavel_na_rede");
-                        toast.success(partilhavel ? "Agora privada" : "Visível na Rede 🌐", {
+                        toast.success(partilhavel ? "Agora privada" : "Visível na Rede", {
                           description: partilhavel ? undefined : "Aparece no seu perfil público como prova de track record.",
                         });
                       }}

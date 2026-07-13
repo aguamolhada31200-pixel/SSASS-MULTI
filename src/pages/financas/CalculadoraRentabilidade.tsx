@@ -124,7 +124,7 @@ function VereditoHero({
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <div className="mb-1 flex items-center gap-2 text-sm">
-          <span>{v.emoji}</span>
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: v.cor }} />
           <span style={{ color: v.cor }} className="font-medium">{v.label}</span>
         </div>
         <p className="text-xs uppercase tracking-widest text-sidebar-text/50">{heroLabel}</p>

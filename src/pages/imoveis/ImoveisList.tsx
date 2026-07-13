@@ -145,13 +145,11 @@ export default function ImoveisList() {
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-muted">Yield líq.</p>
-                        <p className="num text-sm font-semibold" style={{ color: s.cor }}>
-                          {pct(s.yieldAtual)}
-                        </p>
+                        <p className="num text-sm font-semibold text-ink">{pct(s.yieldAtual)}</p>
                       </div>
                     </div>
                     <div className="mt-3 flex items-center gap-2 border-t border-line/60 pt-2.5 text-xs" style={{ color: s.cor }}>
-                      <span>{s.emoji}</span>
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: s.cor }} />
                       <span className="truncate font-medium">{s.titulo}</span>
                     </div>
                     {!idsArrendados.has(p.id) && p.status !== "em_obras" && p.status !== "inativo" && (

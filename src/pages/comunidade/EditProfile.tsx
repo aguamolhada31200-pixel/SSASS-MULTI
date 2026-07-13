@@ -49,7 +49,7 @@ export default function EditProfile() {
       interesses,
       experienciaAutoDeclaradaAnos: anos,
     });
-    toast.success("Perfil atualizado ✨");
+    toast.success("Perfil atualizado");
     navigate(`/comunidade/rede/${CURRENT_USER_ID}`);
   };
 

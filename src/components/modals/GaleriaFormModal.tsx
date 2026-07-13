@@ -211,11 +211,11 @@ export function GaleriaFormModal() {
     };
     if (editingId) {
       update(editingId, payload);
-      toast.success("Comparação atualizada ✨");
+      toast.success("Comparação atualizada");
     } else {
       add({ ...payload, criadoPor: CURRENT_USER_ID });
       const nome = profiles.find((p) => p.id === CURRENT_USER_ID)?.fullName ?? "";
-      toast.success("Comparação criada ✨", {
+      toast.success("Comparação criada", {
         description: visibilidade === "partilhavel_na_rede" ? `Já reforça o track record de ${nome.split(" ")[0]} na Rede.` : undefined,
         action: location.pathname.includes("/galeria")
           ? undefined

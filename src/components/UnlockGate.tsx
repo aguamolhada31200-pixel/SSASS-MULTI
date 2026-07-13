@@ -100,7 +100,7 @@ export function UnlockModal({
       return;
     }
     updatePrivado(patch);
-    toast.success(`Tudo pronto para ${feature} ✨`);
+    toast.success(`Tudo pronto para ${feature}`);
     onClose();
     onDone?.();
   };

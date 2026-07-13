@@ -144,7 +144,7 @@ export default function CalendarioInvestimento() {
   const onCreate = (nome: string, modo: InvestMode, propertyId?: string) => {
     const id = addProject({ nome, modo, propertyId });
     setShowNew(false);
-    toast.success("Investimento iniciado ✨", { description: nome });
+    toast.success("Investimento iniciado", { description: nome });
     navigate(`/financas/calendario-investimento/${id}`);
   };
 
@@ -240,7 +240,7 @@ export default function CalendarioInvestimento() {
 
           {filtradas.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-line bg-card/50 px-6 py-16 text-center text-sm text-muted">
-              {soAtencao ? "Nenhum projeto precisa de atenção. 👌" : "Nenhum projeto corresponde à pesquisa."}
+              {soAtencao ? "Nenhum projeto precisa de atenção." : "Nenhum projeto corresponde à pesquisa."}
             </p>
           ) : vista === "progresso" ? (
             <ProgressoView rows={filtradas} propMap={propMap} />
@@ -377,7 +377,7 @@ function Veredito({ r }: { r: Row }) {
     if (renda > 0)
       return (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-success">✓ A render</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-success">A render</p>
           <p className="font-display text-2xl font-bold text-success">
             <span className="num">{eur(renda)}</span>
             <span className="text-sm font-medium">/mês</span>
@@ -386,7 +386,7 @@ function Veredito({ r }: { r: Row }) {
       );
     return (
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-success">✓ Concluído</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-success">Concluído</p>
         <p className="font-display text-xl font-bold text-ink">Ciclo completo</p>
       </div>
     );
@@ -394,7 +394,7 @@ function Veredito({ r }: { r: Row }) {
   if (r.paradoDias !== null)
     return (
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-danger">● Parado há {r.paradoDias} dias</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-danger">Parado há {r.paradoDias} dias</p>
         <p className="font-display text-2xl font-bold text-danger">
           <span className="text-sm font-medium">já custou </span>
           <span className="num">{eur(r.acumulado)}</span>

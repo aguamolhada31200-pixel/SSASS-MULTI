@@ -300,7 +300,7 @@ function InviteModal({ project: p, onClose, prefill }: { project: CollabProject;
     };
     update(p.id, { partners: [...p.partners, socio] });
     notify({ userId: id, tipo: "socio_convidado", titulo: `Convite: «${p.title}»`, descricao: `${nova}% · ${SOCIO_ROLE_LABEL[role]}`, actorId: CURRENT_USER_ID, link: `/comunidade/colaborativa/${p.id}` });
-    toast.success("Convite enviado ✨", { description: `${nome} · ${nova}% · ${SOCIO_ROLE_LABEL[role]}` });
+    toast.success("Convite enviado", { description: `${nome} · ${nova}% · ${SOCIO_ROLE_LABEL[role]}` });
     onClose();
   };
 

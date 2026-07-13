@@ -6,17 +6,18 @@ type Size = "sm" | "md" | "lg" | "icon";
 
 const variants: Record<Variant, string> = {
   primary: "bg-primary text-white hover:bg-secondary",
-  outline: "border border-primary/40 text-primary hover:bg-accent",
+  outline: "border border-line bg-card text-primary hover:bg-accent",
   ghost: "text-muted hover:bg-accent hover:text-ink",
   gold: "bg-gold text-sidebar hover:bg-gold-dark hover:text-white",
-  danger: "bg-danger text-white hover:opacity-90",
+  // destrutivo: outline vermelho — fundo cheio é demasiado agressivo
+  danger: "border border-danger bg-card text-danger hover:bg-danger/5",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-sm rounded-lg",
-  md: "h-10 px-4 text-sm rounded-xl",
-  lg: "h-12 px-6 text-base rounded-xl",
-  icon: "h-10 w-10 rounded-xl",
+  sm: "h-8 px-3 text-sm rounded-md",
+  md: "h-10 px-4 text-sm rounded-md",
+  lg: "h-12 px-6 text-base rounded-md",
+  icon: "h-10 w-10 rounded-md",
 };
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

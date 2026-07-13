@@ -167,7 +167,7 @@ function CustoEsperaPanel({ property, modo, concluido }: { property: Property; m
     if (property.rendaMensal <= 0) return null;
     return (
       <div className="mt-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-success/30 bg-success/8 px-5 py-4">
-        <p className="font-display text-lg font-bold text-success">✓ A render</p>
+        <p className="font-display text-lg font-bold text-success">A render</p>
         <p className="font-display text-lg font-bold text-success">
           <span className="num">{eur(property.rendaMensal)}</span>/mês
         </p>

@@ -59,7 +59,7 @@ export function InterestModal() {
     incrementContacts(listing.id);
 
     closeInterest();
-    toast.success("Interesse enviado ✨", {
+    toast.success("Interesse enviado", {
       description: "Pode continuar a conversa em Mensagens.",
       action: { label: "Abrir conversa", onClick: () => navigate(`/mensagens?c=${convId}`) },
     });

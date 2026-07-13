@@ -92,18 +92,16 @@ export function InquilinoAvatares({
   );
 }
 
-/** Data de fim com urgência (🔴 <30d, 🟡 30-90d). */
+/** Data de fim com urgência (vermelho <30d, âmbar 30-90d — a cor já comunica). */
 export function FimInline({ dataFim, terminado }: { dataFim?: string; terminado?: boolean }) {
   if (!dataFim) return <span className="text-xs text-muted">Sem termo</span>;
   const dias = diasAteFim(dataFim);
   if (terminado) return <span className="num text-xs text-muted">{dataPT(dataFim)}</span>;
   const cor =
     dias === null ? "text-muted" : dias < 0 ? "text-danger" : dias < 30 ? "text-danger" : dias < 90 ? "text-warning" : "text-muted";
-  const emoji = dias === null || dias >= 90 ? "" : dias < 30 ? "🔴 " : "🟡 ";
   const sufixo = dias === null ? "" : dias < 0 ? ` · há ${Math.abs(dias)}d` : ` · em ${dias}d`;
   return (
     <span className={cn("num text-xs font-semibold", cor)}>
-      {emoji}
       {dataPT(dataFim)}
       <span className="font-normal">{sufixo}</span>
     </span>

@@ -281,11 +281,11 @@ export function PublishListingModal() {
     const payload = { ...base, ...typed } as never;
     if (editingId) {
       update(editingId, payload);
-      toast.success("Anúncio atualizado ✨");
+      toast.success("Anúncio atualizado");
       closeListingForm();
     } else {
       const id = add(payload);
-      toast.success("Anúncio publicado ✨", { description: values.title });
+      toast.success("Anúncio publicado", { description: values.title });
       closeListingForm();
       navigate(`/comunidade/rede/anuncio/${id}`);
     }
@@ -528,7 +528,7 @@ export function PublishListingModal() {
               </Button>
             ) : (
               <Button type="submit" variant="gold" size="lg">
-                <Check size={16} /> {editingId ? "Guardar alterações" : "Publicar anúncio ✨"}
+                <Check size={16} /> {editingId ? "Guardar alterações" : "Publicar anúncio"}
               </Button>
             )}
           </div>
@@ -600,11 +600,11 @@ function CalcTile({ label, value, tone, hint }: { label: string; value: string; 
   );
 }
 
-const SEG_UI: Record<NivelSeguranca, { emoji: string; text: string; chipBg: string; chipBorder: string }> = {
-  muito_segura: { emoji: "🟢", text: "text-success", chipBg: "bg-success/10", chipBorder: "border-success/30" },
-  boa: { emoji: "🟡", text: "text-gold-dark", chipBg: "bg-gold/10", chipBorder: "border-gold/40" },
-  atencao: { emoji: "🟠", text: "text-warning", chipBg: "bg-warning/10", chipBorder: "border-warning/30" },
-  risco: { emoji: "🔴", text: "text-danger", chipBg: "bg-danger/10", chipBorder: "border-danger/30" },
+const SEG_UI: Record<NivelSeguranca, { dot: string; text: string; chipBg: string; chipBorder: string }> = {
+  muito_segura: { dot: "bg-success", text: "text-success", chipBg: "bg-success/10", chipBorder: "border-success/30" },
+  boa: { dot: "bg-gold", text: "text-gold-dark", chipBg: "bg-gold/10", chipBorder: "border-gold/40" },
+  atencao: { dot: "bg-warning", text: "text-warning", chipBg: "bg-warning/10", chipBorder: "border-warning/30" },
+  risco: { dot: "bg-danger", text: "text-danger", chipBg: "bg-danger/10", chipBorder: "border-danger/30" },
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -746,7 +746,8 @@ function CamposReab({
         {posObras > 0 && (
           <div className={cn("mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2", segUi.chipBg, segUi.chipBorder)}>
             <span className="flex items-center gap-2">
-              <span className={cn("text-sm font-semibold", segUi.text)}>{segUi.emoji} {NIVEL_SEGURANCA_LABEL[nivelSeg]}</span>
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", segUi.dot)} />
+              <span className={cn("text-sm font-semibold", segUi.text)}>{NIVEL_SEGURANCA_LABEL[nivelSeg]}</span>
               <span className="text-[11px] text-muted">Margem de segurança</span>
             </span>
             <span className={cn("num text-sm font-bold", segUi.text)}>{pct(margem)}</span>
@@ -757,13 +758,12 @@ function CamposReab({
   );
 }
 
-/** Cabeçalho de agrupamento visual dos campos do formulário — ponto + título dourado + linha separadora. */
+/** Cabeçalho de agrupamento visual dos campos do formulário — título + linha separadora. */
 function CamposSecao({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
-        <p className="font-display text-xs font-bold uppercase tracking-[0.14em] text-gold-dark">{title}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted">{title}</p>
         <span className="h-px flex-1 bg-line" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">{children}</div>

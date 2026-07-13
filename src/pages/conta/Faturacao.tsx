@@ -183,7 +183,7 @@ export default function Faturacao() {
         <SectionCard title="Código promocional" icon={Tag}>
           <div className="flex gap-2">
             <input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="Ex.: REDEGEST10" className={inputCls} />
-            <Button variant="outline" size="sm" onClick={() => { aplicarPromo(promo) ? toast.success("Código aplicado ✨") : toast.error("Código inválido"); setPromo(""); }}>Aplicar</Button>
+            <Button variant="outline" size="sm" onClick={() => { aplicarPromo(promo) ? toast.success("Código aplicado") : toast.error("Código inválido"); setPromo(""); }}>Aplicar</Button>
           </div>
           {plano.promo && (
             <p className="mt-3 flex items-center gap-1.5 text-sm text-success"><CheckCircle2 size={14} /> {plano.promo.codigo} — {plano.promo.desconto}% de desconto ativo</p>

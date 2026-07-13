@@ -30,12 +30,22 @@ export default {
         "gold-dark": "#9B7F3F",
       },
       fontFamily: {
-        display: ['"Playfair Display"', "serif"],
-        sans: ['"DM Sans"', "system-ui", "sans-serif"],
+        // display = sans: o serif foi eliminado; a classe mantém-se por compat.
+        display: ['"Inter"', "system-ui", "sans-serif"],
+        sans: ['"Inter"', "system-ui", "sans-serif"],
       },
+      // Radius uniforme: 8px em cards (xl/2xl), 6px em botões/inputs (md/lg).
       borderRadius: {
-        xl: "0.875rem",
-        "2xl": "1.25rem",
+        md: "6px",
+        lg: "6px",
+        xl: "8px",
+        "2xl": "8px",
+      },
+      // Sombras mínimas — cards assentam na borda, não na sombra.
+      boxShadow: {
+        sm: "0 1px 2px rgba(0,0,0,0.04)",
+        md: "0 2px 6px rgba(0,0,0,0.06)",
+        DEFAULT: "0 1px 2px rgba(0,0,0,0.04)",
       },
       keyframes: {
         "fade-in": {

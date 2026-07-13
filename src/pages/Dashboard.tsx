@@ -268,7 +268,7 @@ export default function Dashboard() {
   if (!enabled) {
     return (
       <>
-        <PageHeader title={`${saudacao()}, ${primeiroNome} 👋`} subtitle={hojePT()} showExampleToggle />
+        <PageHeader title={`${saudacao()}, ${primeiroNome}`} subtitle={hojePT()} showExampleToggle />
         <EmptyState
           icon={Building2}
           title="Vamos preparar a sua conta"
@@ -288,7 +288,7 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader
-        title={`${saudacao()}, ${primeiroNome} 👋`}
+        title={`${saudacao()}, ${primeiroNome}`}
         subtitle={hojePT()}
         showExampleToggle
         actions={

@@ -750,16 +750,17 @@ function SortBtn({
   );
 }
 
-function AlertaPill({ nivel, emoji, texto }: { nivel: AlertaNivel; emoji: string; texto: string }) {
+function AlertaPill({ nivel, texto }: { nivel: AlertaNivel; emoji?: string; texto: string }) {
   const tone =
     nivel === "positivo"
       ? "border-success/30 bg-success/10 text-success"
       : nivel === "atencao"
         ? "border-warning/30 bg-warning/10 text-warning"
         : "border-danger/30 bg-danger/10 text-danger";
+  const dot = nivel === "positivo" ? "bg-success" : nivel === "atencao" ? "bg-warning" : "bg-danger";
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium", tone)}>
-      {nivel === "critico" ? <TriangleAlert size={14} /> : <span>{emoji}</span>}
+      {nivel === "critico" ? <TriangleAlert size={14} /> : <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} />}
       {texto}
     </span>
   );

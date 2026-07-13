@@ -55,7 +55,7 @@ export function MarcoPayModal() {
   const lerComprovativo = () => {
     if (!comprovativo) return;
     setValorLido(marco.valor);
-    toast.success("Comprovativo lido ✨", { description: `Valor confirmado: ${eur(marco.valor)}` });
+    toast.success("Comprovativo lido", { description: `Valor confirmado: ${eur(marco.valor)}` });
   };
 
   const guardar = () => {
@@ -87,7 +87,7 @@ export function MarcoPayModal() {
       },
       CURRENT_USER_ID
     );
-    toast.success(`Marco pago ✨ · ${eur(marco.valor)}`, {
+    toast.success(`Marco pago · ${eur(marco.valor)}`, {
       description: "Comprovativo arquivado · sócios notificados.",
     });
     closeMarcoPay();

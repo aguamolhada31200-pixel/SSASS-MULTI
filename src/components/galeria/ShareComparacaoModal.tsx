@@ -101,8 +101,8 @@ async function gerarComposta(c: Comparacao, formato: Formato): Promise<Blob> {
   ctx.font = `700 ${formato === "story" ? 52 : 44}px 'Playfair Display', serif`;
   ctx.fillText(c.titulo, pad, imgH + (formato === "story" ? 92 : 82), f.w - pad * 2);
 
-  const partes = [`💰 ${eur(c.custoReal)}`, `⏱ ${duracaoLabel(c.duracaoDias)}`];
-  if (c.valorizacaoEstimada) partes.push(`📈 +${eur(c.valorizacaoEstimada)} valorização`);
+  const partes = [`${eur(c.custoReal)}`, `${duracaoLabel(c.duracaoDias)}`];
+  if (c.valorizacaoEstimada) partes.push(`+${eur(c.valorizacaoEstimada)} valorização`);
   ctx.fillStyle = "#C8A664";
   ctx.font = `600 ${formato === "story" ? 40 : 34}px 'DM Sans', sans-serif`;
   ctx.fillText(partes.join("   ·   "), pad, imgH + (formato === "story" ? 168 : 146), f.w - pad * 2);
@@ -148,7 +148,7 @@ export function ShareComparacaoModal({ comparacao, onClose }: { comparacao: Comp
     setBusy(true);
     try {
       await descarregar(c, formato);
-      toast.success("Imagem exportada ✨", { description: "PNG pronto a publicar." });
+      toast.success("Imagem exportada", { description: "PNG pronto a publicar." });
     } catch {
       toast.error("Não foi possível gerar a imagem", { description: "Verifique a ligação e tente de novo." });
     } finally {

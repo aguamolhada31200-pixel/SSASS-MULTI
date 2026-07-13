@@ -304,7 +304,7 @@ export function CollabFormModal() {
       ...financeFields(),
     });
 
-    toast.success("Projeto criado ✨", { description: form.nome });
+    toast.success("Projeto criado", { description: form.nome });
     closeCollabForm();
     navigate(`/comunidade/colaborativa/${id}`);
   };
