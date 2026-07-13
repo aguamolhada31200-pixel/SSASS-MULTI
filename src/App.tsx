@@ -1,8 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import {
-  Wrench,
-  Smartphone,
-} from "lucide-react";
+import { Wrench } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import ImoveisList from "@/pages/imoveis/ImoveisList";
@@ -49,22 +46,6 @@ export default function App() {
         <Route path="imoveis/arrendamentos/novo" element={<NovoArrendamento />} />
         <Route path="imoveis/arrendamentos/:id" element={<ArrendamentoDetail />} />
         <Route path="imoveis/arrendamentos/:id/editar" element={<NovoArrendamento />} />
-        <Route
-          path="imoveis/acesso-digital"
-          element={
-            <Placeholder
-              title="Acesso Digital"
-              subtitle="Fechaduras inteligentes e entrada sem chaves"
-              icon={Smartphone}
-              fase="Fase 2 — Operação avançada"
-              bullets={[
-                "Códigos de acesso temporários por inquilino/estadia",
-                "Registo de entradas · integração com fechaduras smart",
-                "Partilha segura com equipas de limpeza e manutenção",
-              ]}
-            />
-          }
-        />
         <Route path="imoveis/:id" element={<ImovelDetail />} />
 
         {/* Comunidade */}

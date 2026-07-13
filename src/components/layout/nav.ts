@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Building2,
   KeyRound,
-  Smartphone,
   Network,
   Users2,
   Hammer,
@@ -45,7 +44,6 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Os meus imóveis", to: "/imoveis", icon: Building2 },
       { label: "Arrendamentos", to: "/imoveis/arrendamentos", icon: KeyRound },
-      { label: "Acesso Digital", to: "/imoveis/acesso-digital", icon: Smartphone, badge: "Brevemente" },
     ],
   },
   {
