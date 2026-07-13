@@ -17,6 +17,8 @@ import {
   investimentoTotalReab,
   roiReab,
   splitParceiroPct,
+  lucroParceiroReab,
+  retornoEntradaReab,
   ctaCedencia,
   lucroCedencia,
   roiCedencia,
@@ -192,30 +194,40 @@ function buildBanner(l: Listing): { label: string; value: string } | null {
   return null;
 }
 
+/**
+ * 6 métricas por card, ordenadas pelo grau de importância para o INVESTIDOR:
+ * 1.º quanto entra → 2.º quanto ganha → 3.º retorno sobre o que entra →
+ * 4.º retorno da operação → 5.º condições → 6.º prazo/contexto.
+ */
 function buildCardMetrics(l: Listing): CMetric[] {
   if (l.type === "reabilitacao") {
+    const lucroInv = lucroParceiroReab(l);
     return [
       { k: "Capital procurado", v: eur(l.capitalProcurado ?? 0), dot: "bg-gold", color: "text-gold-dark" },
+      { k: "Lucro do investidor", v: eur(lucroInv), dot: "bg-success", color: lucroInv >= 0 ? "text-success" : "text-danger" },
+      { k: "Retorno s/ entrada", v: pct(retornoEntradaReab(l)), dot: "bg-gold", color: "text-gold-dark" },
       { k: "ROI esperado", v: pct(roiReab(l)), dot: "bg-success", color: "text-success" },
-      { k: "A sua parte", v: `${splitParceiroPct(l)}% do lucro`, dot: "bg-gold", color: "text-gold-dark" },
-      { k: "Até venda", v: l.tempoAteVenda ?? "—", dot: "bg-muted", color: "text-ink" },
+      { k: "A sua parte", v: `${splitParceiroPct(l)}% do lucro`, dot: "bg-secondary", color: "text-ink" },
+      { k: "Venda prevista", v: l.tempoAteVenda ?? "—", dot: "bg-muted", color: "text-ink" },
     ];
   }
   if (l.type === "cedencia") {
     const lucro = lucroCedencia(l);
     return [
       { k: "Capital necessário", v: eur(capitalNecessarioCedencia(l)), dot: "bg-gold", color: "text-gold-dark" },
-      { k: "Valor do imóvel", v: eur(l.valorImovel ?? 0), dot: "bg-secondary", color: "text-ink" },
-      { k: "Valor da cedência", v: eur(l.valorCedencia ?? 0), dot: "bg-secondary", color: "text-ink" },
       { k: "Lucro estimado", v: eur(lucro), dot: "bg-success", color: lucro >= 0 ? "text-success" : "text-danger" },
-      { k: roiLabelCedencia(l), v: pct(roiCedencia(l)), dot: "bg-gold", color: "text-gold-dark" },
       { k: "Retorno s/ entrada", v: pct(retornoEntradaCedencia(l)), dot: "bg-gold", color: "text-gold-dark" },
+      { k: roiLabelCedencia(l), v: pct(roiCedencia(l)), dot: "bg-success", color: "text-success" },
+      { k: "Valor da cedência", v: eur(l.valorCedencia ?? 0), dot: "bg-secondary", color: "text-ink" },
+      { k: "Valor do imóvel", v: eur(l.valorImovel ?? 0), dot: "bg-secondary", color: "text-ink" },
     ];
   }
   return [
     { k: "Capital necessário", v: eur(l.capitalNecessario ?? 0), dot: "bg-gold", color: "text-gold-dark" },
+    { k: "Renda mensal", v: eur(l.rendaMensal ?? 0), dot: "bg-success", color: "text-success" },
     { k: "Yield líquido", v: pct(l.yieldLiquido ?? 0), dot: "bg-success", color: "text-success" },
     { k: "Rentab. s/ capital", v: pct(l.rentabilidadeCapital ?? 0), dot: "bg-secondary", color: "text-ink" },
-    { k: "Renda mensal", v: eur(l.rendaMensal ?? 0), dot: "bg-gold", color: "text-gold-dark" },
+    { k: "ROI", v: pct(l.roi ?? 0), dot: "bg-secondary", color: "text-ink" },
+    { k: "Renda anual", v: eur((l.rendaMensal ?? 0) * 12), dot: "bg-muted", color: "text-ink" },
   ];
 }

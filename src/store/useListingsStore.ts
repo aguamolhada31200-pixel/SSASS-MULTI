@@ -150,6 +150,13 @@ export const ENERGY_SCALE: EnergyCert[] = ["A+", "A", "B", "B-", "C", "D", "E", 
 
 const IMG = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1100&q=70`;
 
+/** Data ISO a N dias de hoje — para prazos de seeds nunca ficarem no passado. */
+function emDias(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> = [
   {
     id: "reab-porto",
@@ -230,7 +237,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     capitalNecessario: 33091,
     valorVendaPrevisto: 245000,
     lucroEstimado: 31909,
-    terminoCpcv: "2026-09-02",
+    terminoCpcv: emDias(4), // escritura iminente — alimenta a faixa "Fecham em breve"
     margemSeguranca: "Alta",
     motivoCedencia: "falta_capital",
   },
@@ -270,7 +277,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     capitalNecessario: 22708,
     valorVendaPrevisto: 180000,
     lucroEstimado: 22292,
-    terminoCpcv: "2026-08-04",
+    terminoCpcv: emDias(9), // escritura próxima — alimenta a faixa "Fecham em breve"
     margemSeguranca: "Média",
     motivoCedencia: "falta_capital",
   },
@@ -475,7 +482,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     valorMercadoPosObras: 470000,
     prazoObras: "5 meses",
     lucroEstimado: 86000,
-    terminoCpcv: "2026-06-25",
+    terminoCpcv: emDias(35), // estava no passado nos seeds antigos
     margemSeguranca: "Média",
     motivoCedencia: "falta_capital",
   },
@@ -517,7 +524,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     valorMercadoPosObras: 240000,
     prazoObras: "4 meses",
     lucroEstimado: 35960,
-    terminoCpcv: "2026-08-08",
+    terminoCpcv: emDias(12), // escritura próxima — alimenta a faixa "Fecham em breve"
     margemSeguranca: "Baixa",
     motivoCedencia: "outro",
   },
@@ -761,7 +768,7 @@ export const useListingsStore = create<ListingsState>()(
     }),
     {
       name: "redegest-listings",
-      version: 9,
+      version: 10,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { listings?: Listing[] } | undefined;
         if (state?.listings && version < 5) {
@@ -771,10 +778,11 @@ export const useListingsStore = create<ListingsState>()(
             galleryUrls: normalizeListingPhotos(l.galleryUrls as unknown),
           }));
         }
-        if (state?.listings && version < 9) {
+        if (state?.listings && version < 10) {
           // v6: cedência com/sem obras. v7: anúncio do utilizador (vista autor).
           // v8: reabilitação — valorMercadoAtual/PosObras, impostos consolidados, prazoObras.
           // v9: tipo de imóvel nas cedências que faltavam (Belém, Boavista, Areeiro, Aveiro).
+          // v10: términos de CPCV dinâmicos (4/9/12 dias) — faixa "Fecham em breve".
           // Refresca os seeds mantendo anúncios criados pelo utilizador.
           const seedIds = new Set(SEED.map((l) => l.id));
           const userListings = state.listings.filter((l) => !seedIds.has(l.id));

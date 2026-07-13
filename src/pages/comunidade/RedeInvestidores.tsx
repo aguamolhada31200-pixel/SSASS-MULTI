@@ -1,6 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Plus, BadgeCheck, Star, Map as MapIcon, LayoutGrid, SlidersHorizontal, X, Heart } from "lucide-react";
+import {
+  Search,
+  Plus,
+  BadgeCheck,
+  Star,
+  Map as MapIcon,
+  LayoutGrid,
+  SlidersHorizontal,
+  X,
+  Heart,
+  Hourglass,
+  MessageCircle,
+  Handshake,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ListingCard } from "@/components/rede/ListingCard";
 import { useExampleData } from "@/store/useExampleData";
@@ -9,6 +22,7 @@ import {
   useListingsStore,
   TYPE_LABEL_SHORT,
   TIPO_CEDENCIA_LABEL_SHORT,
+  type Listing,
   type ListingType,
   type EstadoAnuncio,
   type TipoCedencia,
@@ -17,27 +31,65 @@ import {
 } from "@/store/useListingsStore";
 import { useProfilesStore, CURRENT_USER_ID, type Profile } from "@/store/useProfilesStore";
 import { useSavedStore } from "@/store/useSavedStore";
+import { useInterestsStore } from "@/store/useInterestsStore";
 import { capitalDoAnuncio, roiDoAnuncio, yieldDoAnuncio, retornoEntradaCedencia } from "@/lib/calc/rede";
 import { eur, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type CapitalFiltro = "todos" | "ate10" | "10a25" | "25a50" | "mais50";
+type CapitalFiltro = "todos" | "ate25" | "25a50" | "50a100" | "mais100";
 
 const CAPITAL_PILLS: { key: CapitalFiltro; label: string; test: (v: number) => boolean }[] = [
   { key: "todos", label: "Qualquer", test: () => true },
-  { key: "ate10", label: "Até 10.000€", test: (v) => v <= 10000 },
-  { key: "10a25", label: "10–25.000€", test: (v) => v > 10000 && v <= 25000 },
-  { key: "25a50", label: "25–50.000€", test: (v) => v > 25000 && v <= 50000 },
-  { key: "mais50", label: ">50.000€", test: (v) => v > 50000 },
+  { key: "ate25", label: "< 25.000 €", test: (v) => v < 25000 },
+  { key: "25a50", label: "25–50.000 €", test: (v) => v >= 25000 && v <= 50000 },
+  { key: "50a100", label: "50–100.000 €", test: (v) => v > 50000 && v <= 100000 },
+  { key: "mais100", label: "> 100.000 €", test: (v) => v > 100000 },
 ];
 
+type Ordenar = "recentes" | "roi" | "capital" | "fechar";
+
+const ORDENAR_LABEL: Record<Ordenar, string> = {
+  recentes: "Mais recentes",
+  roi: "Maior ROI",
+  capital: "Menor capital",
+  fechar: "A fechar",
+};
+
 type RedeTab = "anuncios" | "investidores" | "guardados";
+
+/** Dias até ao término do CPCV (null se não definido). */
+function diasAteFecho(l: Listing): number | null {
+  if (!l.terminoCpcv) return null;
+  const t = new Date(`${l.terminoCpcv}T00:00:00`).getTime();
+  if (!isFinite(t)) return null;
+  return Math.ceil((t - Date.now()) / 86400000);
+}
+
+/** Prazo (meses) do anúncio para o filtro "Prazo máximo". Sem prazo conhecido → null (passa). */
+function prazoMesesDoAnuncio(l: Listing): number | null {
+  if (l.type === "reabilitacao" && l.tempoAteVenda) {
+    const m = l.tempoAteVenda.match(/(\d+)/);
+    return m ? Number(m[1]) : null;
+  }
+  if (l.type === "cedencia") {
+    const dias = diasAteFecho(l);
+    return dias !== null && dias >= 0 ? Math.max(1, Math.round(dias / 30)) : null;
+  }
+  return null;
+}
+
+/** 4.200.000 → "4,2 M€"; abaixo de 1M usa o formato normal. */
+function capitalCurto(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} M€`;
+  return eur(v);
+}
 
 export default function RedeInvestidores() {
   const { enabled } = useExampleData();
   const listings = useListingsStore((s) => s.listings);
   const profiles = useProfilesStore((s) => s.profiles);
   const savedIds = useSavedStore((s) => s.savedIds);
+  const interests = useInterestsStore((s) => s.interests);
   const openListingForm = useModalStore((s) => s.openListingForm);
   const [params, setParams] = useSearchParams();
 
@@ -68,15 +120,48 @@ export default function RedeInvestidores() {
   const [distrito, setDistrito] = useState("todos");
   const [cidade, setCidade] = useState("todos");
   const [roiMin, setRoiMin] = useState(0);
+  const [prazoMax, setPrazoMax] = useState(0); // meses · 0 = qualquer
   const [yieldMin, setYieldMin] = useState(0);
   const [retEntradaMin, setRetEntradaMin] = useState(0);
   const [tiposCedencia, setTiposCedencia] = useState<TipoCedencia[]>([]);
-  const [estado, setEstado] = useState<"todos" | EstadoAnuncio>("todos");
+  const [estados, setEstados] = useState<EstadoAnuncio[]>([]);
   const [busca, setBusca] = useState("");
-  const [filtrosOpen, setFiltrosOpen] = useState(false);
+  const [ordenar, setOrdenar] = useState<Ordenar>("recentes");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [visiveis, setVisiveis] = useState(9);
+
+  // Sticky: sentinela logo após o hero — quando sai de vista, a barra "colou".
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { threshold: 0 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const baseListings = enabled ? listings.filter((l) => l.status !== "closed") : [];
   const savedGuardados = baseListings.filter((l) => savedIds.includes(l.id));
+
+  // Linha de liquidez do hero — calculada em tempo real dos anúncios ativos.
+  const ativos = baseListings.filter((l) => l.estadoAnuncio === "ativo");
+  const capitalAtivo = ativos.reduce((s, l) => s + capitalDoAnuncio(l), 0);
+
+  const interessesPorAnuncio = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const i of interests) m.set(i.listingId, (m.get(i.listingId) ?? 0) + 1);
+    return m;
+  }, [interests]);
+
+  // "Fecham em breve": ativos com escritura <30 dias OU ≥2 interesses reais. Máx. 3.
+  const fechamEmBreve = useMemo(() => {
+    return ativos
+      .map((l) => ({ l, dias: diasAteFecho(l), n: interessesPorAnuncio.get(l.id) ?? 0 }))
+      .filter((x) => (x.dias !== null && x.dias >= 0 && x.dias < 30) || x.n >= 2)
+      .sort((a, b) => (a.dias ?? 9999) - (b.dias ?? 9999))
+      .slice(0, 3);
+  }, [ativos, interessesPorAnuncio]);
 
   const filtered = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -87,6 +172,11 @@ export default function RedeInvestidores() {
       .filter((l) => distrito === "todos" || l.district === distrito)
       .filter((l) => cidade === "todos" || l.city === cidade)
       .filter((l) => roiMin === 0 || roiDoAnuncio(l) >= roiMin)
+      .filter((l) => {
+        if (prazoMax === 0) return true;
+        const meses = prazoMesesDoAnuncio(l);
+        return meses === null || meses <= prazoMax;
+      })
       .filter((l) => yieldMin === 0 || (l.type === "arrendamento" && yieldDoAnuncio(l) >= yieldMin))
       .filter((l) => {
         if (retEntradaMin === 0) return true;
@@ -98,7 +188,7 @@ export default function RedeInvestidores() {
         if (l.type !== "cedencia") return categoria === "cedencia" ? false : true;
         return l.tipoCedencia ? tiposCedencia.includes(l.tipoCedencia) : false;
       })
-      .filter((l) => estado === "todos" || l.estadoAnuncio === estado)
+      .filter((l) => estados.length === 0 || estados.includes(l.estadoAnuncio))
       .filter((l) => {
         if (!q) return true;
         return (
@@ -108,63 +198,92 @@ export default function RedeInvestidores() {
           l.description.toLowerCase().includes(q)
         );
       })
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  }, [baseListings, categoria, capital, distrito, cidade, roiMin, yieldMin, retEntradaMin, tiposCedencia, estado, busca]);
+      .sort((a, b) => {
+        if (ordenar === "roi") return roiDoAnuncio(b) - roiDoAnuncio(a);
+        if (ordenar === "capital") return capitalDoAnuncio(a) - capitalDoAnuncio(b);
+        if (ordenar === "fechar") {
+          const da = diasAteFecho(a);
+          const db = diasAteFecho(b);
+          return (da !== null && da >= 0 ? da : 9999) - (db !== null && db >= 0 ? db : 9999);
+        }
+        return a.createdAt < b.createdAt ? 1 : -1;
+      });
+  }, [baseListings, categoria, capital, distrito, cidade, roiMin, prazoMax, yieldMin, retEntradaMin, tiposCedencia, estados, busca, ordenar]);
 
   const activeFilters =
-    (categoria !== "todas" ? 1 : 0) +
     (capital !== "todos" ? 1 : 0) +
     (distrito !== "todos" ? 1 : 0) +
     (cidade !== "todos" ? 1 : 0) +
     (roiMin > 0 ? 1 : 0) +
+    (prazoMax > 0 ? 1 : 0) +
     (yieldMin > 0 ? 1 : 0) +
     (retEntradaMin > 0 ? 1 : 0) +
     (tiposCedencia.length > 0 ? 1 : 0) +
-    (estado !== "todos" ? 1 : 0);
+    (estados.length > 0 ? 1 : 0);
+
+  const haFiltro = activeFilters > 0 || categoria !== "todas" || busca.trim().length > 0;
+
+  // Reset da paginação quando qualquer filtro/ordenação muda.
+  useEffect(() => {
+    setVisiveis(9);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoria, capital, distrito, cidade, roiMin, prazoMax, yieldMin, retEntradaMin, tiposCedencia, estados, busca, ordenar, tab]);
 
   const resetFiltros = () => {
-    setCategoria("todas");
     setCapital("todos");
     setDistrito("todos");
     setCidade("todos");
     setRoiMin(0);
+    setPrazoMax(0);
     setYieldMin(0);
     setRetEntradaMin(0);
     setTiposCedencia([]);
-    setEstado("todos");
+    setEstados([]);
   };
 
-  const toggleTipoCedencia = (t: TipoCedencia) => {
+  const toggleTipoCedencia = (t: TipoCedencia) =>
     setTiposCedencia((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]));
-  };
+  const toggleEstado = (e: EstadoAnuncio) =>
+    setEstados((cur) => (cur.includes(e) ? cur.filter((x) => x !== e) : [...cur, e]));
+
+  // Chips removíveis dos filtros ativos (por cima da grelha).
+  const chipsAtivos: { label: string; clear: () => void }[] = [
+    ...(capital !== "todos" ? [{ label: CAPITAL_PILLS.find((c) => c.key === capital)!.label, clear: () => setCapital("todos") }] : []),
+    ...(distrito !== "todos" ? [{ label: distrito, clear: () => setDistrito("todos") }] : []),
+    ...(cidade !== "todos" ? [{ label: cidade, clear: () => setCidade("todos") }] : []),
+    ...(roiMin > 0 ? [{ label: `ROI ≥ ${roiMin}%`, clear: () => setRoiMin(0) }] : []),
+    ...(prazoMax > 0 ? [{ label: `Prazo ≤ ${prazoMax} meses`, clear: () => setPrazoMax(0) }] : []),
+    ...estados.map((e) => ({ label: e === "concluido" ? "Concluído" : e === "financiado" ? "Financiado" : "Ativo", clear: () => toggleEstado(e) })),
+    ...tiposCedencia.map((t) => ({ label: TIPO_CEDENCIA_LABEL_SHORT[t], clear: () => toggleTipoCedencia(t) })),
+    ...(yieldMin > 0 ? [{ label: `Yield ≥ ${yieldMin}%`, clear: () => setYieldMin(0) }] : []),
+    ...(retEntradaMin > 0 ? [{ label: `Ret. entrada ≥ ${retEntradaMin}%`, clear: () => setRetEntradaMin(0) }] : []),
+  ];
+
+  // "Como funciona": só para utilizador novo (0 guardados e 0 interesses enviados).
+  const utilizadorNovo = savedIds.length === 0 && !interests.some((i) => i.userId === CURRENT_USER_ID);
 
   const directoryProfiles = profiles.filter((p) => p.id !== CURRENT_USER_ID);
 
   return (
     <div className="-mx-4 -my-6 sm:-mx-6 lg:-mx-8">
-      {/* Hero imersivo */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#2E1A0E] via-[#5C3D2E] to-[#3a2417] px-6 pb-20 pt-12 text-sidebar-text sm:px-10">
+      {/* Hero compacto */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#2E1A0E] via-[#5C3D2E] to-[#3a2417] px-4 pb-14 pt-7 text-sidebar-text sm:px-10">
         <div className="azulejo absolute inset-0 opacity-[0.06]" />
         <div className="relative mx-auto max-w-6xl">
-          <p className="mb-2 flex items-center gap-2 text-sm text-gold-soft">
-            <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Comunidade
-          </p>
-          <h1 className="font-display text-4xl font-bold leading-tight sm:text-5xl">
-            A rede onde <span className="italic text-gold">capital</span> encontra{" "}
-            <span className="italic text-gold">negócio</span>.
-          </h1>
-          <p className="mt-3 max-w-xl text-sidebar-text/70">
-            Encontre parceiros, oportunidades e cedências de posição. Networking imobiliário profissional, com track record real.
+          <h1 className="text-[26px] font-semibold leading-tight text-[#F5ECD7]">Capital encontra negócio.</h1>
+          <p className="mt-1 text-[13px] font-normal text-gold-soft">
+            {ativos.length} {ativos.length === 1 ? "oportunidade ativa" : "oportunidades ativas"} ·{" "}
+            <span className="num">{capitalCurto(capitalAtivo)}</span> em capital procurado
           </p>
 
-          <div className="glass mt-6 flex flex-col gap-2 rounded-2xl border border-white/15 p-2 sm:flex-row sm:items-center">
+          <div className="glass mt-4 flex max-w-2xl flex-col gap-2 rounded-xl border border-white/15 p-1.5 sm:flex-row sm:items-center">
             <div className="flex flex-1 items-center gap-2 px-3">
-              <Search size={18} className="text-sidebar-text/60" />
+              <Search size={16} className="text-sidebar-text/60" />
               <input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Onde quer investir? (cidade, distrito, palavra-chave)"
-                className="h-10 w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+                placeholder="Cidade, distrito ou tipo de negócio"
+                className="h-9 w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted"
               />
               {busca && (
                 <button onClick={() => setBusca("")} className="text-muted hover:text-ink">
@@ -172,96 +291,145 @@ export default function RedeInvestidores() {
                 </button>
               )}
             </div>
-            <Button variant="gold" className="sm:w-auto" onClick={() => setTab("anuncios")}>
+            <Button variant="gold" size="sm" className="sm:w-auto" onClick={() => setTab("anuncios")}>
               Procurar
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Tabs (pill) */}
-      <div className="relative z-10 mx-auto -mt-8 max-w-6xl px-4 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-md">
-            {(["anuncios", "investidores", "guardados"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors sm:px-5",
-                  tab === t ? "bg-gold text-sidebar" : "text-muted hover:text-ink"
-                )}
-              >
-                {t === "anuncios" ? (
-                  "Anúncios"
-                ) : t === "investidores" ? (
-                  "Investidores"
-                ) : (
-                  <>
-                    <Heart size={13} className={cn(tab === t && "fill-sidebar")} />
-                    Guardados{savedGuardados.length > 0 ? ` (${savedGuardados.length})` : ""}
-                  </>
-                )}
-              </button>
-            ))}
-          </div>
-          <Button variant="gold" size="sm" onClick={() => openListingForm()}>
-            <Plus size={15} /> Publicar anúncio
-          </Button>
-        </div>
-      </div>
+      {/* Sentinela do sticky */}
+      <div ref={sentinelRef} className="h-px" />
 
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        {tab === "anuncios" ? (
-          <>
-            {/* Chips de categoria */}
-            <div className="mb-4 flex flex-wrap gap-2">
-              <Chip ativo={categoria === "todas"} onClick={() => setCategoria("todas")}>
-                Todas
-              </Chip>
-              {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
-                <Chip key={t} ativo={categoria === t} onClick={() => setCategoria(t)}>
-                  {TYPE_LABEL_SHORT[t]}
-                </Chip>
+      {/* Barra sticky: tabs + chips de categoria + ordenar + filtros */}
+      <div className={cn("sticky top-0 z-30 -mt-8 transition-colors", stuck && "border-b border-line bg-bg/95 shadow-sm backdrop-blur-sm")}>
+        <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-md">
+              {(["anuncios", "investidores", "guardados"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors sm:px-5",
+                    tab === t ? "bg-gold text-sidebar" : "text-muted hover:text-ink"
+                  )}
+                >
+                  {t === "anuncios" ? (
+                    "Anúncios"
+                  ) : t === "investidores" ? (
+                    "Investidores"
+                  ) : (
+                    <>
+                      <Heart size={13} className={cn(tab === t && "fill-sidebar")} />
+                      Guardados{savedGuardados.length > 0 ? ` (${savedGuardados.length})` : ""}
+                    </>
+                  )}
+                </button>
               ))}
             </div>
+            <Button variant="gold" size="sm" onClick={() => openListingForm()}>
+              <Plus size={15} /> Publicar anúncio
+            </Button>
+          </div>
 
-            {/* Barra de filtros */}
-            <div className="mb-5 flex items-center justify-between">
-              <p className="text-sm text-muted">
-                {enabled ? `${filtered.length} de ${baseListings.length} anúncios` : "Sem dados de exemplo"}
-              </p>
+          {tab === "anuncios" && (
+            <div className="mt-2.5 flex items-center gap-2">
+              <div className="flex flex-1 gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible">
+                <Chip ativo={categoria === "todas"} onClick={() => setCategoria("todas")}>
+                  Todas
+                </Chip>
+                {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
+                  <Chip key={t} ativo={categoria === t} onClick={() => setCategoria(t)}>
+                    {TYPE_LABEL_SHORT[t]}
+                  </Chip>
+                ))}
+              </div>
+              <select
+                value={ordenar}
+                onChange={(e) => setOrdenar(e.target.value as Ordenar)}
+                className="h-9 shrink-0 rounded-md border border-line bg-card px-2 text-sm text-muted outline-none focus:border-secondary"
+                title="Ordenar"
+              >
+                {(Object.keys(ORDENAR_LABEL) as Ordenar[]).map((o) => (
+                  <option key={o} value={o}>{ORDENAR_LABEL[o]}</option>
+                ))}
+              </select>
               <button
-                onClick={() => setFiltrosOpen((v) => !v)}
+                onClick={() => setDrawerOpen(true)}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm",
+                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-sm",
                   activeFilters > 0 ? "border-gold/40 bg-gold/10 text-gold-dark" : "border-line bg-card text-muted hover:bg-accent"
                 )}
               >
                 <SlidersHorizontal size={14} /> Filtros{activeFilters > 0 ? ` · ${activeFilters}` : ""}
               </button>
             </div>
+          )}
+        </div>
+      </div>
 
-            {filtrosOpen && (
-              <FiltrosBar
-                capital={capital}
-                setCapital={setCapital}
-                distrito={distrito}
-                setDistrito={setDistrito}
-                cidade={cidade}
-                setCidade={setCidade}
-                roiMin={roiMin}
-                setRoiMin={setRoiMin}
-                yieldMin={yieldMin}
-                setYieldMin={setYieldMin}
-                retEntradaMin={retEntradaMin}
-                setRetEntradaMin={setRetEntradaMin}
-                tiposCedencia={tiposCedencia}
-                toggleTipoCedencia={toggleTipoCedencia}
-                estado={estado}
-                setEstado={setEstado}
-                onReset={resetFiltros}
-              />
+      <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
+        {tab === "anuncios" ? (
+          <>
+            {/* Chips dos filtros ativos (removíveis) */}
+            {chipsAtivos.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center gap-1.5">
+                {chipsAtivos.map((c) => (
+                  <span key={c.label} className="inline-flex items-center gap-1 rounded bg-accent px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-muted">
+                    {c.label}
+                    <button onClick={c.clear} className="hover:text-ink" title="Remover filtro">
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Contador de resultados */}
+            <div className="mb-4 flex items-center gap-2 text-[13px] text-muted">
+              {enabled ? (
+                haFiltro ? (
+                  <>
+                    {filtered.length} de {baseListings.length} oportunidades ·{" "}
+                    <button onClick={resetFiltros} className="font-medium text-secondary hover:underline">
+                      Limpar filtros
+                    </button>
+                  </>
+                ) : (
+                  `${baseListings.length} oportunidades`
+                )
+              ) : (
+                "Sem dados de exemplo"
+              )}
+            </div>
+
+            {/* Fecham em breve — urgência real (datas/interesses que existem nos dados) */}
+            {enabled && fechamEmBreve.length > 0 && (
+              <div className="mb-7">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">Fecham em breve</h2>
+                  <button onClick={() => setOrdenar("fechar")} className="text-xs font-medium text-secondary hover:underline">
+                    ver todos →
+                  </button>
+                </div>
+                <div className="flex gap-5 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3">
+                  {fechamEmBreve.map(({ l, dias, n }) => (
+                    <div key={l.id} className="relative w-[280px] shrink-0 sm:w-auto">
+                      <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning shadow-sm">
+                        {dias !== null && dias >= 0 && dias < 30 ? (
+                          <>
+                            <Hourglass size={11} /> {dias} {dias === 1 ? "dia" : "dias"}
+                          </>
+                        ) : (
+                          `${n} interessados`
+                        )}
+                      </span>
+                      <ListingCard listing={l} />
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Grelha */}
@@ -277,10 +445,28 @@ export default function RedeInvestidores() {
                 </Button>
               </div>
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {filtered.map((l) => (
-                  <ListingCard key={l.id} listing={l} />
-                ))}
+              <>
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {filtered.slice(0, visiveis).map((l) => (
+                    <ListingCard key={l.id} listing={l} />
+                  ))}
+                </div>
+                {filtered.length > visiveis && (
+                  <div className="mt-6 flex justify-center">
+                    <Button variant="outline" onClick={() => setVisiveis((v) => v + 9)}>
+                      Carregar mais ({filtered.length - visiveis})
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Como funciona — só para utilizador novo (sem guardados nem interesses) */}
+            {utilizadorNovo && (
+              <div className="mt-10 grid gap-6 border-t border-line/60 pt-8 sm:grid-cols-3">
+                <ComoFuncionaCol icon={<Search size={16} className="text-muted" />} titulo="Encontre" texto="Filtre por capital disponível e zona." />
+                <ComoFuncionaCol icon={<MessageCircle size={16} className="text-muted" />} titulo="Contacte" texto="Fale diretamente com o dono do negócio." />
+                <ComoFuncionaCol icon={<Handshake size={16} className="text-muted" />} titulo="Negoceie" texto="Sem intermediários, sem comissões." />
               </div>
             )}
           </>
@@ -289,6 +475,173 @@ export default function RedeInvestidores() {
         ) : (
           <GuardadosTab listings={savedGuardados} enabled={enabled} />
         )}
+      </div>
+
+      {/* Drawer de filtros (lateral direito · bottom sheet em mobile) */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50" onMouseDown={() => setDrawerOpen(false)}>
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
+          <div
+            className="absolute inset-x-0 bottom-0 flex max-h-[88vh] flex-col rounded-t-2xl border-t border-line bg-card shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[400px] sm:rounded-none sm:border-l sm:border-t-0"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <h2 className="text-base font-semibold text-ink">Filtros</h2>
+              <button onClick={() => setDrawerOpen(false)} className="text-muted hover:text-ink" aria-label="Fechar">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
+              <div>
+                <Label>Capital que posso investir</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CAPITAL_PILLS.map((c) => (
+                    <button
+                      key={c.key}
+                      onClick={() => setCapital(c.key)}
+                      className={cn(
+                        "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                        capital === c.key ? "border-primary bg-primary text-white" : "border-line text-muted hover:bg-accent"
+                      )}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label>Onde</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select value={distrito} onChange={setDistrito}>
+                    <option value="todos">Distrito</option>
+                    {DISTRITOS.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </Select>
+                  <Select value={cidade} onChange={setCidade}>
+                    <option value="todos">Cidade</option>
+                    {CIDADES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label>Retorno mínimo</Label>
+                <div className="space-y-3 rounded-lg border border-line p-3">
+                  <SliderRow
+                    label="ROI mínimo"
+                    value={roiMin}
+                    display={roiMin === 0 ? "Qualquer" : pct(roiMin, 0)}
+                    min={0}
+                    max={30}
+                    step={5}
+                    onChange={setRoiMin}
+                  />
+                  <SliderRow
+                    label="Prazo máximo"
+                    value={prazoMax}
+                    display={prazoMax === 0 ? "Qualquer" : `${prazoMax} meses`}
+                    min={0}
+                    max={24}
+                    step={3}
+                    onChange={setPrazoMax}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Estado</Label>
+                <div className="space-y-1.5">
+                  {(["ativo", "financiado", "concluido"] as EstadoAnuncio[]).map((e) => (
+                    <label key={e} className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 text-sm text-ink hover:bg-accent/50">
+                      <input
+                        type="checkbox"
+                        checked={estados.includes(e)}
+                        onChange={() => toggleEstado(e)}
+                        className="h-4 w-4 rounded border-line"
+                        style={{ accentColor: "#5C3D2E" }}
+                      />
+                      {e === "concluido" ? "Concluído" : e === "financiado" ? "Financiado" : "Ativo"}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <details className="group">
+                <summary className="cursor-pointer text-[11px] font-medium uppercase tracking-wide text-muted hover:text-ink">
+                  Mais filtros
+                </summary>
+                <div className="mt-3 space-y-4">
+                  <div>
+                    <Label>Tipo de Cedência</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(Object.keys(TIPO_CEDENCIA_LABEL_SHORT) as TipoCedencia[]).map((t) => {
+                        const ativo = tiposCedencia.includes(t);
+                        return (
+                          <button
+                            key={t}
+                            onClick={() => toggleTipoCedencia(t)}
+                            className={cn(
+                              "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                              ativo ? "border-gold bg-gold text-sidebar" : "border-line text-muted hover:bg-accent"
+                            )}
+                          >
+                            {TIPO_CEDENCIA_LABEL_SHORT[t]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label>Yield mínima</Label>
+                      <Select value={String(yieldMin)} onChange={(v) => setYieldMin(Number(v))}>
+                        {[0, 3, 4, 5, 6].map((v) => (
+                          <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Retorno s/ entrada</Label>
+                      <Select value={String(retEntradaMin)} onChange={(v) => setRetEntradaMin(Number(v))}>
+                        {[0, 5, 10, 12, 15, 18, 20, 25].map((v) => (
+                          <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>
+                        ))}
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-4">
+              <Button variant="ghost" onClick={resetFiltros}>
+                Limpar tudo
+              </Button>
+              <Button onClick={() => setDrawerOpen(false)}>
+                Aplicar ({filtered.length} {filtered.length === 1 ? "resultado" : "resultados"})
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────── Como funciona ─────────────────────────
+
+function ComoFuncionaCol({ icon, titulo, texto }: { icon: React.ReactNode; titulo: string; texto: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5">{icon}</span>
+      <div>
+        <p className="text-sm font-semibold text-ink">{titulo}</p>
+        <p className="text-[13px] text-muted">{texto}</p>
       </div>
     </div>
   );
@@ -347,147 +700,12 @@ function Chip({ ativo, onClick, children }: { ativo: boolean; onClick: () => voi
     <button
       onClick={onClick}
       className={cn(
-        "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+        "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
         ativo ? "bg-primary text-white" : "border border-line bg-card text-muted hover:bg-accent"
       )}
     >
       {children}
     </button>
-  );
-}
-
-interface FiltrosBarProps {
-  capital: CapitalFiltro;
-  setCapital: (v: CapitalFiltro) => void;
-  distrito: string;
-  setDistrito: (v: string) => void;
-  cidade: string;
-  setCidade: (v: string) => void;
-  roiMin: number;
-  setRoiMin: (v: number) => void;
-  yieldMin: number;
-  setYieldMin: (v: number) => void;
-  retEntradaMin: number;
-  setRetEntradaMin: (v: number) => void;
-  tiposCedencia: TipoCedencia[];
-  toggleTipoCedencia: (t: TipoCedencia) => void;
-  estado: "todos" | EstadoAnuncio;
-  setEstado: (v: "todos" | EstadoAnuncio) => void;
-  onReset: () => void;
-}
-
-function FiltrosBar(p: FiltrosBarProps) {
-  return (
-    <div className="mb-5 grid gap-4 rounded-2xl border border-line bg-card p-5 sm:grid-cols-2">
-      {/* Tipo de Cedência (multi-select) */}
-      <div className="sm:col-span-2">
-        <Label>Tipo de Cedência (multi-select)</Label>
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(TIPO_CEDENCIA_LABEL_SHORT) as TipoCedencia[]).map((t) => {
-            const ativo = p.tiposCedencia.includes(t);
-            return (
-              <button
-                key={t}
-                onClick={() => p.toggleTipoCedencia(t)}
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-sm transition-colors",
-                  ativo ? "bg-gold text-sidebar" : "border border-line text-muted hover:bg-accent"
-                )}
-              >
-                {TIPO_CEDENCIA_LABEL_SHORT[t]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Capital */}
-      <div className="sm:col-span-2">
-        <Label>Capital necessário</Label>
-        <div className="flex flex-wrap gap-1.5">
-          {CAPITAL_PILLS.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => p.setCapital(c.key)}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm transition-colors",
-                p.capital === c.key ? "bg-primary text-white" : "border border-line text-muted hover:bg-accent"
-              )}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Localização */}
-      <div>
-        <Label>Distrito</Label>
-        <Select value={p.distrito} onChange={p.setDistrito}>
-          <option value="todos">Todos os distritos</option>
-          {DISTRITOS.map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </Select>
-      </div>
-      <div>
-        <Label>Cidade</Label>
-        <Select value={p.cidade} onChange={p.setCidade}>
-          <option value="todos">Todas as cidades</option>
-          {CIDADES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </Select>
-      </div>
-
-      {/* Rentabilidade */}
-      <div>
-        <Label>ROI mínimo</Label>
-        <Select value={String(p.roiMin)} onChange={(v) => p.setRoiMin(Number(v))}>
-          {[0, 5, 10, 15, 20, 25, 30].map((v) => (
-            <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>
-          ))}
-        </Select>
-      </div>
-      <div>
-        <Label>Yield mínima (arrendamento)</Label>
-        <Select value={String(p.yieldMin)} onChange={(v) => p.setYieldMin(Number(v))}>
-          {[0, 3, 4, 5, 6].map((v) => (
-            <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>
-          ))}
-        </Select>
-      </div>
-      <div className="sm:col-span-2">
-        <Label>Retorno sobre a Entrada mínimo (cedência)</Label>
-        <Select value={String(p.retEntradaMin)} onChange={(v) => p.setRetEntradaMin(Number(v))}>
-          {[0, 5, 10, 12, 15, 18, 20, 25].map((v) => (
-            <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>
-          ))}
-        </Select>
-      </div>
-
-      {/* Estado */}
-      <div className="sm:col-span-2">
-        <Label>Estado</Label>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(["todos", "ativo", "financiado", "concluido"] as const).map((e) => (
-            <button
-              key={e}
-              onClick={() => p.setEstado(e)}
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm capitalize transition-colors",
-                p.estado === e ? "bg-primary text-white" : "border border-line text-muted hover:bg-accent"
-              )}
-            >
-              {e === "todos" ? "Todos" : e === "concluido" ? "Concluído" : e}
-            </button>
-          ))}
-          <button onClick={p.onReset} className="ml-auto text-xs text-muted hover:text-ink">
-            Limpar tudo
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -500,10 +718,47 @@ function Select({ value, onChange, children }: { value: string; onChange: (v: st
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary"
+      className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-secondary"
     >
       {children}
     </select>
+  );
+}
+
+function SliderRow({
+  label,
+  value,
+  display,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  display: string;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-sm">
+        <span className="text-muted">{label}</span>
+        <span className="num font-semibold text-ink">{display}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full"
+        style={{ accentColor: "#5C3D2E" }}
+      />
+    </div>
   );
 }
 
