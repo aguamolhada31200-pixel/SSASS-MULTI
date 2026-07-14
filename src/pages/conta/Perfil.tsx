@@ -292,7 +292,7 @@ export default function Perfil() {
                 </div>
               </div>
             )}
-            <Button variant="ghost" size="sm" className="mt-3" onClick={() => navigate(`/comunidade/rede/${me?.id ?? ""}`)}>
+            <Button variant="ghost" size="sm" className="mt-3" onClick={() => navigate("/comunidade/rede/meu-perfil")}>
               Ver perfil público <ArrowRight size={13} />
             </Button>
           </SectionCard>

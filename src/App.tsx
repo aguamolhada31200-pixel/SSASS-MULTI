@@ -52,6 +52,8 @@ export default function App() {
         <Route path="comunidade/rede" element={<RedeInvestidores />} />
         <Route path="comunidade/rede/anuncio/:id" element={<ListingDetail />} />
         <Route path="comunidade/rede/perfil/editar" element={<EditProfile />} />
+        {/* Perfil próprio — mesmo componente do perfil público, em modo "próprio" */}
+        <Route path="comunidade/rede/meu-perfil" element={<InvestorProfile />} />
         <Route path="comunidade/rede/:userId" element={<InvestorProfile />} />
         <Route path="mensagens" element={<Mensagens />} />
         <Route path="comunidade/colaborativa" element={<Colaborativa />} />

@@ -50,12 +50,12 @@ export default function EditProfile() {
       experienciaAutoDeclaradaAnos: anos,
     });
     toast.success("Perfil atualizado");
-    navigate(`/comunidade/rede/${CURRENT_USER_ID}`);
+    navigate("/comunidade/rede/meu-perfil");
   };
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link to={`/comunidade/rede/${CURRENT_USER_ID}`} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
+      <Link to="/comunidade/rede/meu-perfil" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
         <ArrowLeft size={15} /> O meu perfil
       </Link>
 
@@ -144,7 +144,7 @@ export default function EditProfile() {
       </Card>
 
       <div className="mt-4 flex justify-end gap-2">
-        <Button variant="ghost" onClick={() => navigate(`/comunidade/rede/${CURRENT_USER_ID}`)}>Cancelar</Button>
+        <Button variant="ghost" onClick={() => navigate("/comunidade/rede/meu-perfil")}>Cancelar</Button>
         <Button variant="gold" onClick={guardar}>Guardar perfil</Button>
       </div>
     </div>

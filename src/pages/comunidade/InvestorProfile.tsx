@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -11,6 +12,7 @@ import {
   Info,
   Pencil,
   MapPin,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -27,8 +29,12 @@ import { eur, pct, dataPTShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export default function InvestorProfile() {
-  const { userId } = useParams();
+  const params = useParams();
+  // Rota /comunidade/rede/meu-perfil não tem :userId — é a vista do próprio.
+  const userId = params.userId ?? CURRENT_USER_ID;
   const navigate = useNavigate();
+  // Pré-visualizar como investidor — o dono vê o perfil tal como os outros o veem
+  const [preview, setPreview] = useState(false);
   const profile = useProfilesStore((s) => s.profiles.find((p) => p.id === userId));
   const listings = useListingsStore((s) => s.listings.filter((l) => l.authorId === userId && l.status === "active"));
   const ratings = usePartnerRatingsStore((s) => s.ratings.filter((r) => r.ratedUserId === userId));
@@ -56,15 +62,41 @@ export default function InvestorProfile() {
     );
 
   const isMe = profile.id === CURRENT_USER_ID;
+  // Em pré-visualização, tudo renderiza como se fosse outra pessoa a ver
+  const vistaPropria = isMe && !preview;
 
   const mensagem = () => {
+    if (isMe) {
+      toast("Modo de pré-visualização", { description: "É assim que os outros investidores contactam consigo." });
+      return;
+    }
     const convId = getOrCreate(profile.id, "direct");
     navigate(`/mensagens?c=${convId}`);
   };
-  const convidar = () => toast.success("Convite de parceria enviado", { description: `${profile.fullName} foi notificado(a).` });
+  const convidar = () => {
+    if (isMe) {
+      toast("Modo de pré-visualização", { description: "É assim que os outros investidores contactam consigo." });
+      return;
+    }
+    toast.success("Convite de parceria enviado", { description: `${profile.fullName} foi notificado(a).` });
+  };
 
   return (
     <div className="-mx-4 -my-6 sm:-mx-6 lg:-mx-8">
+      {/* Barra de pré-visualização — toggle claro para voltar à vista própria */}
+      {isMe && preview && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-accent px-4 py-2.5 sm:px-6">
+          <p className="flex items-center gap-2 text-sm text-ink">
+            <Eye size={15} className="text-secondary" /> Vista pública — é isto que os outros investidores veem.
+          </p>
+          <button
+            onClick={() => setPreview(false)}
+            className="rounded-md border border-line bg-card px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-bg"
+          >
+            Voltar à minha vista
+          </button>
+        </div>
+      )}
       {/* Cover (altura fixa ~200px, botão Rede sobreposto) */}
       <div className="relative h-[200px] overflow-hidden">
         {profile.coverUrl ? (
@@ -121,12 +153,17 @@ export default function InvestorProfile() {
               </div>
             </div>
           </div>
-          {/* Ações */}
+          {/* Ações — vista própria mostra Editar/Pré-visualizar; vista pública mostra contacto */}
           <div className="flex w-full flex-wrap gap-2 sm:mt-4 sm:w-auto">
-            {isMe ? (
-              <Button variant="gold" className="w-full sm:w-auto" onClick={() => navigate("/comunidade/rede/perfil/editar")}>
-                <Pencil size={15} /> Editar perfil
-              </Button>
+            {vistaPropria ? (
+              <>
+                <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setPreview(true)}>
+                  <Eye size={15} /> Pré-visualizar como investidor
+                </Button>
+                <Button variant="gold" className="flex-1 sm:flex-none" onClick={() => navigate("/comunidade/rede/perfil/editar")}>
+                  <Pencil size={15} /> Editar perfil
+                </Button>
+              </>
             ) : (
               <>
                 <Button variant="outline" className="flex-1 sm:flex-none" onClick={mensagem}>
