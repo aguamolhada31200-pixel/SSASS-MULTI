@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Search,
@@ -22,8 +22,11 @@ import {
   Play,
   Pencil,
   Trash2,
+  Users,
+  CircleUserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { NavBar } from "@/components/ui/tubelight-navbar";
 import { ListingCard } from "@/components/rede/ListingCard";
 import { useExampleData } from "@/store/useExampleData";
 import { useModalStore } from "@/store/useModalStore";
@@ -109,6 +112,7 @@ export default function RedeInvestidores() {
   const interests = useInterestsStore((s) => s.interests);
   const alertas = useAlertsStore((s) => s.alertas);
   const openListingForm = useModalStore((s) => s.openListingForm);
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
 
   const tabParam = params.get("tab");
@@ -367,38 +371,23 @@ export default function RedeInvestidores() {
       </div>
 
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
-        {/* ───────── Navegação (no fluxo, sem sticky) ───────── */}
+        {/* ───────── Navegação (no fluxo, sem sticky) — bloco único tubelight ───────── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            {(["anuncios", "investidores", "guardados"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                  tab === t ? "bg-primary text-white" : "text-muted hover:text-ink"
-                )}
-              >
-                {t === "anuncios" ? (
-                  "Anúncios"
-                ) : t === "investidores" ? (
-                  "Investidores"
-                ) : (
-                  <>
-                    <Heart size={13} className={cn(tab === t && "fill-white")} />
-                    Guardados{savedGuardados.length > 0 ? ` (${savedGuardados.length})` : ""}
-                  </>
-                )}
-              </button>
-            ))}
-            {/* Porta de entrada para o próprio perfil na Rede (rota dedicada) */}
-            <Link
-              to="/comunidade/rede/meu-perfil"
-              className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-muted transition-colors hover:text-ink"
-            >
-              O meu perfil
-            </Link>
-          </div>
+          <NavBar
+            active={tab === "anuncios" ? "Anúncios" : tab === "investidores" ? "Investidores" : "Guardados"}
+            items={[
+              { name: "Anúncios", icon: LayoutGrid, onClick: () => setTab("anuncios") },
+              { name: "Investidores", icon: Users, onClick: () => setTab("investidores") },
+              {
+                name: "Guardados",
+                label: savedGuardados.length > 0 ? `Guardados (${savedGuardados.length})` : "Guardados",
+                icon: Heart,
+                onClick: () => setTab("guardados"),
+              },
+              // Porta de entrada para o próprio perfil na Rede (rota dedicada)
+              { name: "O meu perfil", icon: CircleUserRound, onClick: () => navigate("/comunidade/rede/meu-perfil") },
+            ]}
+          />
           <Button onClick={() => openListingForm()}>
             <Plus size={15} /> Publicar anúncio
           </Button>
