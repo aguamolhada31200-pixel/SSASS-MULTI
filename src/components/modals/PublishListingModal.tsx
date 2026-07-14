@@ -20,6 +20,7 @@ import {
   type TipoImovel,
 } from "@/store/useListingsStore";
 import { CURRENT_USER_ID } from "@/store/useProfilesStore";
+import { notificarAlertasComNovoAnuncio } from "@/store/useAlertsStore";
 import {
   ctaReab,
   investimentoTotalReab,
@@ -285,6 +286,9 @@ export function PublishListingModal() {
       closeListingForm();
     } else {
       const id = add(payload);
+      // Alertas de oportunidade: notifica quem tem critérios que este anúncio cumpre.
+      const novo = getById(id);
+      if (novo) notificarAlertasComNovoAnuncio(novo);
       toast.success("Anúncio publicado", { description: values.title });
       closeListingForm();
       navigate(`/comunidade/rede/anuncio/${id}`);

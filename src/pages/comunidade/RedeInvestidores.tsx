@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   Search,
   Plus,
@@ -13,14 +14,14 @@ import {
   Hourglass,
   MessageCircle,
   Handshake,
-  Hammer,
-  KeyRound,
-  ShieldCheck,
-  Wallet,
-  Users,
-  TrendingUp,
-  Building2,
-  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Bell,
+  BellPlus,
+  Pause,
+  Play,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ListingCard } from "@/components/rede/ListingCard";
@@ -40,50 +41,33 @@ import {
 import { useProfilesStore, CURRENT_USER_ID, type Profile } from "@/store/useProfilesStore";
 import { useSavedStore } from "@/store/useSavedStore";
 import { useInterestsStore } from "@/store/useInterestsStore";
+import { useAlertsStore, alertaMatch, ALERT_CAPITAL_LABEL, type Alerta, type AlertCriterios, type AlertCapital } from "@/store/useAlertsStore";
 import { capitalDoAnuncio, roiDoAnuncio, yieldDoAnuncio, retornoEntradaCedencia } from "@/lib/calc/rede";
 import { eur, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type CapitalFiltro = "todos" | "ate25" | "25a50" | "50a100" | "mais100";
+type CapitalFiltro = AlertCapital;
 
 const CAPITAL_PILLS: { key: CapitalFiltro; label: string; test: (v: number) => boolean }[] = [
   { key: "todos", label: "Qualquer", test: () => true },
   { key: "ate25", label: "< 25.000 €", test: (v) => v < 25000 },
-  { key: "25a50", label: "25–50.000 €", test: (v) => v >= 25000 && v <= 50000 },
-  { key: "50a100", label: "50–100.000 €", test: (v) => v > 50000 && v <= 100000 },
+  { key: "25a50", label: "25 – 50.000 €", test: (v) => v >= 25000 && v <= 50000 },
+  { key: "50a100", label: "50 – 100.000 €", test: (v) => v > 50000 && v <= 100000 },
   { key: "mais100", label: "> 100.000 €", test: (v) => v > 100000 },
 ];
 
-type Ordenar = "recentes" | "roi" | "capital" | "fechar";
+type Ordenar = "recentes" | "roi" | "capital" | "fechar" | "procurados";
 
 const ORDENAR_LABEL: Record<Ordenar, string> = {
   recentes: "Mais recentes",
   roi: "Maior ROI",
   capital: "Menor capital",
-  fechar: "A fechar",
+  fechar: "A fechar primeiro",
+  procurados: "Mais procurados",
 };
 
 type RedeTab = "anuncios" | "investidores" | "guardados";
 
-const UNSPLASH = (id: string, w = 1200, q = 72) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=${q}`;
-const HERO_IMG = UNSPLASH("1505691938895-1758d7feb511", 1800, 68);
-const CATEGORIA_IMG: Record<ListingType, string> = {
-  reabilitacao: UNSPLASH("1503387762-592deb58ef4e", 800),
-  cedencia: UNSPLASH("1560448204-e02f11c3d0e2", 800),
-  arrendamento: UNSPLASH("1502672260266-1c1ef2d93688", 800),
-};
-const CATEGORIA_ICON: Record<ListingType, typeof Hammer> = {
-  reabilitacao: Hammer,
-  cedencia: Handshake,
-  arrendamento: KeyRound,
-};
-const CATEGORIA_DESC: Record<ListingType, string> = {
-  reabilitacao: "Capital para comprar, recuperar e revender com margem.",
-  cedencia: "Entre num negócio antes da escritura, com desconto.",
-  arrendamento: "Imóveis prontos a render — rendimento passivo.",
-};
-
-/** Dias até ao término do CPCV (null se não definido). */
 function diasAteFecho(l: Listing): number | null {
   if (!l.terminoCpcv) return null;
   const t = new Date(`${l.terminoCpcv}T00:00:00`).getTime();
@@ -91,7 +75,6 @@ function diasAteFecho(l: Listing): number | null {
   return Math.ceil((t - Date.now()) / 86400000);
 }
 
-/** Prazo (meses) do anúncio para o filtro "Prazo máximo". Sem prazo conhecido → null (passa). */
 function prazoMesesDoAnuncio(l: Listing): number | null {
   if (l.type === "reabilitacao" && l.tempoAteVenda) {
     const m = l.tempoAteVenda.match(/(\d+)/);
@@ -104,10 +87,18 @@ function prazoMesesDoAnuncio(l: Listing): number | null {
   return null;
 }
 
-/** 4.200.000 → "4,2 M€"; abaixo de 1M usa o formato normal. */
+function diasDesde(iso: string): number {
+  const t = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso).getTime();
+  return isFinite(t) ? (Date.now() - t) / 86400000 : 9999;
+}
+
 function capitalCurto(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} M€`;
   return eur(v);
+}
+
+function bandFromValue(v: number): CapitalFiltro {
+  return (CAPITAL_PILLS.find((c) => c.key !== "todos" && c.test(v))?.key ?? "todos") as CapitalFiltro;
 }
 
 export default function RedeInvestidores() {
@@ -116,17 +107,13 @@ export default function RedeInvestidores() {
   const profiles = useProfilesStore((s) => s.profiles);
   const savedIds = useSavedStore((s) => s.savedIds);
   const interests = useInterestsStore((s) => s.interests);
+  const alertas = useAlertsStore((s) => s.alertas);
   const openListingForm = useModalStore((s) => s.openListingForm);
   const [params, setParams] = useSearchParams();
 
   const tabParam = params.get("tab");
   const tab: RedeTab = tabParam === "guardados" || tabParam === "investidores" ? tabParam : "anuncios";
 
-  const catParam = params.get("cat");
-  const categoria: "todas" | ListingType =
-    catParam === "reabilitacao" || catParam === "cedencia" || catParam === "arrendamento" ? catParam : "todas";
-
-  // Guardar tab + categoria na URL para o filtro persistir ao voltar (seta do navegador).
   const patchParams = (patch: Record<string, string | null>) =>
     setParams(
       (prev) => {
@@ -141,45 +128,48 @@ export default function RedeInvestidores() {
     );
 
   const setTab = (t: RedeTab) => patchParams({ tab: t === "anuncios" ? null : t });
-  const setCategoria = (c: "todas" | ListingType) => patchParams({ cat: c === "todas" ? null : c });
+
+  // Tipo de negócio (multi). Sincroniza `cat` na URL quando é seleção única.
+  const [tiposFiltro, setTiposFiltro] = useState<ListingType[]>(() => {
+    const c = params.get("cat");
+    return c === "reabilitacao" || c === "cedencia" || c === "arrendamento" ? [c] : [];
+  });
+  useEffect(() => {
+    patchParams({ cat: tiposFiltro.length === 1 ? tiposFiltro[0] : null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tiposFiltro]);
+
   const [capital, setCapital] = useState<CapitalFiltro>("todos");
   const [distrito, setDistrito] = useState("todos");
   const [cidade, setCidade] = useState("todos");
   const [roiMin, setRoiMin] = useState(0);
-  const [prazoMax, setPrazoMax] = useState(0); // meses · 0 = qualquer
+  const [prazoMax, setPrazoMax] = useState(0);
   const [yieldMin, setYieldMin] = useState(0);
   const [retEntradaMin, setRetEntradaMin] = useState(0);
   const [tiposCedencia, setTiposCedencia] = useState<TipoCedencia[]>([]);
   const [estados, setEstados] = useState<EstadoAnuncio[]>([]);
+  const [apenasVerificados, setApenasVerificados] = useState(false);
   const [busca, setBusca] = useState("");
   const [ordenar, setOrdenar] = useState<Ordenar>("recentes");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [visiveis, setVisiveis] = useState(9);
+  const [alertaModal, setAlertaModal] = useState<null | "criar" | "lista">(null);
 
   const gridRef = useRef<HTMLDivElement>(null);
+  const irParaGrelha = () => gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-  // Sticky: sentinela logo após a faixa de estatísticas — quando sai de vista, a barra "colou".
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const [stuck, setStuck] = useState(false);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { threshold: 0 });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const verificadoDe = useMemo(() => {
+    const m = new Map<string, boolean>();
+    for (const p of profiles) m.set(p.id, p.isVerified);
+    return m;
+  }, [profiles]);
 
   const baseListings = enabled ? listings.filter((l) => l.status !== "closed") : [];
   const savedGuardados = baseListings.filter((l) => savedIds.includes(l.id));
 
-  // Estatísticas em tempo real dos anúncios ativos.
   const ativos = baseListings.filter((l) => l.estadoAnuncio === "ativo");
   const capitalAtivo = ativos.reduce((s, l) => s + capitalDoAnuncio(l), 0);
-  const roiMedio = useMemo(() => {
-    const vals = ativos.map(roiDoAnuncio).filter((v) => v > 0);
-    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
-  }, [ativos]);
-  const contagemPorTipo = (t: ListingType) => ativos.filter((l) => l.type === t).length;
+  const novasSemana = ativos.filter((l) => diasDesde(l.createdAt) <= 7).length;
 
   const interessesPorAnuncio = useMemo(() => {
     const m = new Map<string, number>();
@@ -187,20 +177,19 @@ export default function RedeInvestidores() {
     return m;
   }, [interests]);
 
-  // "Fecham em breve": ativos com escritura <30 dias OU ≥2 interesses reais. Máx. 3.
   const fechamEmBreve = useMemo(() => {
     return ativos
       .map((l) => ({ l, dias: diasAteFecho(l), nInt: interessesPorAnuncio.get(l.id) ?? 0 }))
       .filter((x) => (x.dias !== null && x.dias >= 0 && x.dias < 30) || x.nInt >= 2)
       .sort((a, b) => (a.dias ?? 9999) - (b.dias ?? 9999))
-      .slice(0, 3);
+      .slice(0, 8);
   }, [ativos, interessesPorAnuncio]);
 
   const filtered = useMemo(() => {
     const q = busca.trim().toLowerCase();
     const capTest = CAPITAL_PILLS.find((c) => c.key === capital)!.test;
     return baseListings
-      .filter((l) => categoria === "todas" || l.type === categoria)
+      .filter((l) => tiposFiltro.length === 0 || tiposFiltro.includes(l.type))
       .filter((l) => capTest(capitalDoAnuncio(l)))
       .filter((l) => distrito === "todos" || l.district === distrito)
       .filter((l) => cidade === "todos" || l.city === cidade)
@@ -213,15 +202,16 @@ export default function RedeInvestidores() {
       .filter((l) => yieldMin === 0 || (l.type === "arrendamento" && yieldDoAnuncio(l) >= yieldMin))
       .filter((l) => {
         if (retEntradaMin === 0) return true;
-        if (l.type !== "cedencia") return true; // só aplica a cedências
+        if (l.type !== "cedencia") return true;
         return retornoEntradaCedencia(l) >= retEntradaMin;
       })
       .filter((l) => {
         if (tiposCedencia.length === 0) return true;
-        if (l.type !== "cedencia") return categoria === "cedencia" ? false : true;
+        if (l.type !== "cedencia") return tiposFiltro.includes("cedencia") ? false : true;
         return l.tipoCedencia ? tiposCedencia.includes(l.tipoCedencia) : false;
       })
       .filter((l) => estados.length === 0 || estados.includes(l.estadoAnuncio))
+      .filter((l) => !apenasVerificados || verificadoDe.get(l.authorId))
       .filter((l) => {
         if (!q) return true;
         return (
@@ -234,6 +224,7 @@ export default function RedeInvestidores() {
       .sort((a, b) => {
         if (ordenar === "roi") return roiDoAnuncio(b) - roiDoAnuncio(a);
         if (ordenar === "capital") return capitalDoAnuncio(a) - capitalDoAnuncio(b);
+        if (ordenar === "procurados") return (interessesPorAnuncio.get(b.id) ?? 0) - (interessesPorAnuncio.get(a.id) ?? 0);
         if (ordenar === "fechar") {
           const da = diasAteFecho(a);
           const db = diasAteFecho(b);
@@ -241,7 +232,7 @@ export default function RedeInvestidores() {
         }
         return a.createdAt < b.createdAt ? 1 : -1;
       });
-  }, [baseListings, categoria, capital, distrito, cidade, roiMin, prazoMax, yieldMin, retEntradaMin, tiposCedencia, estados, busca, ordenar]);
+  }, [baseListings, tiposFiltro, capital, distrito, cidade, roiMin, prazoMax, yieldMin, retEntradaMin, tiposCedencia, estados, apenasVerificados, verificadoDe, busca, ordenar, interessesPorAnuncio]);
 
   const activeFilters =
     (capital !== "todos" ? 1 : 0) +
@@ -252,18 +243,19 @@ export default function RedeInvestidores() {
     (yieldMin > 0 ? 1 : 0) +
     (retEntradaMin > 0 ? 1 : 0) +
     (tiposCedencia.length > 0 ? 1 : 0) +
-    (estados.length > 0 ? 1 : 0);
+    (estados.length > 0 ? 1 : 0) +
+    (apenasVerificados ? 1 : 0);
 
-  const haFiltro = activeFilters > 0 || categoria !== "todas" || busca.trim().length > 0;
-  // Modo descoberta: a home "de montra" (sem filtros) mostra as secções de marketing.
+  const haFiltro = activeFilters > 0 || tiposFiltro.length > 0 || busca.trim().length > 0;
   const descoberta = tab === "anuncios" && !haFiltro;
 
   useEffect(() => {
     setVisiveis(9);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoria, capital, distrito, cidade, roiMin, prazoMax, yieldMin, retEntradaMin, tiposCedencia, estados, busca, ordenar, tab]);
+  }, [tiposFiltro, capital, distrito, cidade, roiMin, prazoMax, yieldMin, retEntradaMin, tiposCedencia, estados, apenasVerificados, busca, ordenar, tab]);
 
   const resetFiltros = () => {
+    setTiposFiltro([]);
     setCapital("todos");
     setDistrito("todos");
     setCidade("todos");
@@ -273,22 +265,18 @@ export default function RedeInvestidores() {
     setRetEntradaMin(0);
     setTiposCedencia([]);
     setEstados([]);
+    setApenasVerificados(false);
   };
 
+  const toggleTipoNegocio = (t: ListingType) =>
+    setTiposFiltro((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]));
   const toggleTipoCedencia = (t: TipoCedencia) =>
     setTiposCedencia((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]));
   const toggleEstado = (e: EstadoAnuncio) =>
     setEstados((cur) => (cur.includes(e) ? cur.filter((x) => x !== e) : [...cur, e]));
 
-  const irParaGrelha = () => gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-
-  const escolherCategoria = (c: "todas" | ListingType) => {
-    setTab("anuncios");
-    setCategoria(c);
-    setTimeout(irParaGrelha, 60);
-  };
-
   const chipsAtivos: { label: string; clear: () => void }[] = [
+    ...tiposFiltro.map((t) => ({ label: TYPE_LABEL_SHORT[t], clear: () => toggleTipoNegocio(t) })),
     ...(capital !== "todos" ? [{ label: CAPITAL_PILLS.find((c) => c.key === capital)!.label, clear: () => setCapital("todos") }] : []),
     ...(distrito !== "todos" ? [{ label: distrito, clear: () => setDistrito("todos") }] : []),
     ...(cidade !== "todos" ? [{ label: cidade, clear: () => setCidade("todos") }] : []),
@@ -296,45 +284,69 @@ export default function RedeInvestidores() {
     ...(prazoMax > 0 ? [{ label: `Prazo ≤ ${prazoMax} meses`, clear: () => setPrazoMax(0) }] : []),
     ...estados.map((e) => ({ label: e === "concluido" ? "Concluído" : e === "financiado" ? "Financiado" : "Ativo", clear: () => toggleEstado(e) })),
     ...tiposCedencia.map((t) => ({ label: TIPO_CEDENCIA_LABEL_SHORT[t], clear: () => toggleTipoCedencia(t) })),
+    ...(apenasVerificados ? [{ label: "Verificados", clear: () => setApenasVerificados(false) }] : []),
     ...(yieldMin > 0 ? [{ label: `Yield ≥ ${yieldMin}%`, clear: () => setYieldMin(0) }] : []),
     ...(retEntradaMin > 0 ? [{ label: `Ret. entrada ≥ ${retEntradaMin}%`, clear: () => setRetEntradaMin(0) }] : []),
   ];
 
-  const directoryProfiles = profiles.filter((p) => p.id !== CURRENT_USER_ID);
-  const verificados = directoryProfiles.filter((p) => p.isVerified).length;
-  const destaqueInvestidores = useMemo(
-    () => [...directoryProfiles].sort((a, b) => b.rating * b.numAvaliacoes - a.rating * a.numAvaliacoes).slice(0, 8),
-    [directoryProfiles]
-  );
+  // "Para o seu capital" — banda inferida do filtro ou dos guardados/interesses.
+  const bandaCapital = useMemo<CapitalFiltro | null>(() => {
+    if (capital !== "todos") return capital;
+    const sinais = baseListings.filter(
+      (l) => savedIds.includes(l.id) || interests.some((i) => i.userId === CURRENT_USER_ID && i.listingId === l.id)
+    );
+    if (sinais.length === 0) return null;
+    const media = sinais.reduce((s, l) => s + capitalDoAnuncio(l), 0) / sinais.length;
+    return bandFromValue(media);
+  }, [capital, baseListings, savedIds, interests]);
 
+  const paraOSeuCapital = useMemo(() => {
+    if (!bandaCapital || bandaCapital === "todos") return [];
+    const test = CAPITAL_PILLS.find((c) => c.key === bandaCapital)!.test;
+    return ativos.filter((l) => test(capitalDoAnuncio(l))).slice(0, 8);
+  }, [ativos, bandaCapital]);
+
+  const directoryProfiles = profiles.filter((p) => p.id !== CURRENT_USER_ID);
   const anunciosPorAutor = useMemo(() => {
     const m = new Map<string, number>();
     for (const l of ativos) m.set(l.authorId, (m.get(l.authorId) ?? 0) + 1);
     return m;
   }, [ativos]);
+  const investidoresAtivos = useMemo(
+    () =>
+      directoryProfiles
+        .filter((p) => p.isVerified && (anunciosPorAutor.get(p.id) ?? 0) > 0)
+        .sort((a, b) => (anunciosPorAutor.get(b.id) ?? 0) - (anunciosPorAutor.get(a.id) ?? 0) || b.rating - a.rating)
+        .slice(0, 8),
+    [directoryProfiles, anunciosPorAutor]
+  );
+
+  const meusAlertas = alertas.filter((a) => a.userId === CURRENT_USER_ID);
+  const utilizadorNovo = savedIds.length === 0 && !interests.some((i) => i.userId === CURRENT_USER_ID);
+
+  const criteriosAtuais: AlertCriterios = {
+    capital,
+    distrito,
+    cidade,
+    tipos: tiposFiltro,
+    roiMin,
+  };
 
   return (
     <div className="-mx-4 -my-6 sm:-mx-6 lg:-mx-8">
-      {/* ───────── HERO fotográfico ───────── */}
-      <div className="relative overflow-hidden text-sidebar-text">
-        <img src={HERO_IMG} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#2E1A0E]/95 via-[#5C3D2E]/90 to-[#3a2417]/85" />
-        <div className="azulejo absolute inset-0 opacity-[0.07]" />
-        <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-14">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-gold-soft">
-            <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Marketplace de investimento imobiliário
-          </span>
-          <h1 className="mt-4 max-w-2xl text-[30px] font-semibold leading-[1.1] text-[#F9F1E2] sm:text-[40px]">
-            Onde o capital encontra o negócio certo.
-          </h1>
-          <p className="mt-3 max-w-xl text-sm text-sidebar-text/75 sm:text-[15px]">
-            Parcerias, cedências de posição e imóveis a render — direto entre investidores, sem intermediários.
+      {/* ───────── HERO comprimido ───────── */}
+      <div className="relative overflow-hidden bg-[#2E1A0E] px-4 py-8 text-sidebar-text sm:px-6">
+        <div className="azulejo absolute inset-0 opacity-[0.06]" />
+        <div className="relative mx-auto max-w-[1280px]">
+          <h1 className="text-[28px] font-semibold leading-tight text-[#F5ECD7]">Capital encontra negócio.</h1>
+          <p className="mt-1.5 text-[13px] text-[#E8D5A4]">
+            <span className="num">{ativos.length}</span> oportunidades ativas · <span className="num">{capitalCurto(capitalAtivo)}</span> em capital procurado
+            {novasSemana > 0 && <> · <span className="num">{novasSemana}</span> novas esta semana</>}
           </p>
 
-          {/* Pesquisa */}
-          <div className="mt-6 flex max-w-2xl flex-col gap-2 rounded-xl border border-white/15 bg-white/95 p-1.5 shadow-lg sm:flex-row sm:items-center">
-            <div className="flex flex-1 items-center gap-2 px-3">
-              <Search size={18} className="text-muted" />
+          <div className="mt-4 flex max-w-xl gap-2">
+            <div className="flex flex-1 items-center gap-2 rounded-md border border-white/15 bg-white/95 px-3">
+              <Search size={16} className="text-muted" />
               <input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
@@ -347,84 +359,65 @@ export default function RedeInvestidores() {
                 </button>
               )}
             </div>
-            <Button variant="gold" className="sm:w-auto" onClick={() => { setTab("anuncios"); irParaGrelha(); }}>
-              Explorar oportunidades
+            <Button variant="gold" onClick={() => { setTab("anuncios"); irParaGrelha(); }}>
+              Procurar
             </Button>
-          </div>
-
-          {/* Confiança */}
-          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-sidebar-text/70">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck size={15} className="text-gold-soft" /> <span className="num">{verificados}</span> investidores verificados
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Building2 size={15} className="text-gold-soft" /> <span className="num">{ativos.length}</span> negócios ativos
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Wallet size={15} className="text-gold-soft" /> <span className="num">{capitalCurto(capitalAtivo)}</span> em procura
-            </span>
           </div>
         </div>
       </div>
 
-      {/* ───────── Faixa de estatísticas (sobrepõe o hero) ───────── */}
-      {enabled && (
-        <div className="relative z-10 mx-auto -mt-10 max-w-6xl px-4 sm:px-6">
-          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-line bg-card p-4 shadow-md sm:grid-cols-4 sm:p-5">
-            <EstatItem icon={Building2} label="Oportunidades ativas" value={String(ativos.length)} />
-            <EstatItem icon={Wallet} label="Capital procurado" value={capitalCurto(capitalAtivo)} />
-            <EstatItem icon={TrendingUp} label="ROI médio" value={pct(roiMedio, 0)} />
-            <EstatItem icon={Users} label="Investidores" value={String(profiles.length)} />
+      <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
+        {/* ───────── Navegação (no fluxo, sem sticky) ───────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {(["anuncios", "investidores", "guardados"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                  tab === t ? "bg-primary text-white" : "text-muted hover:text-ink"
+                )}
+              >
+                {t === "anuncios" ? (
+                  "Anúncios"
+                ) : t === "investidores" ? (
+                  "Investidores"
+                ) : (
+                  <>
+                    <Heart size={13} className={cn(tab === t && "fill-white")} />
+                    Guardados{savedGuardados.length > 0 ? ` (${savedGuardados.length})` : ""}
+                  </>
+                )}
+              </button>
+            ))}
           </div>
+          <Button onClick={() => openListingForm()}>
+            <Plus size={15} /> Publicar anúncio
+          </Button>
         </div>
-      )}
 
-      <div ref={sentinelRef} className="h-px" />
-
-      {/* ───────── Barra sticky: tabs + categorias + ordenar + filtros ───────── */}
-      <div className={cn("sticky top-0 z-30 mt-6 transition-colors", stuck && "border-b border-line bg-bg/95 shadow-sm backdrop-blur-sm")}>
-        <div className="mx-auto max-w-6xl px-4 py-2 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-sm">
-              {(["anuncios", "investidores", "guardados"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors sm:px-5",
-                    tab === t ? "bg-gold text-sidebar" : "text-muted hover:text-ink"
-                  )}
-                >
-                  {t === "anuncios" ? (
-                    "Anúncios"
-                  ) : t === "investidores" ? (
-                    "Investidores"
-                  ) : (
-                    <>
-                      <Heart size={13} className={cn(tab === t && "fill-sidebar")} />
-                      Guardados{savedGuardados.length > 0 ? ` (${savedGuardados.length})` : ""}
-                    </>
-                  )}
-                </button>
-              ))}
-            </div>
-            <Button variant="gold" size="sm" onClick={() => openListingForm()}>
-              <Plus size={15} /> Publicar anúncio
-            </Button>
-          </div>
-
-          {tab === "anuncios" && (
-            <div className="mt-2.5 flex items-center gap-2">
+        {tab === "anuncios" && (
+          <>
+            {/* Categorias + filtros + ordenar */}
+            <div className="mt-6 flex items-center gap-2">
               <div className="flex flex-1 gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible">
-                <Chip ativo={categoria === "todas"} onClick={() => setCategoria("todas")}>
-                  Todas
-                </Chip>
+                <CatPill ativo={tiposFiltro.length === 0} onClick={() => setTiposFiltro([])}>Todas</CatPill>
                 {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
-                  <Chip key={t} ativo={categoria === t} onClick={() => setCategoria(t)}>
+                  <CatPill key={t} ativo={tiposFiltro.length === 1 && tiposFiltro[0] === t} onClick={() => setTiposFiltro([t])}>
                     {TYPE_LABEL_SHORT[t]}
-                  </Chip>
+                  </CatPill>
                 ))}
               </div>
+              <button
+                onClick={() => setDrawerOpen(true)}
+                className={cn(
+                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-sm",
+                  activeFilters > 0 ? "border-gold/40 bg-gold/10 text-gold-dark" : "border-line bg-card text-muted hover:bg-accent"
+                )}
+              >
+                <SlidersHorizontal size={14} /> Filtros{activeFilters > 0 ? ` · ${activeFilters}` : ""}
+              </button>
               <select
                 value={ordenar}
                 onChange={(e) => setOrdenar(e.target.value as Ordenar)}
@@ -435,174 +428,151 @@ export default function RedeInvestidores() {
                   <option key={o} value={o}>{ORDENAR_LABEL[o]}</option>
                 ))}
               </select>
-              <button
-                onClick={() => setDrawerOpen(true)}
-                className={cn(
-                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-sm",
-                  activeFilters > 0 ? "border-gold/40 bg-gold/10 text-gold-dark" : "border-line bg-card text-muted hover:bg-accent"
-                )}
-              >
-                <SlidersHorizontal size={14} /> Filtros{activeFilters > 0 ? ` · ${activeFilters}` : ""}
-              </button>
             </div>
-          )}
-        </div>
-      </div>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        {tab === "anuncios" ? (
-          <>
-            {/* Categorias de entrada — só na montra */}
-            {enabled && descoberta && (
-              <div className="mb-8">
-                <div className="grid gap-4 sm:grid-cols-3">
-                  {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
-                    <CategoriaCard key={t} tipo={t} count={contagemPorTipo(t)} onClick={() => escolherCategoria(t)} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Chips dos filtros ativos (removíveis) */}
-            {chipsAtivos.length > 0 && (
-              <div className="mb-4 flex flex-wrap items-center gap-1.5">
-                {chipsAtivos.map((c) => (
-                  <span key={c.label} className="inline-flex items-center gap-1 rounded bg-accent px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-muted">
-                    {c.label}
-                    <button onClick={c.clear} className="hover:text-ink" title="Remover filtro">
-                      <X size={11} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Fecham em breve */}
-            {enabled && fechamEmBreve.length > 0 && (
-              <div className="mb-8">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">
-                    <Hourglass size={14} className="text-warning" /> Fecham em breve
-                  </h2>
-                  <button onClick={() => { setOrdenar("fechar"); irParaGrelha(); }} className="text-xs font-medium text-secondary hover:underline">
-                    ver todos →
-                  </button>
-                </div>
-                <div className="flex gap-5 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3">
-                  {fechamEmBreve.map(({ l, dias, nInt }) => (
-                    <div key={l.id} className="relative w-[280px] shrink-0 sm:w-auto">
-                      <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning shadow-sm">
-                        {dias !== null && dias >= 0 && dias < 30 ? (
-                          <>
-                            <Hourglass size={11} /> {dias} {dias === 1 ? "dia" : "dias"}
-                          </>
-                        ) : (
-                          `${nInt} interessados`
-                        )}
-                      </span>
-                      <ListingCard listing={l} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Cabeçalho da grelha */}
-            <div ref={gridRef} className="mb-4 flex items-center gap-2 text-[13px] text-muted">
+            {/* Contexto de resultados + chips */}
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-muted">
               {enabled ? (
                 haFiltro ? (
                   <>
-                    {filtered.length} de {baseListings.length} oportunidades ·{" "}
-                    <button onClick={resetFiltros} className="font-medium text-secondary hover:underline">
-                      Limpar filtros
-                    </button>
+                    <span>{filtered.length} de {baseListings.length}</span>
+                    <button onClick={resetFiltros} className="font-medium text-primary hover:text-secondary">Limpar filtros</button>
                   </>
                 ) : (
-                  <span className="text-[13px] font-semibold uppercase tracking-[0.06em]">
-                    Todas as oportunidades <span className="font-normal normal-case text-muted">· {baseListings.length}</span>
-                  </span>
+                  <span>{baseListings.length} oportunidades</span>
                 )
               ) : (
-                "Sem dados de exemplo"
+                <span>Sem dados de exemplo</span>
               )}
+              {chipsAtivos.map((c) => (
+                <span key={c.label} className="inline-flex items-center gap-1 rounded bg-accent px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-muted">
+                  {c.label}
+                  <button onClick={c.clear} className="hover:text-ink" title="Remover filtro"><X size={11} /></button>
+                </span>
+              ))}
             </div>
 
-            {/* Grelha */}
             {!enabled ? (
-              <p className="rounded-2xl border border-dashed border-line bg-card/50 px-6 py-16 text-center text-sm text-muted">
+              <p className="mt-8 rounded-lg border border-dashed border-line bg-card/50 px-6 py-16 text-center text-sm text-muted">
                 Ative o toggle «Dados de exemplo» (no topo da app) para explorar a Rede, ou publique o primeiro anúncio.
               </p>
-            ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line bg-card/50 px-6 py-16 text-center">
-                <p className="text-sm text-muted">Nenhum anúncio corresponde aos filtros.</p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={resetFiltros}>
-                  Limpar filtros
-                </Button>
-              </div>
             ) : (
-              <>
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {filtered.slice(0, visiveis).map((l) => (
-                    <ListingCard key={l.id} listing={l} />
-                  ))}
-                </div>
-                {filtered.length > visiveis && (
-                  <div className="mt-6 flex justify-center">
-                    <Button variant="outline" onClick={() => setVisiveis((v) => v + 9)}>
-                      Carregar mais ({filtered.length - visiveis})
-                    </Button>
-                  </div>
+              <div className="mt-14 space-y-14">
+                {/* Fecham em breve */}
+                {descoberta && fechamEmBreve.length > 0 && (
+                  <section>
+                    <SectionHeader title="Fecham em breve" acao={{ label: "ver todos →", onClick: () => { setOrdenar("fechar"); irParaGrelha(); } }} />
+                    <Faixa>
+                      {fechamEmBreve.map(({ l, dias, nInt }) => (
+                        <div key={l.id} className="relative w-[300px] shrink-0 snap-start">
+                          <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning">
+                            {dias !== null && dias >= 0 && dias < 30 ? (
+                              <>{dias} {dias === 1 ? "dia" : "dias"}</>
+                            ) : (
+                              `${nInt} interessados`
+                            )}
+                          </span>
+                          <ListingCard listing={l} />
+                        </div>
+                      ))}
+                    </Faixa>
+                  </section>
                 )}
-              </>
-            )}
 
-            {/* Investidores em destaque — só na montra */}
-            {enabled && descoberta && destaqueInvestidores.length > 0 && (
-              <div className="mt-12">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">Investidores em destaque</h2>
-                  <button onClick={() => setTab("investidores")} className="text-xs font-medium text-secondary hover:underline">
-                    ver diretório →
-                  </button>
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {destaqueInvestidores.map((p) => (
-                    <InvestidorChip key={p.id} profile={p} anuncios={anunciosPorAutor.get(p.id) ?? 0} />
-                  ))}
-                </div>
-              </div>
-            )}
+                {/* Para o seu capital */}
+                {descoberta && paraOSeuCapital.length > 0 && bandaCapital && (
+                  <section>
+                    <SectionHeader
+                      title={`Para o seu capital · ${ALERT_CAPITAL_LABEL[bandaCapital]}`}
+                      acao={{ label: "ajustar →", onClick: () => setDrawerOpen(true) }}
+                    />
+                    <Faixa>
+                      {paraOSeuCapital.map((l) => (
+                        <div key={l.id} className="w-[300px] shrink-0 snap-start">
+                          <ListingCard listing={l} />
+                        </div>
+                      ))}
+                    </Faixa>
+                  </section>
+                )}
 
-            {/* Porquê a REDEGEST — banda de confiança (montra) */}
-            {descoberta && (
-              <div className="mt-12 grid gap-6 rounded-2xl border border-line bg-card p-6 sm:grid-cols-3 sm:p-8">
-                <ValorProp icon={ShieldCheck} titulo="Identidades verificadas" texto="Cada investidor com selo passou por verificação de identidade na plataforma." />
-                <ValorProp icon={MessageCircle} titulo="Contacto direto" texto="Fale diretamente com o dono do negócio — a morada exata é partilhada após o interesse." />
-                <ValorProp icon={Wallet} titulo="Sem comissões" texto="A REDEGEST liga capital a negócio. Sem intermediários, sem taxas de sucesso." />
-              </div>
-            )}
+                {/* Todas as oportunidades */}
+                <section ref={gridRef}>
+                  {descoberta && <SectionHeader title="Todas as oportunidades" />}
+                  {filtered.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-line bg-card/50 px-6 py-16 text-center">
+                      <Search size={20} className="mx-auto text-muted" />
+                      <p className="mt-3 text-sm text-ink">Nenhuma oportunidade com estes critérios.</p>
+                      <div className="mt-4 flex items-center justify-center gap-2">
+                        <Button variant="outline" size="sm" onClick={resetFiltros}>Limpar filtros</Button>
+                        <Button size="sm" onClick={() => setAlertaModal("criar")}>Criar alerta para estes critérios</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                        {filtered.slice(0, visiveis).map((l) => (
+                          <ListingCard key={l.id} listing={l} />
+                        ))}
+                      </div>
+                      {filtered.length > visiveis && (
+                        <div className="mt-12 flex justify-center">
+                          <Button variant="outline" onClick={() => setVisiveis((v) => v + 9)}>
+                            Carregar mais ({filtered.length - visiveis})
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
 
-            {/* CTA publicar — montra */}
-            {descoberta && (
-              <div className="relative mt-8 overflow-hidden rounded-2xl bg-gradient-to-br from-[#2E1A0E] via-[#5C3D2E] to-[#3a2417] px-6 py-8 text-sidebar-text sm:px-10">
-                <div className="azulejo absolute inset-0 opacity-[0.06]" />
-                <div className="relative flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-                  <div>
-                    <h3 className="text-xl font-semibold text-[#F9F1E2]">Tem um negócio imobiliário?</h3>
-                    <p className="mt-1 text-sm text-sidebar-text/75">Publique e encontre o capital certo — em minutos, sem comissões.</p>
-                  </div>
-                  <Button variant="gold" onClick={() => openListingForm()}>
-                    <Plus size={16} /> Publicar anúncio
-                  </Button>
-                </div>
+                {/* Investidores ativos */}
+                {descoberta && investidoresAtivos.length > 0 && (
+                  <section>
+                    <SectionHeader title="Investidores ativos" acao={{ label: "ver todos →", onClick: () => setTab("investidores") }} />
+                    <Faixa>
+                      {investidoresAtivos.map((p) => (
+                        <InvestidorMini key={p.id} profile={p} anuncios={anunciosPorAutor.get(p.id) ?? 0} />
+                      ))}
+                    </Faixa>
+                  </section>
+                )}
+
+                {/* Alertas de oportunidade */}
+                {descoberta && (
+                  <section>
+                    <div className="rounded-lg bg-accent px-6 py-8 text-center">
+                      <p className="text-lg font-semibold text-ink">Ainda não encontrou o negócio certo?</p>
+                      <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+                        Guarde os seus critérios e avisamos quando aparecer uma oportunidade que encaixa.
+                      </p>
+                      <div className="mt-4 flex items-center justify-center gap-4">
+                        <Button onClick={() => setAlertaModal("criar")}><BellPlus size={16} /> Criar alerta</Button>
+                        <button onClick={() => setAlertaModal("lista")} className="text-sm font-medium text-primary hover:text-secondary">
+                          Os meus alertas ({meusAlertas.length})
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {/* Como funciona — só utilizador novo */}
+                {descoberta && utilizadorNovo && (
+                  <section>
+                    <div className="grid gap-6 border-t border-line pt-8 sm:grid-cols-3">
+                      <ComoFunciona icon={<Search size={16} className="text-muted" />} titulo="Encontre" texto="Filtre por capital disponível e zona." />
+                      <ComoFunciona icon={<MessageCircle size={16} className="text-muted" />} titulo="Contacte" texto="Fale diretamente com o dono do negócio." />
+                      <ComoFunciona icon={<Handshake size={16} className="text-muted" />} titulo="Negoceie" texto="Sem intermediários, sem comissões." />
+                    </div>
+                  </section>
+                )}
               </div>
             )}
           </>
-        ) : tab === "investidores" ? (
-          <InvestidoresTab profiles={directoryProfiles} />
-        ) : (
-          <GuardadosTab listings={savedGuardados} enabled={enabled} />
         )}
+
+        {tab === "investidores" && <div className="mt-8"><InvestidoresTab profiles={directoryProfiles} /></div>}
+        {tab === "guardados" && <div className="mt-8"><GuardadosTab listings={savedGuardados} enabled={enabled} /></div>}
       </div>
 
       {/* Drawer de filtros */}
@@ -615,23 +585,18 @@ export default function RedeInvestidores() {
           >
             <div className="flex items-center justify-between border-b border-line px-5 py-4">
               <h2 className="text-base font-semibold text-ink">Filtros</h2>
-              <button onClick={() => setDrawerOpen(false)} className="text-muted hover:text-ink" aria-label="Fechar">
-                <X size={20} />
-              </button>
+              <button onClick={() => setDrawerOpen(false)} className="text-muted hover:text-ink" aria-label="Fechar"><X size={20} /></button>
             </div>
 
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
               <div>
-                <Label>Capital que posso investir</Label>
+                <DrawerLabel>Capital que posso investir</DrawerLabel>
                 <div className="flex flex-wrap gap-1.5">
-                  {CAPITAL_PILLS.map((c) => (
+                  {CAPITAL_PILLS.filter((c) => c.key !== "todos").map((c) => (
                     <button
                       key={c.key}
-                      onClick={() => setCapital(c.key)}
-                      className={cn(
-                        "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                        capital === c.key ? "border-primary bg-primary text-white" : "border-line text-muted hover:bg-accent"
-                      )}
+                      onClick={() => setCapital(capital === c.key ? "todos" : c.key)}
+                      className={cn("rounded-md border px-3 py-1.5 text-sm transition-colors", capital === c.key ? "border-primary bg-primary text-white" : "border-line text-muted hover:bg-accent")}
                     >
                       {c.label}
                     </button>
@@ -640,25 +605,21 @@ export default function RedeInvestidores() {
               </div>
 
               <div>
-                <Label>Onde</Label>
+                <DrawerLabel>Onde</DrawerLabel>
                 <div className="grid grid-cols-2 gap-2">
-                  <Select value={distrito} onChange={setDistrito}>
+                  <DrawerSelect value={distrito} onChange={setDistrito}>
                     <option value="todos">Distrito</option>
-                    {DISTRITOS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </Select>
-                  <Select value={cidade} onChange={setCidade}>
+                    {DISTRITOS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </DrawerSelect>
+                  <DrawerSelect value={cidade} onChange={setCidade}>
                     <option value="todos">Cidade</option>
-                    {CIDADES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </Select>
+                    {CIDADES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </DrawerSelect>
                 </div>
               </div>
 
               <div>
-                <Label>Retorno mínimo</Label>
+                <DrawerLabel>Retorno</DrawerLabel>
                 <div className="space-y-3 rounded-lg border border-line p-3">
                   <SliderRow label="ROI mínimo" value={roiMin} display={roiMin === 0 ? "Qualquer" : pct(roiMin, 0)} min={0} max={30} step={5} onChange={setRoiMin} />
                   <SliderRow label="Prazo máximo" value={prazoMax} display={prazoMax === 0 ? "Qualquer" : `${prazoMax} meses`} min={0} max={24} step={3} onChange={setPrazoMax} />
@@ -666,166 +627,371 @@ export default function RedeInvestidores() {
               </div>
 
               <div>
-                <Label>Estado</Label>
+                <DrawerLabel>Tipo de negócio</DrawerLabel>
                 <div className="space-y-1.5">
-                  {(["ativo", "financiado", "concluido"] as EstadoAnuncio[]).map((e) => (
-                    <label key={e} className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 text-sm text-ink hover:bg-accent/50">
-                      <input
-                        type="checkbox"
-                        checked={estados.includes(e)}
-                        onChange={() => toggleEstado(e)}
-                        className="h-4 w-4 rounded border-line"
-                        style={{ accentColor: "#5C3D2E" }}
-                      />
-                      {e === "concluido" ? "Concluído" : e === "financiado" ? "Financiado" : "Ativo"}
-                    </label>
+                  {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
+                    <Check key={t} checked={tiposFiltro.includes(t)} onChange={() => toggleTipoNegocio(t)}>{TYPE_LABEL_SHORT[t]}</Check>
                   ))}
                 </div>
               </div>
 
-              <details className="group">
-                <summary className="cursor-pointer text-[11px] font-medium uppercase tracking-wide text-muted hover:text-ink">
-                  Mais filtros
-                </summary>
-                <div className="mt-3 space-y-4">
-                  <div>
-                    <Label>Tipo de Cedência</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(Object.keys(TIPO_CEDENCIA_LABEL_SHORT) as TipoCedencia[]).map((t) => {
-                        const ativo = tiposCedencia.includes(t);
-                        return (
-                          <button
-                            key={t}
-                            onClick={() => toggleTipoCedencia(t)}
-                            className={cn(
-                              "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                              ativo ? "border-gold bg-gold text-sidebar" : "border-line text-muted hover:bg-accent"
-                            )}
-                          >
-                            {TIPO_CEDENCIA_LABEL_SHORT[t]}
-                          </button>
-                        );
-                      })}
-                    </div>
+              {tiposFiltro.includes("cedencia") && (
+                <div>
+                  <DrawerLabel>Tipo de cedência</DrawerLabel>
+                  <div className="space-y-1.5">
+                    {(Object.keys(TIPO_CEDENCIA_LABEL_SHORT) as TipoCedencia[]).map((t) => (
+                      <Check key={t} checked={tiposCedencia.includes(t)} onChange={() => toggleTipoCedencia(t)}>{TIPO_CEDENCIA_LABEL_SHORT[t]}</Check>
+                    ))}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label>Yield mínima</Label>
-                      <Select value={String(yieldMin)} onChange={(v) => setYieldMin(Number(v))}>
-                        {[0, 3, 4, 5, 6].map((v) => (
-                          <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>
-                        ))}
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Retorno s/ entrada</Label>
-                      <Select value={String(retEntradaMin)} onChange={(v) => setRetEntradaMin(Number(v))}>
-                        {[0, 5, 10, 12, 15, 18, 20, 25].map((v) => (
-                          <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>
-                        ))}
-                      </Select>
-                    </div>
+                </div>
+              )}
+
+              <div>
+                <DrawerLabel>Estado</DrawerLabel>
+                <div className="space-y-1.5">
+                  {(["ativo", "financiado", "concluido"] as EstadoAnuncio[]).map((e) => (
+                    <Check key={e} checked={estados.includes(e)} onChange={() => toggleEstado(e)}>
+                      {e === "concluido" ? "Concluído" : e === "financiado" ? "Financiado" : "Ativo"}
+                    </Check>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <DrawerLabel>Anunciante</DrawerLabel>
+                <Check checked={apenasVerificados} onChange={() => setApenasVerificados((v) => !v)}>Apenas investidores verificados</Check>
+              </div>
+
+              <details className="group">
+                <summary className="cursor-pointer text-[11px] font-medium uppercase tracking-wide text-muted hover:text-ink">Mais filtros</summary>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <DrawerLabel>Yield mínima</DrawerLabel>
+                    <DrawerSelect value={String(yieldMin)} onChange={(v) => setYieldMin(Number(v))}>
+                      {[0, 3, 4, 5, 6].map((v) => <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>)}
+                    </DrawerSelect>
+                  </div>
+                  <div>
+                    <DrawerLabel>Retorno s/ entrada</DrawerLabel>
+                    <DrawerSelect value={String(retEntradaMin)} onChange={(v) => setRetEntradaMin(Number(v))}>
+                      {[0, 5, 10, 12, 15, 18, 20, 25].map((v) => <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>)}
+                    </DrawerSelect>
                   </div>
                 </div>
               </details>
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-4">
-              <Button variant="ghost" onClick={resetFiltros}>
-                Limpar tudo
-              </Button>
+              <Button variant="ghost" onClick={resetFiltros}>Limpar tudo</Button>
               <Button onClick={() => setDrawerOpen(false)}>
-                Aplicar ({filtered.length} {filtered.length === 1 ? "resultado" : "resultados"})
+                Ver {filtered.length} {filtered.length === 1 ? "oportunidade" : "oportunidades"}
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Alertas de oportunidade */}
+      {alertaModal && (
+        <AlertasModal
+          modo={alertaModal}
+          criteriosAtuais={criteriosAtuais}
+          nomeSugerido={sugerirNomeAlerta(criteriosAtuais)}
+          listings={baseListings}
+          onClose={() => setAlertaModal(null)}
+          onTrocarModo={setAlertaModal}
+        />
+      )}
     </div>
   );
 }
 
-// ───────────────────────── Peças da montra ─────────────────────────
+// ───────────────────────── Peças de layout ─────────────────────────
 
-function EstatItem({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value: string }) {
+function SectionHeader({ title, acao }: { title: string; acao?: { label: string; onClick: () => void } }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-secondary">
-        <Icon size={18} />
-      </span>
-      <div className="min-w-0">
-        <p className="num text-xl font-semibold leading-tight text-ink">{value}</p>
-        <p className="truncate text-[11px] font-medium uppercase tracking-[0.04em] text-muted">{label}</p>
+    <div className="mb-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-muted">{title}</h2>
+        {acao && (
+          <button onClick={acao.onClick} className="shrink-0 text-[13px] text-primary transition-colors hover:text-secondary">
+            {acao.label}
+          </button>
+        )}
       </div>
+      <div className="mt-2 border-b border-line" />
     </div>
   );
 }
 
-function CategoriaCard({ tipo, count, onClick }: { tipo: ListingType; count: number; onClick: () => void }) {
-  const Icon = CATEGORIA_ICON[tipo];
+/** Faixa horizontal com scroll suave, snap e setas discretas (só desktop, no hover). */
+function Faixa({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const scroll = (dir: number) => ref.current?.scrollBy({ left: dir * 320, behavior: "smooth" });
   return (
-    <button onClick={onClick} className="group relative h-36 overflow-hidden rounded-2xl border border-line text-left">
-      <img src={CATEGORIA_IMG[tipo]} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-      <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/45 to-ink/15" />
-      <div className="relative flex h-full flex-col justify-between p-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white backdrop-blur-sm">
-          <Icon size={18} />
-        </span>
-        <div>
-          <div className="flex items-center justify-between">
-            <p className="font-semibold text-white">{TYPE_LABEL_SHORT[tipo]}</p>
-            <span className="num rounded-full bg-gold/90 px-2 py-0.5 text-[11px] font-bold text-sidebar">{count}</span>
-          </div>
-          <p className="mt-0.5 line-clamp-1 text-[12px] text-white/75">{CATEGORIA_DESC[tipo]}</p>
-        </div>
+    <div className="group relative">
+      <div
+        ref={ref}
+        className="flex snap-x gap-5 overflow-x-auto scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {children}
       </div>
+      <button
+        onClick={() => scroll(-1)}
+        className="absolute -left-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-line bg-card text-muted opacity-0 shadow-sm transition-opacity hover:text-ink group-hover:opacity-100 lg:flex"
+        aria-label="Anterior"
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <button
+        onClick={() => scroll(1)}
+        className="absolute -right-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-line bg-card text-muted opacity-0 shadow-sm transition-opacity hover:text-ink group-hover:opacity-100 lg:flex"
+        aria-label="Seguinte"
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+}
+
+function CatPill({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "shrink-0 rounded-full border px-3.5 py-2 text-[13px] font-medium transition-colors",
+        ativo ? "border-primary bg-primary text-white" : "border-line bg-card text-muted hover:bg-accent"
+      )}
+    >
+      {children}
     </button>
   );
 }
 
-function InvestidorChip({ profile, anuncios }: { profile: Profile; anuncios: number }) {
+function InvestidorMini({ profile, anuncios }: { profile: Profile; anuncios: number }) {
   const initials = profile.fullName.split(" ").map((p) => p[0]).join("").slice(0, 2);
   return (
-    <Link
-      to={`/comunidade/rede/${profile.id}`}
-      className="flex w-[220px] shrink-0 items-center gap-3 rounded-xl border border-line bg-card p-3 transition-shadow hover:shadow-md"
-    >
-      <div className={cn("h-11 w-11 shrink-0 overflow-hidden rounded-full", profile.isVerified && "ring-2 ring-gold ring-offset-1 ring-offset-card")}>
+    <div className="flex w-[200px] shrink-0 snap-start flex-col items-center rounded-lg border border-line bg-card p-4 text-center">
+      <div className={cn("h-12 w-12 overflow-hidden rounded-full", profile.isVerified && "ring-2 ring-gold ring-offset-1 ring-offset-card")}>
         {profile.avatarUrl ? (
           <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-secondary text-xs font-semibold text-white">{initials}</div>
+          <div className="flex h-full w-full items-center justify-center bg-secondary text-sm font-semibold text-white">{initials}</div>
         )}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1 truncate text-sm font-medium text-ink">
-          {profile.fullName}
-          {profile.isVerified && <BadgeCheck size={13} className="shrink-0 text-gold-dark" />}
-        </p>
-        <p className="flex items-center gap-1 text-[11px] text-muted">
-          {profile.numAvaliacoes > 0 ? (
-            <>
-              <Star size={10} className="fill-gold text-gold" /> {profile.rating.toFixed(1)} · {anuncios} {anuncios === 1 ? "anúncio" : "anúncios"}
-            </>
-          ) : (
-            `${anuncios} ${anuncios === 1 ? "anúncio" : "anúncios"}`
-          )}
-        </p>
-      </div>
-      <ArrowRight size={15} className="shrink-0 text-muted" />
-    </Link>
+      <p className="mt-2 flex items-center gap-1 text-sm font-semibold text-ink">
+        {profile.fullName}
+        {profile.isVerified && <BadgeCheck size={13} className="text-gold-dark" />}
+      </p>
+      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+        {profile.projetosConcluidos} projetos{profile.numAvaliacoes > 0 && <> · <Star size={10} className="fill-gold text-gold" /> {profile.rating.toFixed(1)}</>}
+      </p>
+      <p className="text-xs text-muted">{anuncios} {anuncios === 1 ? "anúncio ativo" : "anúncios ativos"}</p>
+      <Link to={`/comunidade/rede/${profile.id}`} className="mt-3 w-full rounded-md border border-line bg-card py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-accent">
+        Ver perfil
+      </Link>
+    </div>
   );
 }
 
-function ValorProp({ icon: Icon, titulo, texto }: { icon: typeof ShieldCheck; titulo: string; texto: string }) {
+function ComoFunciona({ icon, titulo, texto }: { icon: React.ReactNode; titulo: string; texto: string }) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-gold-dark">
-        <Icon size={18} />
-      </span>
-      <div>
-        <p className="text-sm font-semibold text-ink">{titulo}</p>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{texto}</p>
+    <div>
+      <span className="mb-1.5 block">{icon}</span>
+      <p className="text-sm font-semibold text-ink">{titulo}</p>
+      <p className="mt-0.5 text-[13px] text-muted">{texto}</p>
+    </div>
+  );
+}
+
+// ───────────────────────── Alertas ─────────────────────────
+
+function sugerirNomeAlerta(c: AlertCriterios): string {
+  const partes: string[] = [];
+  if (c.tipos.length === 1) partes.push(TYPE_LABEL_SHORT[c.tipos[0]]);
+  else partes.push("Oportunidades");
+  if (c.capital !== "todos") partes.push(ALERT_CAPITAL_LABEL[c.capital].toLowerCase());
+  if (c.distrito !== "todos") partes.push(`em ${c.distrito}`);
+  if (c.roiMin > 0) partes.push(`ROI ≥ ${c.roiMin}%`);
+  return partes.join(" · ");
+}
+
+function resumoCriterios(c: AlertCriterios): string[] {
+  const out: string[] = [];
+  out.push(c.tipos.length === 0 ? "Qualquer tipo" : c.tipos.map((t) => TYPE_LABEL_SHORT[t]).join(", "));
+  if (c.capital !== "todos") out.push(ALERT_CAPITAL_LABEL[c.capital]);
+  if (c.distrito !== "todos") out.push(c.distrito);
+  if (c.cidade !== "todos") out.push(c.cidade);
+  if (c.roiMin > 0) out.push(`ROI ≥ ${c.roiMin}%`);
+  return out;
+}
+
+function AlertasModal({
+  modo,
+  criteriosAtuais,
+  nomeSugerido,
+  listings,
+  onClose,
+  onTrocarModo,
+}: {
+  modo: "criar" | "lista";
+  criteriosAtuais: AlertCriterios;
+  nomeSugerido: string;
+  listings: Listing[];
+  onClose: () => void;
+  onTrocarModo: (m: "criar" | "lista") => void;
+}) {
+  const add = useAlertsStore((s) => s.add);
+  const update = useAlertsStore((s) => s.update);
+  const toggle = useAlertsStore((s) => s.toggle);
+  const remove = useAlertsStore((s) => s.remove);
+  const meus = useAlertsStore((s) => s.alertas.filter((a) => a.userId === CURRENT_USER_ID));
+
+  const [editando, setEditando] = useState<Alerta | null>(null);
+  const criteriosBase = editando ? editando.criterios : criteriosAtuais;
+  const [nome, setNome] = useState(editando ? editando.nome : nomeSugerido);
+  const [crit, setCrit] = useState<AlertCriterios>(criteriosBase);
+
+  const contar = (c: AlertCriterios) => listings.filter((l) => alertaMatch(l, c)).length;
+
+  const abrirEdicao = (a: Alerta) => {
+    setEditando(a);
+    setNome(a.nome);
+    setCrit(a.criterios);
+    onTrocarModo("criar");
+  };
+
+  const guardar = () => {
+    if (editando) {
+      update(editando.id, { nome, criterios: crit });
+      toast.success("Alerta atualizado");
+    } else {
+      add(nome, crit);
+      toast.success("Alerta criado", { description: `${contar(crit)} anúncios cumprem agora os critérios.` });
+    }
+    onTrocarModo("lista");
+    setEditando(null);
+  };
+
+  const toggleTipo = (t: ListingType) =>
+    setCrit((c) => ({ ...c, tipos: c.tipos.includes(t) ? c.tipos.filter((x) => x !== t) : [...c.tipos, t] }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h2 className="text-base font-semibold text-ink">{modo === "criar" ? (editando ? "Editar alerta" : "Criar alerta") : "Os meus alertas"}</h2>
+          <button onClick={onClose} className="text-muted hover:text-ink"><X size={20} /></button>
+        </div>
+
+        {modo === "criar" ? (
+          <>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted">Nome do alerta</span>
+                <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Cedência até 50k no Porto" className="h-10 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-secondary" />
+              </label>
+
+              <div>
+                <DrawerLabel>Tipo de negócio</DrawerLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
+                    <button key={t} onClick={() => toggleTipo(t)} className={cn("rounded-md border px-3 py-1.5 text-sm transition-colors", crit.tipos.includes(t) ? "border-primary bg-primary text-white" : "border-line text-muted hover:bg-accent")}>
+                      {TYPE_LABEL_SHORT[t]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <DrawerLabel>Capital</DrawerLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(ALERT_CAPITAL_LABEL) as AlertCapital[]).map((k) => (
+                    <button key={k} onClick={() => setCrit((c) => ({ ...c, capital: k }))} className={cn("rounded-md border px-3 py-1.5 text-sm transition-colors", crit.capital === k ? "border-primary bg-primary text-white" : "border-line text-muted hover:bg-accent")}>
+                      {k === "todos" ? "Qualquer" : ALERT_CAPITAL_LABEL[k]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <DrawerLabel>Zona</DrawerLabel>
+                <div className="grid grid-cols-2 gap-2">
+                  <DrawerSelect value={crit.distrito} onChange={(v) => setCrit((c) => ({ ...c, distrito: v }))}>
+                    <option value="todos">Distrito</option>
+                    {DISTRITOS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </DrawerSelect>
+                  <DrawerSelect value={crit.cidade} onChange={(v) => setCrit((c) => ({ ...c, cidade: v }))}>
+                    <option value="todos">Cidade</option>
+                    {CIDADES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </DrawerSelect>
+                </div>
+              </div>
+
+              <div>
+                <DrawerLabel>ROI mínimo</DrawerLabel>
+                <DrawerSelect value={String(crit.roiMin)} onChange={(v) => setCrit((c) => ({ ...c, roiMin: Number(v) }))}>
+                  {[0, 5, 10, 15, 20, 25, 30].map((v) => <option key={v} value={v}>{v === 0 ? "Qualquer" : `≥ ${v}%`}</option>)}
+                </DrawerSelect>
+              </div>
+
+              <p className="rounded-md bg-accent px-3 py-2 text-[13px] text-muted">
+                <span className="num font-semibold text-ink">{contar(crit)}</span> anúncios cumprem agora estes critérios.
+              </p>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-4">
+              <Button variant="ghost" onClick={() => (meus.length > 0 ? onTrocarModo("lista") : onClose())}>
+                {meus.length > 0 ? "Ver alertas" : "Cancelar"}
+              </Button>
+              <Button onClick={guardar}>{editando ? "Guardar alterações" : "Criar alerta"}</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-5">
+              {meus.length === 0 ? (
+                <div className="py-10 text-center">
+                  <Bell size={22} className="mx-auto text-muted" />
+                  <p className="mt-2 text-sm text-ink">Ainda não tem alertas.</p>
+                </div>
+              ) : (
+                meus.map((a) => (
+                  <div key={a.id} className={cn("rounded-lg border border-line p-3", !a.ativo && "opacity-60")}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                          {a.nome}
+                          {!a.ativo && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted">Em pausa</span>}
+                        </p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {resumoCriterios(a.criterios).map((r) => (
+                            <span key={r} className="rounded bg-accent px-1.5 py-0.5 text-[11px] text-muted">{r}</span>
+                          ))}
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-muted">
+                          <span className="num font-medium text-ink">{contar(a.criterios)}</span> anúncios cumprem
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button onClick={() => toggle(a.id)} className="rounded-md p-1.5 text-muted hover:bg-accent hover:text-ink" title={a.ativo ? "Pausar" : "Retomar"}>
+                          {a.ativo ? <Pause size={15} /> : <Play size={15} />}
+                        </button>
+                        <button onClick={() => abrirEdicao(a)} className="rounded-md p-1.5 text-muted hover:bg-accent hover:text-ink" title="Editar"><Pencil size={15} /></button>
+                        <button onClick={() => { remove(a.id); toast.success("Alerta eliminado"); }} className="rounded-md p-1.5 text-muted hover:bg-danger/10 hover:text-danger" title="Eliminar"><Trash2 size={15} /></button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-4">
+              <Button variant="ghost" onClick={onClose}>Fechar</Button>
+              <Button onClick={() => { setEditando(null); setNome(nomeSugerido); setCrit(criteriosAtuais); onTrocarModo("criar"); }}>
+                <BellPlus size={16} /> Novo alerta
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -839,7 +1005,7 @@ function GuardadosTab({ listings, enabled }: { listings: ReturnType<typeof useLi
 
   if (!enabled) {
     return (
-      <p className="rounded-2xl border border-dashed border-line bg-card/50 px-6 py-16 text-center text-sm text-muted">
+      <p className="rounded-lg border border-dashed border-line bg-card/50 px-6 py-16 text-center text-sm text-muted">
         Ative o toggle «Dados de exemplo» para explorar os guardados.
       </p>
     );
@@ -847,12 +1013,10 @@ function GuardadosTab({ listings, enabled }: { listings: ReturnType<typeof useLi
 
   if (listings.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-gold/30 bg-card/50 px-6 py-16 text-center">
-        <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gold/10 text-gold-dark">
-          <Heart size={22} />
-        </span>
-        <p className="font-display text-lg font-semibold text-ink">Ainda não guardou anúncios.</p>
-        <p className="mt-1 text-sm text-muted">Toque no ♥ para criar a sua shortlist.</p>
+      <div className="rounded-lg border border-dashed border-line bg-card/50 px-6 py-16 text-center">
+        <Heart size={22} className="mx-auto text-muted" />
+        <p className="mt-2 font-semibold text-ink">Ainda não guardou anúncios.</p>
+        <p className="mt-1 text-sm text-muted">Toque no coração de um anúncio para criar a sua shortlist.</p>
       </div>
     );
   }
@@ -860,88 +1024,52 @@ function GuardadosTab({ listings, enabled }: { listings: ReturnType<typeof useLi
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Chip ativo={tipo === "todas"} onClick={() => setTipo("todas")}>Todas</Chip>
+        <CatPill ativo={tipo === "todas"} onClick={() => setTipo("todas")}>Todas</CatPill>
         {(Object.keys(TYPE_LABEL_SHORT) as ListingType[]).map((t) => (
-          <Chip key={t} ativo={tipo === t} onClick={() => setTipo(t)}>
-            {TYPE_LABEL_SHORT[t]}
-          </Chip>
+          <CatPill key={t} ativo={tipo === t} onClick={() => setTipo(t)}>{TYPE_LABEL_SHORT[t]}</CatPill>
         ))}
         <span className="ml-auto text-sm text-muted">
           {filtrados.length} {filtrados.length === 1 ? "guardado" : "guardados"} · privado, só você vê
         </span>
       </div>
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {filtrados.map((l) => (
-          <ListingCard key={l.id} listing={l} />
-        ))}
+        {filtrados.map((l) => <ListingCard key={l.id} listing={l} />)}
       </div>
     </>
   );
 }
 
-function Chip({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
-        ativo ? "bg-primary text-white" : "border border-line bg-card text-muted hover:bg-accent"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
+// ───────────────────────── Drawer helpers ─────────────────────────
 
-function Label({ children }: { children: React.ReactNode }) {
+function DrawerLabel({ children }: { children: React.ReactNode }) {
   return <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">{children}</p>;
 }
 
-function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
+function DrawerSelect({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-secondary"
-    >
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="h-9 w-full rounded-md border border-line bg-card px-3 text-sm outline-none focus:border-secondary">
       {children}
     </select>
   );
 }
 
-function SliderRow({
-  label,
-  value,
-  display,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  display: string;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-}) {
+function Check({ checked, onChange, children }: { checked: boolean; onChange: () => void; children: React.ReactNode }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 text-sm text-ink hover:bg-accent/50">
+      <input type="checkbox" checked={checked} onChange={onChange} className="h-4 w-4 rounded border-line" style={{ accentColor: "#5C3D2E" }} />
+      {children}
+    </label>
+  );
+}
+
+function SliderRow({ label, value, display, min, max, step, onChange }: { label: string; value: number; display: string; min: number; max: number; step: number; onChange: (v: number) => void }) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
         <span className="text-muted">{label}</span>
         <span className="num font-semibold text-ink">{display}</span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full"
-        style={{ accentColor: "#5C3D2E" }}
-      />
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full" style={{ accentColor: "#5C3D2E" }} />
     </div>
   );
 }
@@ -962,16 +1090,10 @@ function InvestidoresTab({ profiles }: { profiles: Profile[] }) {
       <div className="mb-5 flex items-center justify-between">
         <p className="text-sm text-muted">{profiles.length} investidores na rede</p>
         <div className="inline-flex rounded-lg border border-line bg-card p-0.5">
-          <button
-            onClick={() => setVista("grid")}
-            className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm", vista === "grid" ? "bg-primary text-white" : "text-muted")}
-          >
+          <button onClick={() => setVista("grid")} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm", vista === "grid" ? "bg-primary text-white" : "text-muted")}>
             <LayoutGrid size={14} /> Grelha
           </button>
-          <button
-            onClick={() => setVista("mapa")}
-            className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm", vista === "mapa" ? "bg-primary text-white" : "text-muted")}
-          >
+          <button onClick={() => setVista("mapa")} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm", vista === "mapa" ? "bg-primary text-white" : "text-muted")}>
             <MapIcon size={14} /> Mapa
           </button>
         </div>
@@ -979,9 +1101,7 @@ function InvestidoresTab({ profiles }: { profiles: Profile[] }) {
 
       {vista === "grid" ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {profiles.map((p) => (
-            <InvestidorCard key={p.id} profile={p} anunciosAtivos={activosPorAutor.get(p.id) ?? 0} />
-          ))}
+          {profiles.map((p) => <InvestidorCard key={p.id} profile={p} anunciosAtivos={activosPorAutor.get(p.id) ?? 0} />)}
         </div>
       ) : (
         <MapaInvestidores profiles={profiles} activosPorAutor={activosPorAutor} />
@@ -992,10 +1112,7 @@ function InvestidoresTab({ profiles }: { profiles: Profile[] }) {
 
 function InvestidorCard({ profile, anunciosAtivos }: { profile: Profile; anunciosAtivos: number }) {
   return (
-    <Link
-      to={`/comunidade/rede/${profile.id}`}
-      className="group overflow-hidden rounded-2xl border border-line bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
-    >
+    <Link to={`/comunidade/rede/${profile.id}`} className="group overflow-hidden rounded-2xl border border-line bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
       <div className="relative h-24 bg-gradient-to-br from-[#8B5E3C] to-[#5C3D2E]">
         {profile.coverUrl && <img src={profile.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />}
         <div className="azulejo absolute inset-0 opacity-[0.08]" />
@@ -1018,22 +1135,10 @@ function InvestidorCard({ profile, anunciosAtivos }: { profile: Profile; anuncio
           {profile.isVerified && <BadgeCheck size={15} className="text-gold-dark" />}
         </h3>
         <p className="line-clamp-1 text-xs text-muted">{profile.tagline}</p>
-
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line/60 pt-3 text-center">
           <Stat label="Anúncios" value={String(anunciosAtivos)} />
           <Stat label="Projetos" value={String(profile.projetosConcluidos)} />
-          <Stat
-            label="Rating"
-            value={
-              profile.numAvaliacoes > 0 ? (
-                <span className="inline-flex items-center gap-0.5">
-                  <Star size={11} className="fill-gold text-gold" /> {profile.rating.toFixed(1)}
-                </span>
-              ) : (
-                "—"
-              )
-            }
-          />
+          <Stat label="Rating" value={profile.numAvaliacoes > 0 ? <span className="inline-flex items-center gap-0.5"><Star size={11} className="fill-gold text-gold" /> {profile.rating.toFixed(1)}</span> : "—"} />
         </div>
       </div>
     </Link>
@@ -1049,13 +1154,7 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function MapaInvestidores({
-  profiles,
-  activosPorAutor,
-}: {
-  profiles: Profile[];
-  activosPorAutor: Map<string, number>;
-}) {
+function MapaInvestidores({ profiles, activosPorAutor }: { profiles: Profile[]; activosPorAutor: Map<string, number> }) {
   const porDistrito = useMemo(() => {
     const m = new Map<string, Profile[]>();
     for (const p of profiles) {
@@ -1067,7 +1166,7 @@ function MapaInvestidores({
   }, [profiles]);
 
   return (
-    <div className="rounded-2xl border border-line bg-gradient-to-br from-[#FDF8F0] to-[#F5ECD7] p-6">
+    <div className="rounded-2xl border border-line bg-card p-6">
       <p className="mb-4 flex items-center gap-2 text-sm text-muted">
         <MapIcon size={15} /> Clusters por região · {profiles.length} investidores
       </p>
@@ -1076,17 +1175,11 @@ function MapaInvestidores({
           <div key={cidade} className="rounded-xl border border-line bg-card p-4">
             <div className="mb-2 flex items-center justify-between">
               <h4 className="font-display text-base font-semibold text-ink">{cidade}</h4>
-              <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-gold/15 px-2 text-sm font-bold text-gold-dark">
-                {ps.length}
-              </span>
+              <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-gold/15 px-2 text-sm font-bold text-gold-dark">{ps.length}</span>
             </div>
             <div className="space-y-1.5">
               {ps.map((p) => (
-                <Link
-                  key={p.id}
-                  to={`/comunidade/rede/${p.id}`}
-                  className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-bg"
-                >
+                <Link key={p.id} to={`/comunidade/rede/${p.id}`} className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-bg">
                   <div className={cn("h-7 w-7 overflow-hidden rounded-full", p.isVerified && "ring-1 ring-gold")}>
                     {p.avatarUrl ? (
                       <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />

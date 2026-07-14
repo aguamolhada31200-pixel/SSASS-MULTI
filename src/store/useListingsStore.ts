@@ -226,7 +226,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     savedCount: 47,
     contactPreference: "mensagem",
     visibility: "verified",
-    createdAt: "2026-06-02",
+    createdAt: emDias(-2), // recente — alimenta "novas esta semana"
     tipoCedencia: "cpcv",
     valorImovel: 210000,
     valorNegociado: 10000,
@@ -266,7 +266,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     savedCount: 26,
     contactPreference: "mensagem",
     visibility: "public",
-    createdAt: "2026-06-04",
+    createdAt: emDias(-4), // recente — alimenta "novas esta semana"
     tipoCedencia: "cpcv",
     valorImovel: 158000,
     valorNegociado: 8000,
@@ -511,7 +511,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     savedCount: 8,
     contactPreference: "telefone",
     visibility: "public",
-    createdAt: "2026-06-08",
+    createdAt: emDias(-1), // recente — alimenta "novas esta semana"
     tipoCedencia: "obra_iniciada",
     valorImovel: 135000,
     valorNegociado: 5000,
@@ -552,7 +552,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     savedCount: 33,
     contactPreference: "mensagem",
     visibility: "public",
-    createdAt: "2026-06-05",
+    createdAt: emDias(-5), // recente — alimenta "novas esta semana"
     precoImovel: 185000,
     capitalNecessario: 45000,
     yieldLiquido: 4.3,
@@ -659,7 +659,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     savedCount: 4,
     contactPreference: "mensagem",
     visibility: "public",
-    createdAt: "2026-06-09",
+    createdAt: emDias(-3), // recente — alimenta "novas esta semana"
     valorImovel: 95000,
     valorNegociado: 5000,
     orcamentoObras: 35000,
@@ -701,7 +701,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     savedCount: 12,
     contactPreference: "mensagem",
     visibility: "public",
-    createdAt: "2026-06-18",
+    createdAt: emDias(-6), // recente — alimenta "novas esta semana"
     precoImovel: 210000,
     capitalNecessario: 55000,
     yieldLiquido: 4.6,
@@ -768,7 +768,7 @@ export const useListingsStore = create<ListingsState>()(
     }),
     {
       name: "redegest-listings",
-      version: 10,
+      version: 11,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { listings?: Listing[] } | undefined;
         if (state?.listings && version < 5) {
@@ -778,11 +778,12 @@ export const useListingsStore = create<ListingsState>()(
             galleryUrls: normalizeListingPhotos(l.galleryUrls as unknown),
           }));
         }
-        if (state?.listings && version < 10) {
+        if (state?.listings && version < 11) {
           // v6: cedência com/sem obras. v7: anúncio do utilizador (vista autor).
           // v8: reabilitação — valorMercadoAtual/PosObras, impostos consolidados, prazoObras.
           // v9: tipo de imóvel nas cedências que faltavam (Belém, Boavista, Areeiro, Aveiro).
           // v10: términos de CPCV dinâmicos (4/9/12 dias) — faixa "Fecham em breve".
+          // v11: 6 anúncios com createdAt recente — linha "novas esta semana".
           // Refresca os seeds mantendo anúncios criados pelo utilizador.
           const seedIds = new Set(SEED.map((l) => l.id));
           const userListings = state.listings.filter((l) => !seedIds.has(l.id));
