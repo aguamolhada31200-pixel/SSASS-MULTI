@@ -34,6 +34,7 @@ import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ChartCard } from "@/components/ui/chart-card";
 import { Badge } from "@/components/ui/Badge";
 import { useExampleData } from "@/store/useExampleData";
 import { useModalStore } from "@/store/useModalStore";
@@ -303,9 +304,7 @@ export default function Contabilidade() {
 
           {/* Gráficos */}
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            <Card className="lg:col-span-2">
-              <CardContent>
-                <h3 className="mb-3 font-display text-base font-semibold text-ink">Receitas vs Despesas — 2026</h3>
+            <ChartCard title="Receitas vs Despesas — 2026" className="lg:col-span-2">
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={serieMensal} barGap={4}>
                     <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -323,12 +322,9 @@ export default function Contabilidade() {
                     <Bar dataKey="Despesa" fill="#9B3A2A" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            </ChartCard>
 
-            <Card>
-              <CardContent>
-                <h3 className="mb-3 font-display text-base font-semibold text-ink">Despesas por categoria</h3>
+            <ChartCard title="Despesas por categoria">
                 {donutDespesas.length === 0 ? (
                   <p className="py-12 text-center text-sm text-muted">Sem despesas no período.</p>
                 ) : (
@@ -356,8 +352,7 @@ export default function Contabilidade() {
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
+            </ChartCard>
           </div>
 
           {/* Tabela / cards */}

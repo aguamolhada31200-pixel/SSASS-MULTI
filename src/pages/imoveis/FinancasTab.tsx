@@ -33,6 +33,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ChartCard } from "@/components/ui/chart-card";
 import { EmptyState } from "@/components/EmptyState";
 import { useExampleData } from "@/store/useExampleData";
 import { useModalStore } from "@/store/useModalStore";
@@ -319,11 +320,7 @@ export function FinancasTab({ property }: { property: Property }) {
 
       {/* Gráficos */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardContent>
-            <h3 className="mb-3 font-display text-base font-semibold text-ink">
-              Receitas vs Despesas
-            </h3>
+        <ChartCard title="Receitas vs Despesas" className="lg:col-span-2">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={serieMensal} barGap={4}>
                 <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -335,12 +332,9 @@ export function FinancasTab({ property }: { property: Property }) {
                 <Bar dataKey="Despesa" fill="#9B3A2A" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </ChartCard>
 
-        <Card>
-          <CardContent>
-            <h3 className="mb-3 font-display text-base font-semibold text-ink">Onde vai o dinheiro</h3>
+        <ChartCard title="Onde vai o dinheiro">
             {donutDespesas.length === 0 ? (
               <p className="py-12 text-center text-sm text-muted">Sem despesas no período.</p>
             ) : (
@@ -368,12 +362,9 @@ export function FinancasTab({ property }: { property: Property }) {
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
+        </ChartCard>
 
-        <Card className="lg:col-span-3">
-          <CardContent>
-            <h3 className="mb-3 font-display text-base font-semibold text-ink">Evolução do cashflow</h3>
+        <ChartCard title="Evolução do cashflow" className="lg:col-span-3">
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={evolCashflow}>
                 <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -385,8 +376,7 @@ export function FinancasTab({ property }: { property: Property }) {
                 <Line type="monotone" dataKey="Acumulado" stroke="#5C3D2E" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </ChartCard>
       </div>
 
       {/* Desempenho como investimento */}

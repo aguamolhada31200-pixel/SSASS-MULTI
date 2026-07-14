@@ -31,6 +31,7 @@ import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ChartCard } from "@/components/ui/chart-card";
 import { useExampleData } from "@/store/useExampleData";
 import { useModalStore } from "@/store/useModalStore";
 import { usePropertiesStore, type Property } from "@/store/usePropertiesStore";
@@ -331,14 +332,15 @@ export default function Dashboard() {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {/* Gráfico receita vs despesa */}
-        <Card className="lg:col-span-2">
-          <CardContent>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-display text-lg font-semibold text-ink">Receitas vs Despesas · {new Date().getFullYear()}</h3>
-              <Link to="/financas/contabilidade" className="text-sm text-secondary hover:underline">
-                Ver contabilidade →
-              </Link>
-            </div>
+        <ChartCard
+          title={`Receitas vs Despesas · ${new Date().getFullYear()}`}
+          className="lg:col-span-2"
+          action={
+            <Link to="/financas/contabilidade" className="text-sm text-secondary hover:underline">
+              Ver contabilidade →
+            </Link>
+          }
+        >
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={fluxoMensal} barGap={4}>
                 <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -349,8 +351,7 @@ export default function Dashboard() {
                 <Bar dataKey="despesa" name="Despesa" fill="#E8D5BE" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </ChartCard>
 
         {/* Alertas — derivados da carteira */}
         <Card>
@@ -410,9 +411,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Donut ocupação */}
-        <Card>
-          <CardContent className="flex flex-col items-center">
-            <h3 className="mb-2 self-start font-display text-lg font-semibold text-ink">Ocupação</h3>
+        <ChartCard title="Ocupação" contentClassName="flex flex-col items-center">
             <div className="relative">
               <ResponsiveContainer width={180} height={180}>
                 <PieChart>
@@ -431,8 +430,7 @@ export default function Dashboard() {
             <Link to="/imoveis" className="mt-2 text-sm text-secondary hover:underline">
               Ver imóveis <ArrowRight size={13} className="inline" />
             </Link>
-          </CardContent>
-        </Card>
+        </ChartCard>
       </div>
     </>
   );

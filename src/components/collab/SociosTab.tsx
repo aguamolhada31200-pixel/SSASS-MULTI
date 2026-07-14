@@ -14,6 +14,7 @@ import {
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ChartCard } from "@/components/ui/chart-card";
 import {
   useCollabStore,
   podeGerir,
@@ -117,21 +118,21 @@ export function SociosTab({ project: p }: { project: CollabProject }) {
   return (
     <div className="mt-5 space-y-5">
       {/* Donut + ações */}
-      <Card>
-        <CardContent>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <CollabSH title="Distribuição de percentagens" />
-            {gestor && (
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => setRedeOpen(true)}>
-                  <Network size={14} /> Convidar da Rede
-                </Button>
-                <Button size="sm" variant="gold" onClick={() => setInviteOpen(true)}>
-                  <UserPlus size={14} /> Convidar sócio
-                </Button>
-              </div>
-            )}
-          </div>
+      <ChartCard
+        title="Distribuição de percentagens"
+        action={
+          gestor ? (
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => setRedeOpen(true)}>
+                <Network size={14} /> Convidar da Rede
+              </Button>
+              <Button size="sm" variant="gold" onClick={() => setInviteOpen(true)}>
+                <UserPlus size={14} /> Convidar sócio
+              </Button>
+            </div>
+          ) : undefined
+        }
+      >
           <div className="flex flex-col items-center gap-5 sm:flex-row">
             <PieChart width={180} height={180}>
               <Pie data={donut} dataKey="value" innerRadius={52} outerRadius={82} stroke="none" paddingAngle={2}>
@@ -153,8 +154,7 @@ export function SociosTab({ project: p }: { project: CollabProject }) {
               })}
             </div>
           </div>
-        </CardContent>
-      </Card>
+      </ChartCard>
 
       {/* Cards de sócio */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -39,6 +39,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ChartCard } from "@/components/ui/chart-card";
 import {
   useCollabStore,
   STATUS_LABEL,
@@ -206,27 +207,24 @@ function DonutCard({ title, data }: { title: string; data: { name: string; value
   const total = data.reduce((a, b) => a + b.value, 0);
   if (total === 0) return null;
   return (
-    <Card>
-      <CardContent>
-        <SH title={title} />
-        <div className="flex flex-col items-center gap-4 sm:flex-row">
-          <PieChart width={170} height={170}>
-            <Pie data={data} dataKey="value" innerRadius={48} outerRadius={78} stroke="none">
-              {data.map((d) => <Cell key={d.name} fill={d.color} />)}
-            </Pie>
-            <Tooltip formatter={(v: number) => eur(v)} />
-          </PieChart>
-          <div className="flex-1 space-y-1.5">
-            {data.map((d) => (
-              <div key={d.name} className="flex items-center justify-between border-b border-line/60 py-1.5 text-sm last:border-0">
-                <span className="flex items-center gap-2 text-muted"><span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} /> {d.name}</span>
-                <span className="num font-medium text-ink">{eur(d.value)}</span>
-              </div>
-            ))}
-          </div>
+    <ChartCard title={title}>
+      <div className="flex flex-col items-center gap-4 sm:flex-row">
+        <PieChart width={170} height={170}>
+          <Pie data={data} dataKey="value" innerRadius={48} outerRadius={78} stroke="none">
+            {data.map((d) => <Cell key={d.name} fill={d.color} />)}
+          </Pie>
+          <Tooltip formatter={(v: number) => eur(v)} />
+        </PieChart>
+        <div className="flex-1 space-y-1.5">
+          {data.map((d) => (
+            <div key={d.name} className="flex items-center justify-between border-b border-line/60 py-1.5 text-sm last:border-0">
+              <span className="flex items-center gap-2 text-muted"><span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color }} /> {d.name}</span>
+              <span className="num font-medium text-ink">{eur(d.value)}</span>
+            </div>
+          ))}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </ChartCard>
   );
 }
 
@@ -378,9 +376,7 @@ function ReabVisaoGeral({ p, inv, totalGasto, saldo, venda, maisValia, impostos,
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         {p.budgetTimeline && p.budgetTimeline.length > 0 && (
-          <Card>
-            <CardContent>
-              <SH title="Orçamento previsto vs real" />
+          <ChartCard title="Orçamento previsto vs real">
               <div className="overflow-x-auto">
                 <BarChart width={440} height={220} data={p.budgetTimeline} barGap={4}>
                   <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -392,14 +388,11 @@ function ReabVisaoGeral({ p, inv, totalGasto, saldo, venda, maisValia, impostos,
                   <Bar dataKey="real" name="Real" fill="#5C3D2E" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </div>
-            </CardContent>
-          </Card>
+          </ChartCard>
         )}
 
         {p.expensesByCategory && p.expensesByCategory.length > 0 && (
-          <Card>
-            <CardContent>
-              <SH title="Despesas por categoria" />
+          <ChartCard title="Despesas por categoria">
               <div className="overflow-x-auto">
                 <BarChart width={440} height={220} data={p.expensesByCategory} layout="vertical">
                   <XAxis type="number" hide />
@@ -408,8 +401,7 @@ function ReabVisaoGeral({ p, inv, totalGasto, saldo, venda, maisValia, impostos,
                   <Bar dataKey="valor" fill="#C8A664" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </div>
-            </CardContent>
-          </Card>
+          </ChartCard>
         )}
 
         <DonutCard title="Composição do investimento" data={composition} />
@@ -417,9 +409,7 @@ function ReabVisaoGeral({ p, inv, totalGasto, saldo, venda, maisValia, impostos,
 
         {/* Evolução no tempo */}
         {p.budgetTimeline && p.budgetTimeline.length > 0 && (
-          <Card className="lg:col-span-2">
-            <CardContent>
-              <SH title="Evolução acumulada" />
+          <ChartCard title="Evolução acumulada" className="lg:col-span-2">
               <div className="overflow-x-auto">
                 <LineChart width={700} height={220} data={p.budgetTimeline}>
                   <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -431,18 +421,14 @@ function ReabVisaoGeral({ p, inv, totalGasto, saldo, venda, maisValia, impostos,
                   <Line type="monotone" dataKey="real" name="Real" stroke="#5C3D2E" strokeWidth={2.5} dot={{ r: 3, fill: "#5C3D2E" }} />
                 </LineChart>
               </div>
-            </CardContent>
-          </Card>
+          </ChartCard>
         )}
       </div>
 
       {/* Distribuição do lucro */}
-      <Card>
-        <CardContent>
-          <SH title="Distribuição do lucro" />
-          <PartnerBars partners={p.partners} valuePerPct={lucro} />
-        </CardContent>
-      </Card>
+      <ChartCard title="Distribuição do lucro">
+        <PartnerBars partners={p.partners} valuePerPct={lucro} />
+      </ChartCard>
     </div>
   );
 }
@@ -894,9 +880,7 @@ function ArrVisaoGeral({ p, cashflowMensal, cashflowAnual }: { p: CollabProject;
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Receita vs Despesa */}
         {cashflowEvol.length > 0 && (
-          <Card>
-            <CardContent>
-              <SH title="Receita vs despesa mensal" />
+          <ChartCard title="Receita vs despesa mensal">
               <div className="overflow-x-auto">
                 <BarChart width={440} height={220} data={cashflowEvol} barGap={4}>
                   <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -908,17 +892,14 @@ function ArrVisaoGeral({ p, cashflowMensal, cashflowAnual }: { p: CollabProject;
                   <Bar dataKey="Despesa" fill="#9B3A2A" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </div>
-            </CardContent>
-          </Card>
+          </ChartCard>
         )}
 
         <DonutCard title="Distribuição das despesas" data={distribDespesas} />
 
         {/* Cashflow evolution */}
         {cashflowEvol.length > 0 && (
-          <Card className="lg:col-span-2">
-            <CardContent>
-              <SH title="Evolução do cashflow" />
+          <ChartCard title="Evolução do cashflow" className="lg:col-span-2">
               <div className="overflow-x-auto">
                 <LineChart width={700} height={220} data={cashflowEvol}>
                   <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -930,16 +911,12 @@ function ArrVisaoGeral({ p, cashflowMensal, cashflowAnual }: { p: CollabProject;
                   <Line type="monotone" dataKey="Acumulado" name="Acumulado" stroke="#4A7C59" strokeWidth={2.5} dot={{ r: 3, fill: "#4A7C59" }} />
                 </LineChart>
               </div>
-            </CardContent>
-          </Card>
+          </ChartCard>
         )}
       </div>
 
       {/* Distribuição de rendimento */}
-      <Card>
-        <CardContent>
-          <SH title="Distribuição de rendimento" />
-          <p className="mb-3 text-xs text-muted">Rendimento recorrente distribuído proporcionalmente entre sócios — mensal e anual.</p>
+      <ChartCard title="Distribuição de rendimento" description="Rendimento recorrente distribuído proporcionalmente entre sócios — mensal e anual.">
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {p.partners.map((s) => (
               <div key={s.id} className="rounded-xl border border-line bg-bg/40 p-3">
@@ -954,8 +931,7 @@ function ArrVisaoGeral({ p, cashflowMensal, cashflowAnual }: { p: CollabProject;
             ))}
           </div>
           <PartnerBars partners={p.partners} valuePerPct={cashflowMensal} suffix="/mês" />
-        </CardContent>
-      </Card>
+      </ChartCard>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ChartCard } from "@/components/ui/chart-card";
 import { usePropertiesStore, PROP_TYPE_LABEL, STATUS_LABEL, type Property } from "@/store/usePropertiesStore";
 import { useObrasStore, CATEGORIA_LABEL, ESTADO_LABEL, type Obra, type ObraCategoria, type ObraEstado } from "@/store/useObrasStore";
 import { useTenantsStore, TIPO_LABEL as TENANT_TIPO_LABEL, urgenciaContrato, diasAteFim, type Tenant } from "@/store/useTenantsStore";
@@ -331,9 +332,7 @@ function VisaoGeral({
 
       {/* Gráficos */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent>
-            <h3 className="mb-3 font-display text-base font-semibold text-ink">Receitas vs Despesas</h3>
+        <ChartCard title="Receitas vs Despesas">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={receitasVsDespesas} barGap={6}>
                 <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -345,14 +344,11 @@ function VisaoGeral({
                 <Bar dataKey="Despesas" fill="#9B3A2A" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </ChartCard>
 
         <DonutCard title="Distribuição das despesas" data={distribDespesas} />
 
-        <Card>
-          <CardContent>
-            <h3 className="mb-3 font-display text-base font-semibold text-ink">Evolução do cashflow</h3>
+        <ChartCard title="Evolução do cashflow">
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={cashflowEvol}>
                 <CartesianGrid vertical={false} stroke="#E8D5BE" />
@@ -364,8 +360,7 @@ function VisaoGeral({
                 <Line type="monotone" dataKey="Acumulado" stroke="#5C3D2E" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </ChartCard>
 
         <DonutCard title="Composição dos custos" data={composicaoCustos} />
       </div>
@@ -411,9 +406,7 @@ function MiniStat({ label, value, tone }: { label: string; value: string; tone?:
 function DonutCard({ title, data }: { title: string; data: { name: string; value: number; color: string }[] }) {
   const total = data.reduce((a, b) => a + b.value, 0);
   return (
-    <Card>
-      <CardContent>
-        <h3 className="mb-3 font-display text-base font-semibold text-ink">{title}</h3>
+    <ChartCard title={title}>
         {total === 0 ? (
           <p className="py-12 text-center text-sm text-muted">Sem dados suficientes.</p>
         ) : (
@@ -436,8 +429,7 @@ function DonutCard({ title, data }: { title: string; data: { name: string; value
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+    </ChartCard>
   );
 }
 
