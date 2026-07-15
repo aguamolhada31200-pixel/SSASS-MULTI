@@ -4,6 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { MoneyBox } from "@/components/ui/MoneyField";
 import { cn } from "@/lib/utils";
 import { eur, eurSigned, pct } from "@/lib/format";
 import {
@@ -84,16 +85,22 @@ function NumberField({
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
-      <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-        <input
-          type="number"
-          value={Number.isFinite(value) ? value : 0}
-          step={step}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          className="h-10 w-full bg-transparent px-3 text-sm outline-none"
-        />
-        <span className="px-3 text-sm text-muted">{suffix}</span>
-      </div>
+      {suffix === "€" ? (
+        // Campos de valor (€) — separador de milhares automático (ex.: 160.000)
+        <MoneyBox value={value || undefined} onChange={(n) => onChange(n ?? 0)} suffix="€" />
+      ) : (
+        // Campos não-monetários (% · meses) mantêm o input numérico com passos
+        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
+          <input
+            type="number"
+            value={Number.isFinite(value) ? value : 0}
+            step={step}
+            onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+            className="h-10 w-full bg-transparent px-3 text-sm outline-none"
+          />
+          <span className="px-3 text-sm text-muted">{suffix}</span>
+        </div>
+      )}
     </label>
   );
 }
