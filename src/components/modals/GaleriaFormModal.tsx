@@ -55,6 +55,7 @@ export function GaleriaFormModal() {
   const getById = useGaleriaStore((s) => s.getById);
 
   const [step, setStep] = useState(0);
+  const [mostrarErros, setMostrarErros] = useState(false);
   const [obraId, setObraId] = useState<string>("");
   const [antes, setAntes] = useState("");
   const [depois, setDepois] = useState("");
@@ -99,6 +100,7 @@ export function GaleriaFormModal() {
   useEffect(() => {
     if (!open) return;
     setNovas([]);
+    setMostrarErros(false);
     if (editingId) {
       const c = getById(editingId);
       if (c) {
@@ -186,9 +188,11 @@ export function GaleriaFormModal() {
 
   const next = () => {
     if (!podeAvancar()) {
+      setMostrarErros(true);
       toast.error(step === 1 ? "Selecione a foto ANTES e a foto DEPOIS" : "Preencha os campos obrigatórios");
       return;
     }
+    setMostrarErros(false);
     setStep((s) => Math.min(s + 1, 3));
   };
 
@@ -255,6 +259,9 @@ export function GaleriaFormModal() {
           {step === 0 && (
             <div className="space-y-2">
               <p className="mb-3 text-sm text-muted">As fotos vêm da obra — escolha a origem da transformação.</p>
+              {mostrarErros && !obraId && (
+                <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs font-medium text-danger">Selecione a obra de origem.</p>
+              )}
               {obras.length === 0 && (
                 <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">Ainda não há obras registadas.</p>
               )}
@@ -294,6 +301,9 @@ export function GaleriaFormModal() {
           {/* PASSO 2 — selecionar ANTES e DEPOIS das fotos existentes */}
           {step === 1 && obra && (
             <div className="space-y-4">
+              {mostrarErros && (!antes || !depois) && (
+                <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs font-medium text-danger">Selecione a foto ANTES e a foto DEPOIS.</p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Slot label="Antes" url={antes} onClear={() => setAntes("")} />
                 <Slot label="Depois" url={depois} onClear={() => setDepois("")} gold />
@@ -356,7 +366,8 @@ export function GaleriaFormModal() {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-xs font-medium text-muted">Título</span>
-                <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className={inputCls} placeholder='Ex.: "Cozinha — Príncipe Real"' />
+                <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className={cn(inputCls, mostrarErros && titulo.trim().length < 3 && "border-danger")} placeholder='Ex.: "Cozinha — Príncipe Real"' />
+                {mostrarErros && titulo.trim().length < 3 && <span className="mt-1 block text-xs text-danger">Dê um título (mín. 3 letras)</span>}
               </label>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted">Divisão</span>
@@ -375,10 +386,11 @@ export function GaleriaFormModal() {
               </label>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted">Duração (auto · datas da obra)</span>
-                <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
+                <div className={cn("flex items-center rounded-lg border bg-card focus-within:border-secondary", mostrarErros && duracao <= 0 ? "border-danger" : "border-line")}>
                   <input type="number" value={duracao || ""} onChange={(e) => setDuracao(Number(e.target.value))} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
                   <span className="px-3 text-sm text-muted">dias</span>
                 </div>
+                {mostrarErros && duracao <= 0 && <span className="mt-1 block text-xs text-danger">Indique a duração em dias</span>}
               </label>
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-muted">Valorização estimada (opcional)</span>
@@ -434,7 +446,7 @@ export function GaleriaFormModal() {
 
         <div className="flex items-center justify-between border-t border-line px-5 py-4">
           {step > 0 ? (
-            <Button variant="ghost" onClick={() => setStep((s) => s - 1)}>
+            <Button variant="ghost" onClick={() => { setMostrarErros(false); setStep((s) => s - 1); }}>
               <ChevronLeft size={15} /> Voltar
             </Button>
           ) : (

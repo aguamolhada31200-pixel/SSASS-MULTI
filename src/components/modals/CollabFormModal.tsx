@@ -126,6 +126,7 @@ export function CollabFormModal() {
       setForm(emptyState(nomeMe));
     }
     setStep(1);
+    setMostrarErros(false);
   }, [open, editingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = <K extends keyof WizardState>(k: K, v: WizardState[K]) =>
@@ -133,6 +134,8 @@ export function CollabFormModal() {
 
   const soma = useMemo(() => somaDraft(form.socios), [form.socios]);
   const somaOk = soma === 100;
+  // Mostra os erros a vermelho por baixo dos campos quando se tenta avançar
+  const [mostrarErros, setMostrarErros] = useState(false);
 
   if (!open) return null;
 
@@ -151,13 +154,15 @@ export function CollabFormModal() {
 
   const next = () => {
     if (!podeAvancar()) {
+      setMostrarErros(true);
       if (step === 3 && !somaOk) toast.error(`As percentagens somam ${soma}% — devem somar 100%.`);
       else toast.error("Preencha os campos obrigatórios.");
       return;
     }
+    setMostrarErros(false);
     setStep((s) => Math.min(4, s + 1));
   };
-  const back = () => setStep((s) => Math.max(1, s - 1));
+  const back = () => { setMostrarErros(false); setStep((s) => Math.max(1, s - 1)); };
 
   const addSocio = () =>
     setForm((f) => ({
@@ -368,6 +373,7 @@ export function CollabFormModal() {
               set={set}
               isReab={isReab}
               properties={properties}
+              mostrarErros={mostrarErros}
             />
           )}
           {step === 3 && (
@@ -377,6 +383,7 @@ export function CollabFormModal() {
               onAdd={addSocio}
               onRemove={removeSocio}
               onChange={setSocio}
+              mostrarErros={mostrarErros}
             />
           )}
           {step === 4 && <StepRevisao form={form} soma={soma} properties={properties} />}
@@ -443,11 +450,12 @@ function StepTipo({ tipo, onPick, disabled }: { tipo: CollabType; onPick: (t: Co
 
 // ───────────────────────── Passo 2 · Imóvel ─────────────────────────
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
       {children}
+      {error && <span className="mt-1 block text-xs text-danger">{error}</span>}
     </label>
   );
 }
@@ -459,11 +467,13 @@ function StepImovel({
   set,
   isReab,
   properties,
+  mostrarErros,
 }: {
   form: WizardState;
   set: <K extends keyof WizardState>(k: K, v: WizardState[K]) => void;
   isReab: boolean;
   properties: ReturnType<typeof usePropertiesStore.getState>["properties"];
+  mostrarErros: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -484,7 +494,7 @@ function StepImovel({
       </div>
 
       {form.imovelMode === "existente" ? (
-        <Field label="Imóvel">
+        <Field label="Imóvel" error={mostrarErros && !form.propertyId ? "Selecione um imóvel" : undefined}>
           <select value={form.propertyId} onChange={(e) => set("propertyId", e.target.value)} className={inputCls}>
             <option value="">— Selecionar imóvel —</option>
             {properties.map((p) => (
@@ -495,8 +505,8 @@ function StepImovel({
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Nome do imóvel *"><input value={form.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Ex.: T2 Príncipe Real" className={inputCls} /></Field>
-            <Field label="Cidade *"><input value={form.cidade} onChange={(e) => set("cidade", e.target.value)} placeholder="Lisboa" className={inputCls} /></Field>
+            <Field label="Nome do imóvel *" error={mostrarErros && form.nome.trim().length < 2 ? "Indique o nome do imóvel" : undefined}><input value={form.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Ex.: T2 Príncipe Real" className={inputCls} /></Field>
+            <Field label="Cidade *" error={mostrarErros && form.cidade.trim().length < 2 ? "Indique a cidade" : undefined}><input value={form.cidade} onChange={(e) => set("cidade", e.target.value)} placeholder="Lisboa" className={inputCls} /></Field>
             <Field label="Distrito"><input value={form.distrito} onChange={(e) => set("distrito", e.target.value)} placeholder="Lisboa" className={inputCls} /></Field>
           </div>
 
@@ -576,16 +586,23 @@ function StepSocios({
   onAdd,
   onRemove,
   onChange,
+  mostrarErros,
 }: {
   socios: SocioDraft[];
   soma: number;
   onAdd: () => void;
   onRemove: (id: string) => void;
   onChange: (id: string, patch: Partial<SocioDraft>) => void;
+  mostrarErros: boolean;
 }) {
   const somaOk = soma === 100;
   return (
     <div className="space-y-3">
+      {mostrarErros && !somaOk && (
+        <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs font-medium text-danger">
+          As percentagens têm de somar 100% (estão em {soma}%).
+        </p>
+      )}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted">Quem participa e com que percentagem?</p>
         <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", somaOk ? "bg-success/12 text-success" : "bg-danger/12 text-danger")}>
@@ -609,13 +626,16 @@ function StepSocios({
                 )}
               </div>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <input
-                  value={s.name}
-                  onChange={(e) => onChange(s.id, { name: e.target.value })}
-                  placeholder="Nome"
-                  disabled={isMe}
-                  className={cn(inputCls, isMe && "opacity-70")}
-                />
+                <div>
+                  <input
+                    value={s.name}
+                    onChange={(e) => onChange(s.id, { name: e.target.value })}
+                    placeholder="Nome"
+                    disabled={isMe}
+                    className={cn(inputCls, isMe && "opacity-70", mostrarErros && !s.name.trim() && "border-danger")}
+                  />
+                  {mostrarErros && !s.name.trim() && <span className="mt-1 block text-xs text-danger">Indique o nome do sócio</span>}
+                </div>
                 <input
                   value={s.email}
                   onChange={(e) => onChange(s.id, { email: e.target.value })}

@@ -531,18 +531,6 @@ export function PropertyFormModal() {
                     <Num label="Estadia máxima (opcional)" reg={register("estadiaMaximaMeses")} suffix="meses" />
                   </>
                 )}
-
-                <div className="sm:col-span-2 rounded-xl border border-gold/25 bg-gold/5 p-3">
-                  <p className="text-xs font-medium text-ink">
-                    💡 A <strong>renda</strong>, a <strong>caução</strong> e as datas do contrato
-                    deixaram de se definir aqui.
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted">
-                    Um imóvel acabado de comprar não tem renda. A renda pertence ao <strong>arrendamento</strong>:
-                    depois de guardar, crie um em <strong>Imóveis › Arrendamentos</strong> e o imóvel
-                    passa automaticamente a «Arrendado».
-                  </p>
-                </div>
               </>
             )}
 

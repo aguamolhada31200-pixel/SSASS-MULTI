@@ -15,6 +15,7 @@ import {
   type Divisao,
 } from "@/store/useObrasStore";
 import { DIVISAO_ICON } from "@/components/obras/Divisoes";
+import { MoneyBox } from "@/components/ui/MoneyField";
 import { useCollabStore } from "@/store/useCollabStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { cn } from "@/lib/utils";
@@ -75,9 +76,12 @@ export function NewObraModal() {
   const [form, setForm] = useState<FormState>(() =>
     emptyForm({ projectId: initialProjectId, propertyId: initialPropertyId })
   );
+  // Erros inline (vermelho por baixo do campo) — mostrados ao tentar submeter.
+  const [erros, setErros] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open) {
+      setErros({});
       if (editingId && editingObra) {
         // Pré-preencher o formulário com os dados da obra existente
         setForm({
@@ -106,26 +110,29 @@ export function NewObraModal() {
 
   const isEditing = !!editingId;
 
-  const patch = (p: Partial<FormState>) => setForm((s) => ({ ...s, ...p }));
+  const patch = (p: Partial<FormState>) => {
+    setForm((s) => ({ ...s, ...p }));
+    // Limpa o erro dos campos que o utilizador acabou de corrigir
+    setErros((e) => {
+      const n = { ...e };
+      Object.keys(p).forEach((k) => delete n[k]);
+      return n;
+    });
+  };
 
   const sugeridas = FASES_SUGERIDAS[form.categoria];
   const preSelected = !!(initialProjectId || initialPropertyId);
 
   const onSubmit = () => {
-    if (!form.titulo.trim()) {
-      toast.error("Indique o nome da obra");
-      return;
-    }
-    if (!isEditing && form.origin === "project" && !form.projectId) {
-      toast.error("Selecione um projeto");
-      return;
-    }
-    if (!isEditing && form.origin === "property" && !form.propertyId) {
-      toast.error("Selecione um imóvel");
-      return;
-    }
-    if (form.orcamento <= 0) {
-      toast.error("Orçamento tem de ser superior a 0");
+    // Valida e mostra os erros a vermelho por baixo de cada campo obrigatório
+    const e: Record<string, string> = {};
+    if (!form.titulo.trim()) e.titulo = "Indique o nome da obra";
+    if (!isEditing && form.origin === "project" && !form.projectId) e.projectId = "Selecione um projeto";
+    if (!isEditing && form.origin === "property" && !form.propertyId) e.propertyId = "Selecione um imóvel";
+    if (form.orcamento <= 0) e.orcamento = "Indique o orçamento previsto";
+    if (Object.keys(e).length > 0) {
+      setErros(e);
+      toast.error("Faltam campos obrigatórios");
       return;
     }
 
@@ -304,7 +311,7 @@ export function NewObraModal() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             {!preSelected && !isEditing && form.origin === "project" && (
-              <Field label="Projeto" className="sm:col-span-2">
+              <Field label="Projeto" error={erros.projectId} className="sm:col-span-2">
                 <select
                   value={form.projectId}
                   onChange={(e) => patch({ projectId: e.target.value })}
@@ -321,7 +328,7 @@ export function NewObraModal() {
             )}
 
             {!preSelected && !isEditing && form.origin === "property" && (
-              <Field label="Imóvel" className="sm:col-span-2">
+              <Field label="Imóvel" error={erros.propertyId} className="sm:col-span-2">
                 <select
                   value={form.propertyId}
                   onChange={(e) => patch({ propertyId: e.target.value })}
@@ -337,7 +344,7 @@ export function NewObraModal() {
               </Field>
             )}
 
-            <Field label="Nome da obra" className="sm:col-span-2">
+            <Field label="Nome da obra" error={erros.titulo} className="sm:col-span-2">
               <input
                 value={form.titulo}
                 onChange={(e) => patch({ titulo: e.target.value })}
@@ -358,17 +365,8 @@ export function NewObraModal() {
               </select>
             </Field>
 
-            <Field label="Orçamento previsto">
-              <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-                <input
-                  type="number"
-                  step="any"
-                  value={form.orcamento || ""}
-                  onChange={(e) => patch({ orcamento: Number(e.target.value) || 0 })}
-                  className="h-10 w-full bg-transparent px-3 text-sm outline-none"
-                />
-                <span className="px-3 text-sm text-muted">€</span>
-              </div>
+            <Field label="Orçamento previsto" error={erros.orcamento}>
+              <MoneyBox value={form.orcamento || undefined} onChange={(n) => patch({ orcamento: n ?? 0 })} />
             </Field>
 
             <Field label="Data de início">
@@ -495,10 +493,12 @@ const inputCls =
 
 function Field({
   label,
+  error,
   className,
   children,
 }: {
   label: string;
+  error?: string;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -506,6 +506,7 @@ function Field({
     <label className={cn("block", className)}>
       <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
       {children}
+      {error && <span className="mt-1 block text-xs text-danger">{error}</span>}
     </label>
   );
 }
