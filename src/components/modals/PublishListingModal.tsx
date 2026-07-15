@@ -880,32 +880,17 @@ function CamposCedencia({
         </button>
       </Field>
 
-      {/* Cenário definido pelo ESTADO DO IMÓVEL (escolhido acima em "Estado do imóvel") */}
+      {/* Campos conforme o ESTADO DO IMÓVEL: "a recuperar" ⇒ obras; senão ⇒ valor atual */}
       {comObras ? (
-        <div className="sm:col-span-2 rounded-xl border border-gold/25 bg-gold/[0.04] p-3">
-          <p className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-gold-dark">
-            <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Obras · imóvel «a recuperar»
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <MoneyInput label="Valor previsto das obras" control={control} name="obra" hint="Orçamento estimado da reabilitação" />
-            <MoneyInput label="Valor de mercado pós-obras" control={control} name="valorMercadoPosObras" error={errors.valorMercadoPosObras?.message} hint="Valor de venda estimado depois das obras" />
-            <Field label="Prazo estimado das obras — em meses (opcional)" className="sm:col-span-2">
-              <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 4 meses" />
-            </Field>
-          </div>
-        </div>
+        <>
+          <MoneyInput label="Valor previsto das obras" control={control} name="obra" hint="Orçamento estimado da reabilitação" />
+          <MoneyInput label="Valor de mercado pós-obras" control={control} name="valorMercadoPosObras" error={errors.valorMercadoPosObras?.message} hint="Valor de venda estimado depois das obras" />
+          <Field label="Prazo estimado das obras — em meses (opcional)" className="sm:col-span-2">
+            <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 4 meses" />
+          </Field>
+        </>
       ) : (
-        <div className="sm:col-span-2 rounded-xl border border-line bg-bg/50 p-3">
-          <p className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-secondary" /> Sem obras · imóvel pronto
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <MoneyInput label="Valor de mercado atual" control={control} name="valorVendaPrevisto" error={errors.valorVendaPrevisto?.message} hint="Quanto o imóvel vale hoje, no estado atual" />
-            <p className="flex items-center text-[11px] text-muted">
-              O lucro calcula-se por <strong className="mx-1">Valor de mercado atual − CTA</strong>. Para adicionar obras, mude o <strong className="mx-1">estado do imóvel</strong> para «a recuperar».
-            </p>
-          </div>
-        </div>
+        <MoneyInput label="Valor de mercado atual" control={control} name="valorVendaPrevisto" error={errors.valorVendaPrevisto?.message} className="sm:col-span-2" hint="Quanto o imóvel vale hoje, no estado atual" />
       )}
 
       <Field label="Capital Necessário (auto)">
