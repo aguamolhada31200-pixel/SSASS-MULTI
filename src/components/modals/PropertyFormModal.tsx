@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Trash2, Plus, Hammer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { MoneyInput, MoneyBox } from "@/components/ui/MoneyField";
 import { useModalStore } from "@/store/useModalStore";
 import {
   usePropertiesStore,
@@ -208,6 +209,7 @@ export function PropertyFormModal() {
     watch,
     setValue,
     getValues,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -387,12 +389,12 @@ export function PropertyFormModal() {
                 <Field label="Data de compra (opcional)" error={errors.dataCompra?.message}>
                   <input type="date" {...register("dataCompra")} className={inputCls} />
                 </Field>
-                <Num label="Valor de compra" reg={register("valorCompra")} error={errors.valorCompra?.message} suffix="€" />
-                <Num label="Valor da entrada (opcional)" reg={register("entrada")} suffix="€" />
-                <Num label="Valor financiado (opcional)" reg={register("financiado")} suffix="€" />
+                <MoneyInput label="Valor de compra" control={control} name="valorCompra" error={errors.valorCompra?.message} />
+                <MoneyInput label="Valor da entrada (opcional)" control={control} name="entrada" />
+                <MoneyInput label="Valor financiado (opcional)" control={control} name="financiado" />
                 <Num label="Prazo do financiamento (opcional)" reg={register("prazoAnos")} suffix="anos" />
                 <Num label="Taxa de juro (opcional)" reg={register("taxaJuro")} suffix="%" />
-                <Num label="Prestação mensal (opcional)" reg={register("prestacaoMensal")} suffix="€" />
+                <MoneyInput label="Prestação mensal (opcional)" control={control} name="prestacaoMensal" />
                 <div className="sm:col-span-2 -mt-1 space-y-1">
                   <button type="button" onClick={sugerirPrestacao} className="text-xs font-medium text-secondary hover:underline">
                     ⚡ Sugerir prestação a partir do financiado (prazo/taxa acima; defaults 30 anos · 4%)
@@ -574,10 +576,10 @@ export function PropertyFormModal() {
                 </div>
 
                 <SectionTitle className="mt-2">Despesas fixas do imóvel</SectionTitle>
-                <Num label="IMI anual (opcional)" reg={register("imiAnual")} suffix="€" />
-                <Num label="Seguro anual (opcional)" reg={register("seguroAnual")} suffix="€" />
-                <Num label="Condomínio mensal (opcional)" reg={register("condominioMensal")} suffix="€" />
-                <Num label="Outras despesas mensais (opcional)" reg={register("outrasMensais")} suffix="€" />
+                <MoneyInput label="IMI anual (opcional)" control={control} name="imiAnual" />
+                <MoneyInput label="Seguro anual (opcional)" control={control} name="seguroAnual" />
+                <MoneyInput label="Condomínio mensal (opcional)" control={control} name="condominioMensal" />
+                <MoneyInput label="Outras despesas mensais (opcional)" control={control} name="outrasMensais" />
               </>
             )}
 
@@ -655,16 +657,10 @@ export function PropertyFormModal() {
                         </select>
                       </Field>
                       <Field label="Orçamento previsto">
-                        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-                          <input
-                            type="number"
-                            step="any"
-                            value={obraData.orcamento || ""}
-                            onChange={(e) => patchObra({ orcamento: Number(e.target.value) || 0 })}
-                            className="h-10 w-full bg-transparent px-3 text-sm outline-none"
-                          />
-                          <span className="px-3 text-sm text-muted">€</span>
-                        </div>
+                        <MoneyBox
+                          value={obraData.orcamento || undefined}
+                          onChange={(n) => patchObra({ orcamento: n ?? 0 })}
+                        />
                       </Field>
                       <Field label="Data de início">
                         <input

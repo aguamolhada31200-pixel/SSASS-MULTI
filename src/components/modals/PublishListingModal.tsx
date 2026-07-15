@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm, type Control, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Trash2, Hammer, Handshake, KeyRound, Plus } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Trash2, Hammer, Handshake, KeyRound, Plus, Info, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { MoneyInput, RHFMoney } from "@/components/ui/MoneyField";
 import { useModalStore } from "@/store/useModalStore";
 import {
   useListingsStore,
@@ -38,12 +39,16 @@ import {
   roiCedencia,
   retornoEntradaCedencia,
   restanteAoPromitenteVendedor,
+  margemSegurancaCedencia,
+  folgaCedencia,
 } from "@/lib/calc/rede";
 import { calcularIMT, calcularIS } from "@/lib/calc/imt";
 import { DISTRITOS_PT, concelhosDe } from "@/lib/concelhos";
 import { eur, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+// Modal de publicação de anúncios da Rede (3 tipos) — fotos obrigatórias,
+// margem de segurança, sub-página de fórmulas e valores com separador de milhares.
 const schema = z
   .object({
     type: z.enum(["reabilitacao", "cedencia", "arrendamento"]),
@@ -102,6 +107,8 @@ const schema = z
     const req = (cond: boolean, path: string, message: string) => {
       if (!cond) ctx.addIssue({ code: "custom", path: [path], message });
     };
+    // Foto obrigatória em todos os tipos — pelo menos a capa.
+    req((v.galleryUrls?.length ?? 0) > 0, "galleryUrls", "Adicione pelo menos uma foto (a 1.ª é a capa)");
     if (v.type === "reabilitacao") {
       req(!!v.valorImovel && v.valorImovel > 0, "valorImovel", "Obrigatório");
       req(!!v.capitalProcurado && v.capitalProcurado > 0, "capitalProcurado", "Obrigatório");
@@ -166,6 +173,7 @@ export function PublishListingModal() {
   const getById = useListingsStore((s) => s.getById);
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const [showFormulas, setShowFormulas] = useState(false);
 
   const {
     register,
@@ -174,6 +182,7 @@ export function PublishListingModal() {
     reset,
     watch,
     setValue,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -184,6 +193,7 @@ export function PublishListingModal() {
   useEffect(() => {
     if (!open) return;
     setStep(0);
+    setShowFormulas(false);
     if (editingId) {
       const l = getById(editingId);
       if (l) {
@@ -200,11 +210,8 @@ export function PublishListingModal() {
   const floorPlan = watch("floorPlanUrl");
   const distrito = watch("district");
 
-  const valoresLive = useMemo(() => {
-    const v = watch();
-    return v;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watch()]);
+  // watch() sem argumentos subscreve todas as mudanças — valores sempre live no resumo.
+  const valoresLive = watch();
 
   if (!open) return null;
 
@@ -359,6 +366,9 @@ export function PublishListingModal() {
         </div>
 
         <form onSubmit={handleSubmit(onValid as (v: FormValues) => void, onInvalidSubmit)} className="flex min-h-0 flex-1 flex-col">
+          {showFormulas ? (
+            <FormulasPanel type={type} onBack={() => setShowFormulas(false)} />
+          ) : (
           <div className="flex-1 overflow-y-auto p-5">
             {/* STEP 0 — categoria */}
             {step === 0 && (
@@ -449,7 +459,9 @@ export function PublishListingModal() {
 
                 {/* Fotos */}
                 <div>
-                  <p className="mb-1.5 text-xs font-medium text-muted">Fotos (opcional · a 1.ª é a capa)</p>
+                  <p className="mb-1.5 text-xs font-medium text-muted">
+                    Fotos <span className="text-danger">*</span> <span className="font-normal">· a 1.ª é a capa</span>
+                  </p>
                   <PhotoRow
                     fotos={gallery}
                     onAddUrl={addPhoto}
@@ -475,7 +487,7 @@ export function PublishListingModal() {
                 {/* Campos type-aware */}
                 <div className="rounded-xl border border-line bg-bg p-4">
                   {type === "reabilitacao" && (
-                    <CamposReab register={register} errors={errors} values={valoresLive} setValue={setValue} />
+                    <CamposReab register={register} errors={errors} values={valoresLive} setValue={setValue} control={control} />
                   )}
                   {type === "cedencia" && (
                     <CamposCedencia
@@ -483,9 +495,10 @@ export function PublishListingModal() {
                       errors={errors}
                       values={valoresLive}
                       setValue={setValue}
+                      control={control}
                     />
                   )}
-                  {type === "arrendamento" && <CamposArrendamento register={register} errors={errors} />}
+                  {type === "arrendamento" && <CamposArrendamento register={register} errors={errors} control={control} />}
 
                   {/* Live computed */}
                   <LiveComputed type={type} v={valoresLive} />
@@ -517,20 +530,47 @@ export function PublishListingModal() {
             {step === 3 && (
               <SummaryStep v={valoresLive} />
             )}
+
+            {/* Bolha informativa — abre a sub-página de fórmulas e definições */}
+            {step > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowFormulas(true)}
+                className="mt-5 flex w-full items-center gap-2.5 rounded-xl border border-gold/30 bg-gold/5 px-4 py-3 text-left transition-colors hover:bg-gold/10"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold/15 text-gold-dark">
+                  <Info size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-ink">Como calculamos estes números?</span>
+                  <span className="block text-[11px] text-muted">Fórmulas e definições usadas neste tipo de anúncio</span>
+                </span>
+                <ChevronRight size={16} className="shrink-0 text-muted" />
+              </button>
+            )}
           </div>
+          )}
 
           <div className="flex items-center justify-between border-t border-line px-5 py-4">
-            <Button type="button" variant="ghost" onClick={() => (step === 0 ? closeListingForm() : setStep((s) => s - 1))}>
-              <ChevronLeft size={16} /> {step === 0 ? "Cancelar" : "Voltar"}
-            </Button>
-            {step < 3 ? (
-              <Button type="button" variant="gold" onClick={next}>
-                Próximo <ChevronRight size={16} />
+            {showFormulas ? (
+              <Button type="button" variant="ghost" onClick={() => setShowFormulas(false)}>
+                <ChevronLeft size={16} /> Voltar ao formulário
               </Button>
             ) : (
-              <Button type="submit" variant="gold" size="lg">
-                <Check size={16} /> {editingId ? "Guardar alterações" : "Publicar anúncio"}
-              </Button>
+              <>
+                <Button type="button" variant="ghost" onClick={() => (step === 0 ? closeListingForm() : setStep((s) => s - 1))}>
+                  <ChevronLeft size={16} /> {step === 0 ? "Cancelar" : "Voltar"}
+                </Button>
+                {step < 3 ? (
+                  <Button type="button" variant="gold" onClick={next}>
+                    Próximo <ChevronRight size={16} />
+                  </Button>
+                ) : (
+                  <Button type="submit" variant="gold" size="lg">
+                    <Check size={16} /> {editingId ? "Guardar alterações" : "Publicar anúncio"}
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </form>
@@ -614,11 +654,13 @@ function CamposReab({
   errors,
   values,
   setValue,
+  control,
 }: {
   register: any;
   errors: any;
   values: FormValues;
   setValue: any;
+  control: Control<FormValues>;
 }) {
   const invPct = parseInvestidorPct(values.split);
   const setInv = (x: number) => {
@@ -654,40 +696,34 @@ function CamposReab({
   return (
     <div className="space-y-5">
       <CamposSecao title="Aquisição">
-        <Num label="Valor do imóvel (CPCV)" reg={register("valorImovel")} suffix="€" error={errors.valorImovel?.message} />
+        <MoneyInput label="Valor do imóvel (CPCV)" control={control} name="valorImovel" error={errors.valorImovel?.message} hint="Preço no contrato-promessa de compra e venda" />
         <Field label="Desconto obtido (opcional)">
-          <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-            <input type="number" step="any" {...register("valorNegociado")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
-            <span className="px-3 text-sm text-muted">€</span>
-          </div>
+          <RHFMoney control={control} name="valorNegociado" />
           <p className="mt-1 text-[10px] text-muted">
             = quanto baixou ao valor do imóvel {precoAcordado > 0 ? `· preço acordado ${eur(precoAcordado)}` : ""}
           </p>
         </Field>
 
         <Field label="Impostos (IMT + IS + Registos)" className="sm:col-span-2">
-          <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-            <input type="number" step="any" {...register("impostos")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
-            <span className="px-3 text-sm text-muted">€</span>
-          </div>
+          <RHFMoney control={control} name="impostos" />
           <button type="button" onClick={calcularImpostosAuto} className="mt-1 text-[11px] text-secondary hover:underline">
             Calcular automaticamente (IMT HS + IS 0,8% + Registo)
           </button>
         </Field>
 
-        <Num label="Outros custos (opcional)" reg={register("outrosCustos")} suffix="€" className="sm:col-span-2" />
+        <MoneyInput label="Outros custos (opcional)" control={control} name="outrosCustos" className="sm:col-span-2" hint="Comissões, projetos, licenças e outros gastos do negócio" />
       </CamposSecao>
 
       <CamposSecao title="Obra">
-        <Num label="Orçamento de obras" reg={register("orcamentoObras")} suffix="€" error={errors.orcamentoObras?.message} className="sm:col-span-2" />
+        <MoneyInput label="Orçamento de obras" control={control} name="orcamentoObras" error={errors.orcamentoObras?.message} className="sm:col-span-2" />
         <Field label="Prazo estimado das obras (opcional)" className="sm:col-span-2">
           <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 10 meses" />
         </Field>
       </CamposSecao>
 
       <CamposSecao title="Resultado esperado">
-        <Num label="Valor de mercado atual (opcional, sem obras)" reg={register("valorMercadoAtual")} suffix="€" />
-        <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
+        <MoneyInput label="Valor de mercado atual (opcional, sem obras)" control={control} name="valorMercadoAtual" hint="Quanto valeria hoje, sem obras" />
+        <MoneyInput label="Valor de mercado pós-obras" control={control} name="valorMercadoPosObras" error={errors.valorMercadoPosObras?.message} hint="Valor de venda estimado depois de recuperado" />
 
         <Field label="Venda prevista" error={errors.tempoAteVenda?.message} className="sm:col-span-2">
           <input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 6 meses" />
@@ -695,7 +731,7 @@ function CamposReab({
       </CamposSecao>
 
       <CamposSecao title="Parceria">
-        <Num label="Capital procurado" reg={register("capitalProcurado")} suffix="€" error={errors.capitalProcurado?.message} className="sm:col-span-2" />
+        <MoneyInput label="Capital procurado" control={control} name="capitalProcurado" error={errors.capitalProcurado?.message} className="sm:col-span-2" hint="Dinheiro que procura no investidor para entrar no negócio" />
 
         {/* Divisão do lucro — deixa claro quanto o INVESTIDOR recebe */}
         <div className="sm:col-span-2">
@@ -777,11 +813,13 @@ function CamposCedencia({
   errors,
   values,
   setValue,
+  control,
 }: {
   register: any;
   errors: any;
   values: FormValues;
   setValue: (k: any, v: any, opts?: any) => void;
+  control: Control<FormValues>;
 }) {
   const valorImovel = Number(values.valorImovel) || 0;
   const valorNegociado = Number(values.valorNegociado) || 0; // desconto conseguido
@@ -820,23 +858,17 @@ function CamposCedencia({
         </select>
       </Field>
 
-      <Num label="Valor do Imóvel (CPCV)" reg={register("valorImovel")} suffix="€" />
+      <MoneyInput label="Valor do Imóvel (CPCV)" control={control} name="valorImovel" hint="Preço acordado no contrato-promessa com o vendedor" />
       <Field label="Desconto Obtido" error={errors.valorNegociado?.message}>
-        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-          <input type="number" step="any" {...register("valorNegociado")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
-          <span className="px-3 text-sm text-muted">€</span>
-        </div>
+        <RHFMoney control={control} name="valorNegociado" />
         <p className="mt-1 text-[10px] text-muted">
           = quanto baixou ao valor do imóvel {precoAcordado > 0 ? `· preço acordado ${eur(precoAcordado)}` : ""}
         </p>
       </Field>
 
-      <Num label="Valor da cedência" reg={register("valorCedencia")} suffix="€" error={errors.valorCedencia?.message} />
+      <MoneyInput label="Valor da cedência" control={control} name="valorCedencia" error={errors.valorCedencia?.message} hint="Quanto cobra ao investidor para lhe ceder a sua posição" />
       <Field label="Impostos (IMT + IS + Registo)">
-        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-          <input type="number" step="any" {...register("impostos")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
-          <span className="px-3 text-sm text-muted">€</span>
-        </div>
+        <RHFMoney control={control} name="impostos" />
         <button
           type="button"
           onClick={calcularImpostosAuto}
@@ -846,10 +878,10 @@ function CamposCedencia({
         </button>
       </Field>
 
-      <Num label="Valor previsto das obras (opcional)" reg={register("obra")} suffix="€" />
+      <MoneyInput label="Valor previsto das obras (opcional)" control={control} name="obra" hint="Se houver obras, o negócio avalia-se pelo valor pós-obras" />
       {comObras ? (
         <>
-          <Num label="Valor de mercado pós-obras" reg={register("valorMercadoPosObras")} suffix="€" error={errors.valorMercadoPosObras?.message} />
+          <MoneyInput label="Valor de mercado pós-obras" control={control} name="valorMercadoPosObras" error={errors.valorMercadoPosObras?.message} hint="Valor de venda estimado depois das obras" />
           <Field label="Prazo estimado das obras (opcional)" className="sm:col-span-2">
             <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 4 meses" />
           </Field>
@@ -873,10 +905,7 @@ function CamposCedencia({
         <p className="mt-1 text-[10px] text-muted">= Valor da Cedência + Impostos{comObras ? " + Valor previsto das obras" : ""}</p>
       </Field>
       <Field label="Sinal já pago pelo cedente">
-        <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
-          <input type="number" step="any" {...register("sinalPagoCedente")} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
-          <span className="px-3 text-sm text-muted">€</span>
-        </div>
+        <RHFMoney control={control} name="sinalPagoCedente" />
         <button
           type="button"
           onClick={usarSinalDefault}
@@ -886,7 +915,7 @@ function CamposCedencia({
         </button>
       </Field>
 
-      <Num label="Valor de mercado atual" reg={register("valorVendaPrevisto")} suffix="€" error={errors.valorVendaPrevisto?.message} />
+      <MoneyInput label="Valor de mercado atual" control={control} name="valorVendaPrevisto" error={errors.valorVendaPrevisto?.message} hint="Quanto o imóvel vale hoje, no estado atual" />
 
       <Field label="Custo Total da Aquisição — CTA (auto)" className="sm:col-span-2">
         <div className="flex items-center rounded-lg border border-gold/40 bg-gold/5">
@@ -915,16 +944,37 @@ function CamposCedencia({
   );
 }
 
-function CamposArrendamento({ register, errors }: { register: any; errors: any }) {
+function CamposArrendamento({ register, errors, control }: { register: any; errors: any; control: Control<FormValues> }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Num label="Preço do imóvel" reg={register("precoImovel")} suffix="€" error={errors.precoImovel?.message} />
-      <Num label="Capital necessário" reg={register("capitalNecessario")} suffix="€" error={errors.capitalNecessario?.message} />
-      <Num label="Renda mensal total" reg={register("rendaMensal")} suffix="€" error={errors.rendaMensal?.message} />
+      <MoneyInput label="Preço do imóvel" control={control} name="precoImovel" error={errors.precoImovel?.message} hint="Valor de compra do imóvel pronto a arrendar" />
+      <MoneyInput label="Capital necessário" control={control} name="capitalNecessario" error={errors.capitalNecessario?.message} hint="Dinheiro que procura no investidor (entrada + custos)" />
+      <MoneyInput label="Renda mensal total" control={control} name="rendaMensal" error={errors.rendaMensal?.message} />
     </div>
   );
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+/**
+ * Constrói um Listing de cedência a partir do formulário para reutilizar os
+ * helpers de margem de segurança da página do anúncio (paridade garantida).
+ */
+function cedenciaDraft(v: FormValues): Listing {
+  return {
+    type: "cedencia",
+    tipoCedencia: (v.tipoCedencia || undefined) as Listing["tipoCedencia"],
+    valorImovel: Number(v.valorImovel) || 0,
+    sinalPagoCedente: Number(v.sinalPagoCedente) || 0,
+    valorCedencia: Number(v.valorCedencia) || 0,
+    valorNegociado: Number(v.valorNegociado) || 0,
+    impostos: Number(v.impostos) || 0,
+    obra: Number(v.obra) || 0,
+    outrosCustos: Number(v.outrosCustos) || 0,
+    valorVendaPrevisto: Number(v.valorVendaPrevisto) || 0,
+    valorMercadoPosObras: Number(v.valorMercadoPosObras) || 0,
+    estado: v.estado as EstadoImovel,
+  } as Listing;
+}
 
 function computeCedencia(v: FormValues) {
   const valorImovel = Number(v.valorImovel) || 0;
@@ -980,8 +1030,14 @@ function LiveComputed({ type, v }: { type: ListingType; v: FormValues }) {
     );
   }
 
-  // Cedência — decomposição do CTA
+  // Cedência — decomposição do CTA + margem de segurança
   const c = computeCedencia(v);
+  const draft = cedenciaDraft(v);
+  const margem = margemSegurancaCedencia(draft);
+  const folga = folgaCedencia(draft);
+  const baseMargem = c.comObras ? c.posObras : c.venda;
+  const nivelSeg = nivelSegurancaReab(margem);
+  const segUi = SEG_UI[nivelSeg];
   return (
     <div className="mt-4 rounded-2xl border border-gold/30 bg-gold/5 p-4">
       <p className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-gold-dark">
@@ -1010,6 +1066,18 @@ function LiveComputed({ type, v }: { type: ListingType; v: FormValues }) {
           <div className="text-muted">Valor de mercado pós-obras: <strong className="num text-ink">{eur(c.posObras)}</strong></div>
         </div>
       ) : null}
+
+      {/* Margem de Segurança — mesma estrutura de bolhas do Compra e Revenda */}
+      {baseMargem > 0 && (
+        <div className={cn("mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2", segUi.chipBg, segUi.chipBorder)}>
+          <span className="flex items-center gap-2">
+            <span className={cn("h-2 w-2 shrink-0 rounded-full", segUi.dot)} />
+            <span className={cn("text-sm font-semibold", segUi.text)}>{NIVEL_SEGURANCA_LABEL[nivelSeg]}</span>
+            <span className="text-[11px] text-muted">Margem de segurança · folga {eur(folga)}</span>
+          </span>
+          <span className={cn("num text-sm font-bold", segUi.text)}>{pct(margem)}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1204,15 +1272,26 @@ function SummaryFinanceCedencia({ v }: { v: FormValues }) {
   const obra = Number(v.obra) || 0;
   const mercadoAtual = Number(v.valorVendaPrevisto) || 0;
   const posObras = Number(v.valorMercadoPosObras) || 0;
+  const c = computeCedencia(v);
+  const draft = cedenciaDraft(v);
+  const margem = margemSegurancaCedencia(draft);
+  const baseMargem = c.comObras ? posObras : mercadoAtual;
   return (
     <SummarySection title="Números da operação — Cedência de Posição">
       {v.tipoCedencia && <SummaryRow k="Tipo de cedência" v={TIPO_CEDENCIA_LABEL[v.tipoCedencia]} />}
       {valorImovel > 0 && <SummaryRow k="Valor do imóvel (CPCV)" v={eur(valorImovel)} />}
       {valorCedencia > 0 && <SummaryRow k="Valor da cedência" v={eur(valorCedencia)} />}
       {impostos > 0 && <SummaryRow k="Impostos (IMT + IS + Registo)" v={eur(impostos)} />}
+      {c.cta > 0 && <SummaryRow k="CTA · Custo Total da Aquisição" v={eur(c.cta)} />}
       {obra > 0 && <SummaryRow k="Valor previsto das obras" v={eur(obra)} />}
       {mercadoAtual > 0 && <SummaryRow k="Valor de mercado atual" v={eur(mercadoAtual)} />}
       {posObras > 0 && <SummaryRow k="Valor de mercado pós-obras" v={eur(posObras)} />}
+      {baseMargem > 0 && <SummaryRow k="Lucro estimado" v={eur(c.lucro)} />}
+      {baseMargem > 0 && <SummaryRow k={c.comObras ? "ROI pós-obras" : "ROI da operação"} v={pct(c.roi)} />}
+      {c.capitalNecessario > 0 && <SummaryRow k="Capital necessário" v={eur(c.capitalNecessario)} />}
+      {baseMargem > 0 && (
+        <SummaryRow k="Margem de segurança" v={`${pct(margem)} · ${NIVEL_SEGURANCA_LABEL[nivelSegurancaReab(margem)]}`} />
+      )}
       {v.motivoCedencia && <SummaryRow k="Motivo" v={v.motivoCedencia.replace("_", " ")} />}
       {v.terminoCpcv && <SummaryRow k="Término do CPCV" v={v.terminoCpcv} />}
     </SummarySection>
@@ -1229,6 +1308,116 @@ function SummaryFinanceArrendamento({ v }: { v: FormValues }) {
       {capital > 0 && <SummaryRow k="Capital necessário" v={eur(capital)} />}
       {renda > 0 && <SummaryRow k="Renda mensal" v={eur(renda)} />}
     </SummarySection>
+  );
+}
+
+/* ═══════════════════════ Sub-página de fórmulas e definições ═══════════════════════ */
+
+interface Formula {
+  nome: string;
+  expr: string;
+  nota?: string;
+}
+
+const FORMULAS: Record<ListingType, { intro: string; itens: Formula[]; classificacao: boolean }> = {
+  reabilitacao: {
+    intro: "Comprar, recuperar e revender com margem. Estes são os cálculos que o investidor vê no anúncio.",
+    itens: [
+      { nome: "CTA · Custo Total da Aquisição", expr: "Valor do imóvel (CPCV) + Impostos (IMT + IS + Registos)" },
+      { nome: "Investimento Total", expr: "CTA + Orçamento das obras + Outros custos" },
+      { nome: "Lucro estimado pós-obras", expr: "Valor de mercado pós-obras − Investimento Total" },
+      { nome: "ROI da operação", expr: "Lucro ÷ Investimento Total × 100" },
+      { nome: "Lucro do investidor", expr: "Lucro × (% da divisão do lucro ÷ 100)", nota: "A divisão do lucro define quanto do lucro fica para o investidor." },
+      { nome: "Retorno sobre a entrada", expr: "Lucro do investidor ÷ Capital procurado × 100" },
+      { nome: "Margem de segurança", expr: "(Valor pós-obras − Investimento Total) ÷ Valor pós-obras × 100", nota: "Quanto o preço de venda pode descer antes de o negócio deixar de dar lucro." },
+    ],
+    classificacao: true,
+  },
+  cedencia: {
+    intro: "Ceder uma posição de contrato-promessa antes da escritura. O cálculo muda consoante haja ou não obras.",
+    itens: [
+      { nome: "Restante ao Promitente Vendedor", expr: "Valor do imóvel − Sinal já pago pelo cedente" },
+      { nome: "CTA · Custo Total da Aquisição", expr: "Valor da cedência + Restante ao Promitente Vendedor + Impostos" },
+      { nome: "Capital necessário", expr: "Valor da cedência + Impostos (+ Obras, se houver)" },
+      { nome: "Lucro — sem obras", expr: "Valor de mercado atual − CTA" },
+      { nome: "Lucro — com obras", expr: "Valor pós-obras − (CTA + Obras + Outros custos)" },
+      { nome: "ROI", expr: "Lucro ÷ Custo total × 100" },
+      { nome: "Retorno sobre a entrada", expr: "Lucro ÷ Capital necessário × 100" },
+      { nome: "Margem de segurança — sem obras", expr: "(Valor de mercado atual − CTA) ÷ Valor de mercado atual × 100" },
+      { nome: "Margem de segurança — com obras", expr: "(Valor pós-obras − Investimento Total) ÷ Valor pós-obras × 100", nota: "Investimento Total = CTA + Obras + Outros custos." },
+    ],
+    classificacao: true,
+  },
+  arrendamento: {
+    intro: "Imóvel pronto a arrendar, para rendimento passivo. Indicadores de rentabilidade recorrente.",
+    itens: [
+      { nome: "Renda anual", expr: "Renda mensal × 12" },
+      { nome: "Yield bruto", expr: "Renda anual ÷ Preço do imóvel × 100" },
+      { nome: "Yield líquido", expr: "Yield bruto × 0,75", nota: "O fator 0,75 estima o líquido após despesas correntes (IMI, condomínio, seguros…)." },
+      { nome: "Rentabilidade sobre o capital", expr: "(Renda anual × 0,75) ÷ Capital necessário × 100" },
+    ],
+    classificacao: false,
+  },
+};
+
+function FBlock({ f }: { f: Formula }) {
+  return (
+    <div className="rounded-xl border border-line bg-bg/40 p-3">
+      <p className="text-xs font-semibold text-ink">{f.nome}</p>
+      <p className="num mt-1 text-[13px] font-medium text-gold-dark">{f.expr}</p>
+      {f.nota && <p className="mt-1 text-[11px] text-muted">{f.nota}</p>}
+    </div>
+  );
+}
+
+function FormulasPanel({ type, onBack }: { type: ListingType; onBack: () => void }) {
+  const data = FORMULAS[type];
+  const tipoLabel = type === "reabilitacao" ? "Compra e Revenda" : type === "cedencia" ? "Cedência de Posição" : "Arrendamento (Buy e Hold)";
+  return (
+    <div className="flex-1 overflow-y-auto p-5">
+      <button type="button" onClick={onBack} className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
+        <ChevronLeft size={15} /> Voltar ao formulário
+      </button>
+      <div className="mb-1 flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gold/15 text-gold-dark"><Calculator size={15} /></span>
+        <h3 className="font-display text-base font-semibold text-ink">Fórmulas e definições · {tipoLabel}</h3>
+      </div>
+      <p className="mb-4 text-sm text-muted">{data.intro}</p>
+
+      <div className="space-y-2">
+        {data.itens.map((f) => <FBlock key={f.nome} f={f} />)}
+      </div>
+
+      {data.classificacao && (
+        <div className="mt-4 rounded-xl border border-gold/30 bg-gold/5 p-4">
+          <p className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-gold-dark">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Classificação da margem de segurança
+          </p>
+          <div className="space-y-1.5">
+            <ClassRow dot="bg-success" text="text-success" label="Excelente" faixa="acima de 20%" />
+            <ClassRow dot="bg-gold" text="text-gold-dark" label="Boa" faixa="15% a 20%" />
+            <ClassRow dot="bg-warning" text="text-warning" label="Atenção" faixa="10% a 15%" />
+            <ClassRow dot="bg-danger" text="text-danger" label="Elevado risco" faixa="abaixo de 10%" />
+          </div>
+        </div>
+      )}
+
+      <p className="mt-4 text-[11px] text-muted">
+        Estes valores são estimativas com base nos dados que preencher — não substituem aconselhamento fiscal ou jurídico.
+      </p>
+    </div>
+  );
+}
+
+function ClassRow({ dot, text, label, faixa }: { dot: string; text: string; label: string; faixa: string }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="flex items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", dot)} />
+        <span className={cn("font-semibold", text)}>{label}</span>
+      </span>
+      <span className="num text-muted">{faixa}</span>
+    </div>
   );
 }
 
