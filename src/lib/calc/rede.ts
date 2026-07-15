@@ -173,20 +173,18 @@ export function ctaCedencia(l: Listing): number {
 }
 
 /**
- * Há obras quando o NEGÓCIO envolve reabilitação:
- * · valor de obras previsto > 0; ou
- * · tipo de cedência ≠ "apenas CPCV" (projeto aprovado, licença e obra
- *   iniciada implicam reabilitação à frente).
- * Uma cedência "apenas CPCV" sem obras previstas avalia-se pelo mercado ATUAL
- * — o estado do imóvel ("a recuperar") descreve o imóvel, não o plano.
+ * Há obras quando o NEGÓCIO envolve reabilitação. O ESTADO DO IMÓVEL manda:
+ * · "a recuperar" ⇒ cedência com obras (avalia-se pelo valor pós-obras);
+ * · qualquer outro estado ⇒ sem obras, salvo se houver orçamento de obras ou
+ *   valor de mercado pós-obras preenchido.
+ * O tipo de cedência (apenas CPCV, projeto, licença, obra iniciada) passa a ser
+ * apenas descritivo — não determina se o negócio tem obras.
  */
 export function comObrasCedencia(
-  l: Pick<Listing, "tipoCedencia" | "obra" | "valorMercadoPosObras" | "estado">
+  l: Pick<Listing, "obra" | "valorMercadoPosObras" | "estado">
 ): boolean {
-  if ((l.obra ?? 0) > 0) return true;
-  if (l.tipoCedencia) return l.tipoCedencia !== "cpcv";
-  // retro-compat: anúncios antigos sem tipo definido
-  return (l.valorMercadoPosObras ?? 0) > 0 || l.estado === "a recuperar";
+  if (l.estado === "a recuperar") return true;
+  return (l.obra ?? 0) > 0 || (l.valorMercadoPosObras ?? 0) > 0;
 }
 
 /**

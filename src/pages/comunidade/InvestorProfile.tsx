@@ -23,8 +23,6 @@ import { useListingsStore } from "@/store/useListingsStore";
 import { usePartnerRatingsStore } from "@/store/usePartnerRatingsStore";
 import { useConversationsStore } from "@/store/useConversationsStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
-import { useGaleriaStore, duracaoLabel } from "@/store/useGaleriaStore";
-import { ComparacaoCard } from "@/components/galeria/ComparacaoCard";
 import { eur, pct, dataPTShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -40,12 +38,6 @@ export default function InvestorProfile() {
   const ratings = usePartnerRatingsStore((s) => s.ratings.filter((r) => r.ratedUserId === userId));
   const getOrCreate = useConversationsStore((s) => s.getOrCreate);
   const properties = usePropertiesStore((s) => s.properties);
-  // Transformações partilháveis — prova visual de track record (não-falsificável: liga a obras reais)
-  const transformacoes = useGaleriaStore((s) =>
-    s.comparacoes.filter((c) => c.criadoPor === userId && c.visibilidade === "partilhavel_na_rede")
-  )
-    .slice()
-    .sort((a, b) => Number(b.destaque) - Number(a.destaque) || (a.createdAt < b.createdAt ? 1 : -1));
 
   // "Imóveis registados" — conta em usePropertiesStore por owner (ownerId ausente = utilizador atual).
   const imoveisRegistados = properties.filter((p) => (p.ownerId ?? CURRENT_USER_ID) === userId).length;
@@ -227,23 +219,6 @@ export default function InvestorProfile() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Transformações — prova visual de track record */}
-            {transformacoes.length > 0 && (
-              <div>
-                <h3 className="mb-1 font-display text-lg font-semibold text-ink">Transformações · {transformacoes.length}</h3>
-                <p className="mb-3 text-xs text-muted">
-                  {transformacoes.length} {transformacoes.length === 1 ? "obra" : "obras"} ·{" "}
-                  <span className="num">{eur(transformacoes.reduce((a, c) => a + c.custoReal, 0))}</span> investidos · média{" "}
-                  {duracaoLabel(Math.round(transformacoes.reduce((a, c) => a + c.duracaoDias, 0) / transformacoes.length))}
-                </p>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  {transformacoes.map((c) => (
-                    <ComparacaoCard key={c.id} c={c} readOnly />
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Anúncios ativos */}
             <div>

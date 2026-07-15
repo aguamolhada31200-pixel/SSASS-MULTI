@@ -118,12 +118,10 @@ const schema = z
       req(!!v.valorCedencia && v.valorCedencia > 0, "valorCedencia", "Obrigatório");
       req(!!v.tipoCedencia, "tipoCedencia", "Obrigatório");
       req(!!v.motivoCedencia, "motivoCedencia", "Obrigatório");
-      // Com obras = obra prevista > 0 OU tipo ≠ "apenas CPCV" (projeto/licença/
-      // reabilitação implicam obras à frente). "Apenas CPCV" sem obras avalia-se
-      // pelo valor de mercado ATUAL — o pós-obras não é exigido.
-      const cedComObras =
-        (Number(v.obra) || 0) > 0 ||
-        (v.tipoCedencia ? v.tipoCedencia !== "cpcv" : v.estado === "a recuperar");
+      // O ESTADO DO IMÓVEL decide o cenário: "a recuperar" ⇒ com obras (exige o
+      // valor de mercado pós-obras); qualquer outro estado ⇒ sem obras (exige o
+      // valor de mercado atual).
+      const cedComObras = v.estado === "a recuperar" || (Number(v.obra) || 0) > 0;
       if (cedComObras) {
         req(!!v.valorMercadoPosObras && v.valorMercadoPosObras > 0, "valorMercadoPosObras", "Obrigatório");
       } else {
@@ -716,7 +714,7 @@ function CamposReab({
 
       <CamposSecao title="Obra">
         <MoneyInput label="Orçamento de obras" control={control} name="orcamentoObras" error={errors.orcamentoObras?.message} className="sm:col-span-2" />
-        <Field label="Prazo estimado das obras (opcional)" className="sm:col-span-2">
+        <Field label="Prazo estimado das obras — em meses (opcional)" className="sm:col-span-2">
           <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 10 meses" />
         </Field>
       </CamposSecao>
@@ -725,8 +723,8 @@ function CamposReab({
         <MoneyInput label="Valor de mercado atual (opcional, sem obras)" control={control} name="valorMercadoAtual" hint="Quanto valeria hoje, sem obras" />
         <MoneyInput label="Valor de mercado pós-obras" control={control} name="valorMercadoPosObras" error={errors.valorMercadoPosObras?.message} hint="Valor de venda estimado depois de recuperado" />
 
-        <Field label="Venda prevista" error={errors.tempoAteVenda?.message} className="sm:col-span-2">
-          <input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 6 meses" />
+        <Field label="Venda prevista — em meses" error={errors.tempoAteVenda?.message} className="sm:col-span-2">
+          <input {...register("tempoAteVenda")} className={inputCls} placeholder="Ex.: 6 meses (tempo até vender)" />
         </Field>
       </CamposSecao>
 
@@ -830,8 +828,8 @@ function CamposCedencia({
   const sinal = Number(values.sinalPagoCedente) || 0;
   const restante = Math.max(0, valorImovel - sinal);
   const obra = Number(values.obra) || 0;
-  // Com obras = obra prevista > 0 OU tipo ≠ "apenas CPCV" (mesma regra de lib/calc/rede)
-  const comObras = obra > 0 || (values.tipoCedencia ? values.tipoCedencia !== "cpcv" : values.estado === "a recuperar");
+  // O ESTADO DO IMÓVEL manda: "a recuperar" ⇒ com obras (mesma regra de lib/calc/rede).
+  const comObras = values.estado === "a recuperar" || obra > 0;
   const capitalNecessario = valorCedencia + impostos + (comObras ? obra : 0);
   const cta = valorCedencia + restante + impostos;
 
@@ -858,6 +856,10 @@ function CamposCedencia({
         </select>
       </Field>
 
+      <p className="sm:col-span-2 -mt-1 text-[11px] text-muted">
+        O <strong>estado do imóvel</strong> (em cima) define o cenário: <strong>«a recuperar»</strong> mostra os campos de obras; qualquer outro estado calcula sem obras.
+      </p>
+
       <MoneyInput label="Valor do Imóvel (CPCV)" control={control} name="valorImovel" hint="Preço acordado no contrato-promessa com o vendedor" />
       <Field label="Desconto Obtido" error={errors.valorNegociado?.message}>
         <RHFMoney control={control} name="valorNegociado" />
@@ -878,20 +880,32 @@ function CamposCedencia({
         </button>
       </Field>
 
-      <MoneyInput label="Valor previsto das obras (opcional)" control={control} name="obra" hint="Se houver obras, o negócio avalia-se pelo valor pós-obras" />
+      {/* Cenário definido pelo ESTADO DO IMÓVEL (escolhido acima em "Estado do imóvel") */}
       {comObras ? (
-        <>
-          <MoneyInput label="Valor de mercado pós-obras" control={control} name="valorMercadoPosObras" error={errors.valorMercadoPosObras?.message} hint="Valor de venda estimado depois das obras" />
-          <Field label="Prazo estimado das obras (opcional)" className="sm:col-span-2">
-            <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 4 meses" />
-          </Field>
-        </>
-      ) : (
-        <Field label=" ">
-          <p className="rounded-lg border border-line bg-bg px-3 py-2.5 text-[11px] text-muted">
-            Cedência sem obras — o lucro calcula-se pelo <strong>valor de mercado atual</strong> − CTA.
+        <div className="sm:col-span-2 rounded-xl border border-gold/25 bg-gold/[0.04] p-3">
+          <p className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-gold-dark">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Obras · imóvel «a recuperar»
           </p>
-        </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MoneyInput label="Valor previsto das obras" control={control} name="obra" hint="Orçamento estimado da reabilitação" />
+            <MoneyInput label="Valor de mercado pós-obras" control={control} name="valorMercadoPosObras" error={errors.valorMercadoPosObras?.message} hint="Valor de venda estimado depois das obras" />
+            <Field label="Prazo estimado das obras — em meses (opcional)" className="sm:col-span-2">
+              <input {...register("prazoObras")} className={inputCls} placeholder="Ex.: 4 meses" />
+            </Field>
+          </div>
+        </div>
+      ) : (
+        <div className="sm:col-span-2 rounded-xl border border-line bg-bg/50 p-3">
+          <p className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-secondary" /> Sem obras · imóvel pronto
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MoneyInput label="Valor de mercado atual" control={control} name="valorVendaPrevisto" error={errors.valorVendaPrevisto?.message} hint="Quanto o imóvel vale hoje, no estado atual" />
+            <p className="flex items-center text-[11px] text-muted">
+              O lucro calcula-se por <strong className="mx-1">Valor de mercado atual − CTA</strong>. Para adicionar obras, mude o <strong className="mx-1">estado do imóvel</strong> para «a recuperar».
+            </p>
+          </div>
+        </div>
       )}
 
       <Field label="Capital Necessário (auto)">
@@ -914,8 +928,6 @@ function CamposCedencia({
           Usar 10% do preço acordado {sinalDefault > 0 ? `(${eur(sinalDefault)})` : ""}
         </button>
       </Field>
-
-      <MoneyInput label="Valor de mercado atual" control={control} name="valorVendaPrevisto" error={errors.valorVendaPrevisto?.message} hint="Quanto o imóvel vale hoje, no estado atual" />
 
       <Field label="Custo Total da Aquisição — CTA (auto)" className="sm:col-span-2">
         <div className="flex items-center rounded-lg border border-gold/40 bg-gold/5">
@@ -985,8 +997,8 @@ function computeCedencia(v: FormValues) {
   const obra = Number(v.obra) || 0;
   const venda = Number(v.valorVendaPrevisto) || 0; // valor de mercado atual
   const posObras = Number(v.valorMercadoPosObras) || 0;
-  // Mesma regra de lib/calc/rede: obra prevista > 0 OU tipo ≠ "apenas CPCV"
-  const comObras = obra > 0 || (v.tipoCedencia ? v.tipoCedencia !== "cpcv" : v.estado === "a recuperar");
+  // Mesma regra de lib/calc/rede: o estado do imóvel manda ("a recuperar" ⇒ obras).
+  const comObras = v.estado === "a recuperar" || obra > 0;
 
   const precoAcordado = Math.max(0, valorImovel - valorNegociado);
   const restante = Math.max(0, valorImovel - sinal);
