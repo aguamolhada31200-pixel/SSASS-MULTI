@@ -14,6 +14,7 @@ import EditProfile from "@/pages/comunidade/EditProfile";
 import Colaborativa from "@/pages/comunidade/Colaborativa";
 import ProjectRoom from "@/pages/comunidade/ProjectRoom";
 import CentroDeComando from "@/pages/comunidade/CentroDeComando";
+import ObrasCasa from "@/pages/comunidade/ObrasCasa";
 import ObraDetalhe from "@/pages/comunidade/ObraDetalhe";
 import GaleriaAntesDepois from "@/pages/comunidade/GaleriaAntesDepois";
 import Mensagens from "@/pages/Mensagens";
@@ -58,6 +59,9 @@ export default function App() {
         <Route path="mensagens" element={<Mensagens />} />
         <Route path="comunidade/colaborativa" element={<Colaborativa />} />
         <Route path="comunidade/colaborativa/obras" element={<CentroDeComando />} />
+        {/* Navegação por profundidade: Casa → Divisão → Obra */}
+        <Route path="comunidade/colaborativa/obras/:casaId" element={<ObrasCasa />} />
+        <Route path="comunidade/colaborativa/obras/:casaId/:id" element={<ObraDetalhe />} />
         <Route path="obra/:id" element={<ObraDetalhe />} />
         <Route path="comunidade/colaborativa/galeria" element={<GaleriaAntesDepois />} />
         <Route path="comunidade/colaborativa/:id" element={<ProjectRoom />} />

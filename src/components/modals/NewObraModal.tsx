@@ -7,9 +7,14 @@ import {
   useObrasStore,
   CATEGORIA_LABEL,
   FASES_SUGERIDAS,
+  DIVISAO_LABEL,
+  DIVISAO_ORDEM,
+  divisaoDe,
   type ObraCategoria,
   type ObraEstado,
+  type Divisao,
 } from "@/store/useObrasStore";
+import { DIVISAO_ICON } from "@/components/obras/Divisoes";
 import { useCollabStore } from "@/store/useCollabStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { cn } from "@/lib/utils";
@@ -20,6 +25,7 @@ interface FormState {
   origin: Origin;
   projectId: string;
   propertyId: string;
+  divisao: Divisao | "";
   titulo: string;
   categoria: ObraCategoria;
   orcamento: number;
@@ -40,6 +46,7 @@ function emptyForm(initial: {
     origin: initial.propertyId ? "property" : "project",
     projectId: initial.projectId ?? "",
     propertyId: initial.propertyId ?? "",
+    divisao: "",
     titulo: "",
     categoria: "geral",
     orcamento: 0,
@@ -77,6 +84,7 @@ export function NewObraModal() {
           origin: editingObra.propertyId ? "property" : "project",
           projectId: editingObra.projectId ?? "",
           propertyId: editingObra.propertyId ?? "",
+          divisao: divisaoDe(editingObra),
           titulo: editingObra.titulo,
           categoria: editingObra.categoria,
           orcamento: editingObra.orcamento,
@@ -124,6 +132,7 @@ export function NewObraModal() {
     if (isEditing && editingId) {
       updateObra(editingId, {
         titulo: form.titulo.trim(),
+        divisao: form.divisao || undefined,
         categoria: form.categoria,
         orcamento: form.orcamento,
         dataInicio: form.dataInicio,
@@ -142,6 +151,7 @@ export function NewObraModal() {
       projectId: form.origin === "project" ? form.projectId : undefined,
       propertyId: form.origin === "property" ? form.propertyId : undefined,
       titulo: form.titulo.trim(),
+      divisao: form.divisao || undefined,
       categoria: form.categoria,
       orcamento: form.orcamento,
       gasto: 0,
@@ -219,6 +229,45 @@ export function NewObraModal() {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
+          {/* PRIMEIRO passo: em que parte da casa? (uma pergunta por ecrã) */}
+          {!isEditing && !form.divisao ? (
+            <div>
+              <h3 className="font-display text-xl font-semibold text-ink">Em que parte da casa?</h3>
+              <p className="mt-1 text-sm text-muted">Escolha a divisão onde vai mexer.</p>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {DIVISAO_ORDEM.map((d) => {
+                  const Icon = DIVISAO_ICON[d];
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => patch({ divisao: d })}
+                      className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-bg/40 p-4 transition-all hover:-translate-y-0.5 hover:border-gold hover:bg-gold/5"
+                    >
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-secondary">
+                        <Icon size={26} strokeWidth={1.8} />
+                      </span>
+                      <span className="text-sm font-medium text-ink">{DIVISAO_LABEL[d]}</span>
+                      {d === "casa_toda" && (
+                        <span className="text-center text-[10px] leading-tight text-muted">Obras gerais (canalização, eletricidade…)</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+          <>
+          {!isEditing && form.divisao && (
+            <button
+              type="button"
+              onClick={() => patch({ divisao: "" })}
+              className="mb-4 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-3 py-1.5 text-sm font-medium text-gold-dark hover:bg-gold/15"
+            >
+              {(() => { const Icon = DIVISAO_ICON[form.divisao as Divisao]; return <Icon size={15} />; })()}
+              {DIVISAO_LABEL[form.divisao as Divisao]} · alterar
+            </button>
+          )}
           {!preSelected && !isEditing && (
             <div className="mb-5">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
@@ -419,6 +468,8 @@ export function NewObraModal() {
               </button>
             </div>}
           </div>
+          </>
+          )}
         </div>
 
         {/* Footer */}
@@ -426,9 +477,11 @@ export function NewObraModal() {
           <Button type="button" variant="ghost" onClick={closeObraForm}>
             Cancelar
           </Button>
-          <Button type="button" onClick={onSubmit}>
-            <Check size={16} /> {isEditing ? "Guardar alterações" : "Adicionar obra"}
-          </Button>
+          {(isEditing || form.divisao) && (
+            <Button type="button" onClick={onSubmit}>
+              <Check size={16} /> {isEditing ? "Guardar alterações" : "Adicionar obra"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

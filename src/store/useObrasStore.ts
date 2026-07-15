@@ -22,6 +22,39 @@ export type ObraEstado =
   | "concluida"
   | "atrasada";
 
+/** Divisão da casa onde a obra acontece — base da navegação Casa → Divisão → Obra. */
+export type Divisao =
+  | "cozinha"
+  | "sala"
+  | "quarto"
+  | "wc"
+  | "hall"
+  | "varanda"
+  | "exterior"
+  | "casa_toda";
+
+export const DIVISAO_LABEL: Record<Divisao, string> = {
+  cozinha: "Cozinha",
+  sala: "Sala",
+  quarto: "Quarto",
+  wc: "WC",
+  hall: "Hall",
+  varanda: "Varanda",
+  exterior: "Exterior",
+  casa_toda: "Casa toda",
+};
+
+/** Ordem de apresentação no nível 2 — "casa_toda" fica sempre no fim (cartão à parte). */
+export const DIVISAO_ORDEM: Divisao[] = ["cozinha", "sala", "quarto", "wc", "hall", "varanda", "exterior", "casa_toda"];
+
+/** Divisão efetiva de uma obra — obras antigas sem divisão inferem-na da categoria. */
+export function divisaoDe(o: Pick<Obra, "divisao" | "categoria">): Divisao {
+  if (o.divisao) return o.divisao;
+  if (o.categoria === "cozinha") return "cozinha";
+  if (o.categoria === "wc") return "wc";
+  return "casa_toda";
+}
+
 export type MarcoEstado = "pendente" | "pago" | "atrasado";
 
 export const CATEGORIA_LABEL: Record<ObraCategoria, string> = {
@@ -140,6 +173,8 @@ export interface Obra {
   propertyId?: string;
   titulo: string;
   categoria: ObraCategoria;
+  /** Divisão da casa (Casa → Divisão → Obra). Ausente em obras antigas — usar divisaoDe(). */
+  divisao?: Divisao;
   orcamento: number;
   /** Stored fallback when there are no despesas linked. Auto-replaced by sum(despesas) in selectors. */
   gasto: number;
@@ -267,6 +302,7 @@ const SEED_OBRAS: Obra[] = ([
   // PORTO FLIP — projeto colaborativo #001
   {
     id: "o-porto-1",
+    divisao: "sala",
     projectId: "porto-flip",
     titulo: "Estudo arquitetura",
     categoria: "arquitetura",
@@ -284,6 +320,7 @@ const SEED_OBRAS: Obra[] = ([
   },
   {
     id: "o-porto-2",
+    divisao: "casa_toda",
     projectId: "porto-flip",
     titulo: "Canalização total",
     categoria: "canalizacao",
@@ -300,6 +337,7 @@ const SEED_OBRAS: Obra[] = ([
   },
   {
     id: "o-porto-3",
+    divisao: "casa_toda",
     projectId: "porto-flip",
     titulo: "Reforço estrutural piso 1",
     categoria: "estrutural",
@@ -316,6 +354,7 @@ const SEED_OBRAS: Obra[] = ([
   },
   {
     id: "o-porto-4",
+    divisao: "casa_toda",
     projectId: "porto-flip",
     titulo: "Eletricidade ITED",
     categoria: "eletricidade",
@@ -334,6 +373,7 @@ const SEED_OBRAS: Obra[] = ([
   // PRÍNCIPE REAL — projeto colaborativo #003 (novo)
   {
     id: "o-principe-1",
+    divisao: "sala",
     projectId: "principe-real",
     titulo: "Pintura completa",
     categoria: "pintura",
@@ -351,6 +391,7 @@ const SEED_OBRAS: Obra[] = ([
   },
   {
     id: "o-principe-2",
+    divisao: "cozinha",
     projectId: "principe-real",
     titulo: "Cozinha nova",
     categoria: "cozinha",
@@ -367,6 +408,7 @@ const SEED_OBRAS: Obra[] = ([
   },
   {
     id: "o-principe-3",
+    divisao: "wc",
     projectId: "principe-real",
     titulo: "Casa de banho completa",
     categoria: "wc",
@@ -387,6 +429,7 @@ const SEED_OBRAS: Obra[] = ([
   // T3 COIMBRA — imóvel solo
   {
     id: "o-coimbra-1",
+    divisao: "casa_toda",
     propertyId: "seed-coimbra",
     titulo: "Remodelação total",
     categoria: "geral",
@@ -406,6 +449,7 @@ const SEED_OBRAS: Obra[] = ([
   // T2 ARROIOS — imóvel solo
   {
     id: "o-arroios-pintura",
+    divisao: "casa_toda",
     propertyId: "seed-arroios",
     titulo: "Pintura geral",
     categoria: "pintura",
@@ -423,6 +467,7 @@ const SEED_OBRAS: Obra[] = ([
   },
   {
     id: "o-arroios-1",
+    divisao: "sala",
     propertyId: "seed-arroios",
     titulo: "Pavimento flutuante quartos e sala",
     categoria: "geral",
@@ -438,6 +483,7 @@ const SEED_OBRAS: Obra[] = ([
   },
   {
     id: "o-arroios-2",
+    divisao: "casa_toda",
     propertyId: "seed-arroios",
     titulo: "Estores elétricos",
     categoria: "geral",
@@ -963,6 +1009,60 @@ export function saudeObra(
   return { saude, score, problema };
 }
 
+// ── Estado humano de um conjunto de obras (capa da casa / cartão da divisão) ──
+
+export type EstadoHumano = "tudo_em_dia" | "atraso" | "atencao" | "concluidas" | "nao_comecou";
+
+/** Rótulos para a capa da CASA (nível 1). */
+export const ESTADO_HUMANO_CASA: Record<EstadoHumano, string> = {
+  tudo_em_dia: "Tudo em dia",
+  atraso: "Vai com atraso",
+  atencao: "Precisa de atenção",
+  concluidas: "Obras concluídas",
+  nao_comecou: "Ainda não começou",
+};
+
+/** Rótulos curtos para o cartão da DIVISÃO (nível 2). */
+export const ESTADO_HUMANO_DIVISAO: Record<EstadoHumano, string> = {
+  tudo_em_dia: "A decorrer",
+  atraso: "Atrasada",
+  atencao: "Precisa de atenção",
+  concluidas: "Pronta",
+  nao_comecou: "Por começar",
+};
+
+export const ESTADO_HUMANO_HEX: Record<EstadoHumano, string> = {
+  tudo_em_dia: "#4A7C59",
+  atraso: "#C17E2A",
+  atencao: "#9B3A2A",
+  concluidas: "#4A7C59",
+  nao_comecou: "#6B4C3B",
+};
+
+/**
+ * Estado em linguagem humana de um conjunto de obras (nunca números crus):
+ * concluídas > não começou > precisa de atenção (risco/marco vencido) >
+ * vai com atraso (atrasada/a abrandar/pausada) > tudo em dia.
+ */
+export function estadoHumanoObras(
+  obras: Obra[],
+  fases: Fase[],
+  despesas: Despesa[],
+  marcos: Marco[]
+): EstadoHumano {
+  if (obras.length === 0) return "nao_comecou";
+  if (obras.every((o) => o.estado === "concluida")) return "concluidas";
+  if (obras.every((o) => o.estado === "por_iniciar")) return "nao_comecou";
+  const ativas = obras.filter((o) => o.estado !== "concluida");
+  const algumaRisco = ativas.some((o) => saudeObra(o, fases, despesas, marcos).saude === "risco");
+  if (algumaRisco) return "atencao";
+  const algumaAtrasada = ativas.some(
+    (o) => o.estado === "pausada" || estaAtrasada(o) || estadoRitmo(o, fases) !== "no_prazo"
+  );
+  if (algumaAtrasada) return "atraso";
+  return "tudo_em_dia";
+}
+
 // ───────────────────── Helpers de prova (transparência) ─────────────────────
 
 /** Estado de prova derivado. Pode ser sobrescrito pelo campo manual. */
@@ -1433,8 +1533,9 @@ export const useObrasStore = create<ObrasState>()(
     }),
     {
       name: "redegest-obras",
-      version: 7,
+      version: 8,
       // v4: co-gestão. v5/v6: obra parada + marcos espalhados. v7: comprovativos + confirmações.
+      // v8: divisão da casa (navegação Casa → Divisão → Obra).
       // Re-semeia os exemplos mantendo obras/itens criados pelo utilizador.
       migrate: (persisted: unknown, version: number) => {
         const s = (persisted ?? {}) as {
@@ -1444,7 +1545,7 @@ export const useObrasStore = create<ObrasState>()(
           marcos?: Marco[];
           logs?: LogEntry[];
         };
-        if (version < 7) {
+        if (version < 8) {
           const seedObraIds = new Set(SEED_OBRAS.map((o) => o.id));
           const seedFaseIds = new Set(SEED_FASES.map((f) => f.id));
           const seedDespIds = new Set(SEED_DESPESAS.map((d) => d.id));

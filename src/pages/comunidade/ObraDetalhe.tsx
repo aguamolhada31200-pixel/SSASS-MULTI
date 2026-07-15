@@ -63,6 +63,8 @@ import {
   SAUDE_LABEL,
   SAUDE_HEX,
   ROLE_LABEL,
+  divisaoDe,
+  DIVISAO_LABEL,
   type Obra,
   type ObraEstado,
   type MarcoEstado,
@@ -163,14 +165,24 @@ export default function ObraDetalhe() {
     navigate("/comunidade/colaborativa/obras");
   };
 
+  // Navegação Casa → Divisão → Obra: voltar leva à página da casa (nível 2)
+  const casaId = obra.projectId ?? obra.propertyId;
+  const casaHref = casaId ? `/comunidade/colaborativa/obras/${casaId}` : "/comunidade/colaborativa/obras";
+  const casaNome = project ? project.title : property?.name ?? "Obras";
+  const divisao = divisaoDe(obra);
+
   return (
     <>
-      <Link
-        to={ownerHref}
-        className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink"
-      >
-        <ArrowLeft size={15} /> {ownerTitle}
-      </Link>
+      {/* Breadcrumb visual: Casa › Divisão › Obra */}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-sm">
+        <Link to={casaHref} className="inline-flex items-center gap-1.5 text-muted hover:text-ink">
+          <ArrowLeft size={15} /> {casaNome}
+        </Link>
+        <span className="text-muted/50">›</span>
+        <Link to={casaHref} className="text-muted hover:text-ink">{DIVISAO_LABEL[divisao]}</Link>
+        <span className="text-muted/50">›</span>
+        <span className="font-medium text-ink">{obra.titulo}</span>
+      </div>
 
       {/* Header */}
       <Card>
@@ -254,11 +266,18 @@ export default function ObraDetalhe() {
               value={eur(g)}
               tone={estOrc === "vermelho" ? "danger" : estOrc === "ambar" ? "warning" : "success"}
             />
-            <KpiMini
-              label="Desvio"
-              value={desv === 0 ? "—" : `${desv > 0 ? "+" : ""}${eur(desv)}`}
-              tone={desv > 0 ? "danger" : desv < 0 ? "success" : "neutral"}
-            />
+            {/* Desvio em linguagem humana: só assusta (vermelho) quando há gasto REAL
+                acima do orçamento — obra por começar mostra "Ainda não começou". */}
+            {g === 0 && prog === 0 ? (
+              <KpiMini label="Desvio" value="Ainda não começou" tone="neutral" />
+            ) : (
+              <KpiMini
+                label="Desvio"
+                value={desv === 0 ? "—" : `${desv > 0 ? "+" : ""}${eur(desv)}`}
+                tone={desv > 0 ? "danger" : desv < 0 ? "success" : "neutral"}
+                sub={desv < 0 ? "dentro do orçamento" : desv > 0 ? "acima do orçamento" : undefined}
+              />
+            )}
             <KpiMini label="Progresso" value={`${prog}%`} tone="info" />
             <KpiMini
               label={atrasada ? "Atrasada" : "Restantes"}

@@ -40,6 +40,9 @@ import {
   SAUDE_LABEL,
   SAUDE_HEX,
   gastoNaoComprovado,
+  estadoHumanoObras,
+  ESTADO_HUMANO_CASA,
+  ESTADO_HUMANO_HEX,
   type Obra,
   type Fase,
   type Marco,
@@ -190,7 +193,8 @@ export default function CentroDeComando() {
     return out;
   }, [despesas, marcos, ativas]);
 
-  // ───── Vista (Lista por defeito) + tabs + filtros + decisão ─────
+  // ───── Vista principal: grelha de CASAS. Vista completa (cronograma/lista) é opcional. ─────
+  const [vistaCompleta, setVistaCompleta] = useState(false);
   const [modo, setModo] = useState<"cronograma" | "lista">("lista");
   const [tab, setTab] = useState<TabKey>("todas");
   const [socioFiltro, setSocioFiltro] = useState<Set<string>>(new Set());
@@ -232,6 +236,7 @@ export default function CentroDeComando() {
   );
 
   const focarObra = (obraId: string) => {
+    setVistaCompleta(true);
     setModo("cronograma");
     setTab("todas");
     requestAnimationFrame(() => {
@@ -253,24 +258,7 @@ export default function CentroDeComando() {
               <p className="mb-2 flex items-center gap-2 text-sm text-gold-soft">
                 <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Gestão de Obras · Co-gestão
               </p>
-              {enabled ? (
-                <h1 className="font-display text-3xl font-bold leading-tight sm:text-[2.6rem]">
-                  {emRisco.length > 0 ? (
-                    <>
-                      O seu dinheiro está <span className="italic text-gold">em risco</span> em{" "}
-                      {emRisco.length} {emRisco.length === 1 ? "obra" : "obras"}.
-                    </>
-                  ) : (
-                    <>
-                      Tudo no <span className="italic text-gold">caminho certo</span>.
-                    </>
-                  )}
-                </h1>
-              ) : (
-                <h1 className="font-display text-3xl font-bold leading-tight sm:text-[2.6rem]">
-                  Centro de <span className="italic text-gold">Comando</span> de Obras
-                </h1>
-              )}
+              <h1 className="font-display text-3xl font-bold leading-tight sm:text-[2.6rem]">Obras</h1>
               <p className="mt-2 text-sm text-sidebar-text/70">
                 Atualizado agora · {ativas.length} {ativas.length === 1 ? "obra em curso" : "obras em curso"} ·{" "}
                 {sociosCount} {sociosCount === 1 ? "sócio" : "sócios"}
@@ -284,8 +272,8 @@ export default function CentroDeComando() {
             </div>
           </div>
 
-          {/* Barra de saúde */}
-          {enabled && ativas.length > 0 && (
+          {/* Barra de saúde — só na vista completa (cronograma) */}
+          {enabled && vistaCompleta && ativas.length > 0 && (
             <SaudeBar ativas={ativas} saudeDe={saudeDe} onPick={focarObra} />
           )}
         </div>
@@ -310,47 +298,60 @@ export default function CentroDeComando() {
               onFocar={focarObra}
             />
 
-            {/* Tabs por estado + filtro + toggle de vista */}
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <div className="-mx-1 flex flex-1 items-center gap-1 overflow-x-auto px-1 pb-1">
-                {TAB_ORDER.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTab(t)}
-                    className={cn(
-                      "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                      tab === t ? "bg-primary text-white" : "text-muted hover:bg-accent hover:text-ink"
-                    )}
-                  >
-                    {TAB_LABEL[t]}
-                    <span className={cn("num rounded-full px-1.5 text-[11px]", tab === t ? "bg-white/20" : "bg-accent text-muted")}>
-                      {tabCounts[t]}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <FiltrarMenu
-                  socioFiltro={socioFiltro}
-                  setSocioFiltro={setSocioFiltro}
-                  projetoFiltro={projetoFiltro}
-                  setProjetoFiltro={setProjetoFiltro}
-                  obras={listaTodas}
-                />
-                <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-sm">
-                  <ModoBtn ativo={modo === "lista"} onClick={() => setModo("lista")} icon={<LayoutList size={14} />} label="Lista" atalho="L" />
-                  <ModoBtn ativo={modo === "cronograma"} onClick={() => setModo("cronograma")} icon={<ChartGantt size={14} />} label="Cronograma" atalho="G" />
+            {!vistaCompleta ? (
+              /* ─── Caminho principal: escolher a CASA ─── */
+              <CasasGrid obras={listaTodas} saudeDe={saudeDe} onVerCronograma={() => setVistaCompleta(true)} />
+            ) : (
+              <>
+                {/* Vista completa (gestor avançado): tabs + filtros + cronograma/lista */}
+                <button
+                  onClick={() => setVistaCompleta(false)}
+                  className="mt-8 inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink"
+                >
+                  ← Voltar às casas
+                </button>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <div className="-mx-1 flex flex-1 items-center gap-1 overflow-x-auto px-1 pb-1">
+                    {TAB_ORDER.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setTab(t)}
+                        className={cn(
+                          "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                          tab === t ? "bg-primary text-white" : "text-muted hover:bg-accent hover:text-ink"
+                        )}
+                      >
+                        {TAB_LABEL[t]}
+                        <span className={cn("num rounded-full px-1.5 text-[11px]", tab === t ? "bg-white/20" : "bg-accent text-muted")}>
+                          {tabCounts[t]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FiltrarMenu
+                      socioFiltro={socioFiltro}
+                      setSocioFiltro={setSocioFiltro}
+                      projetoFiltro={projetoFiltro}
+                      setProjetoFiltro={setProjetoFiltro}
+                      obras={listaTodas}
+                    />
+                    <div className="inline-flex rounded-full border border-line bg-card p-1 shadow-sm">
+                      <ModoBtn ativo={modo === "lista"} onClick={() => setModo("lista")} icon={<LayoutList size={14} />} label="Lista" atalho="L" />
+                      <ModoBtn ativo={modo === "cronograma"} onClick={() => setModo("cronograma")} icon={<ChartGantt size={14} />} label="Cronograma" atalho="G" />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="mt-4 animate-fade-in" ref={ganttRef} key={modo + tab}>
-              {modo === "cronograma" ? (
-                <CronogramaPanel obras={obrasVisiveis} saudeDe={saudeDe} decisoesPendentes={decisoesPendentes} />
-              ) : (
-                <ListaPanel obras={obrasVisiveis} saudeDe={saudeDe} />
-              )}
-            </div>
+                <div className="mt-4 animate-fade-in" ref={ganttRef} key={modo + tab}>
+                  {modo === "cronograma" ? (
+                    <CronogramaPanel obras={obrasVisiveis} saudeDe={saudeDe} decisoesPendentes={decisoesPendentes} />
+                  ) : (
+                    <ListaPanel obras={obrasVisiveis} saudeDe={saudeDe} />
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
@@ -675,6 +676,133 @@ function CriticoCard({ issue }: { issue: Issue }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ───────────────────── Grelha de CASAS (nível 1 · caminho principal) ─────────────────────
+
+type CasaFiltro = "todas" | "decorrer" | "concluidas";
+
+interface CasaInfo {
+  id: string;
+  kind: "project" | "property";
+  nome: string;
+  cidade: string;
+  foto?: string;
+  obras: Obra[];
+}
+
+function CasasGrid({
+  obras,
+  onVerCronograma,
+}: {
+  obras: Obra[];
+  saudeDe: Map<string, ReturnType<typeof saudeObra>>;
+  onVerCronograma: () => void;
+}) {
+  const navigate = useNavigate();
+  const fases = useObrasStore((s) => s.fases);
+  const despesas = useObrasStore((s) => s.despesas);
+  const marcos = useObrasStore((s) => s.marcos);
+  const projects = useCollabStore((s) => s.projects);
+  const properties = usePropertiesStore((s) => s.properties);
+  const [filtro, setFiltro] = useState<CasaFiltro>("todas");
+
+  // Só casas (projetos + imóveis solo) que TÊM pelo menos uma obra
+  const casas = useMemo<CasaInfo[]>(() => {
+    const out: CasaInfo[] = [];
+    projects.forEach((p) => {
+      const os = obras.filter((o) => o.projectId === p.id);
+      if (os.length > 0) out.push({ id: p.id, kind: "project", nome: p.title, cidade: p.city, foto: p.coverImageUrl, obras: os });
+    });
+    properties.forEach((p) => {
+      const os = obras.filter((o) => o.propertyId === p.id);
+      if (os.length > 0) out.push({ id: p.id, kind: "property", nome: p.name, cidade: p.city, foto: p.photos?.[0]?.url, obras: os });
+    });
+    return out;
+  }, [projects, properties, obras]);
+
+  const visiveis = casas.filter((c) => {
+    const estado = estadoHumanoObras(c.obras, fases, despesas, marcos);
+    if (filtro === "decorrer") return estado !== "concluidas" && estado !== "nao_comecou";
+    if (filtro === "concluidas") return estado === "concluidas";
+    return true;
+  });
+
+  return (
+    <div className="mt-8">
+      {/* Filtro simples — nada mais */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1.5">
+          {([
+            ["todas", "Todas"],
+            ["decorrer", "Com obras a decorrer"],
+            ["concluidas", "Concluídas"],
+          ] as [CasaFiltro, string][]).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setFiltro(k)}
+              className={cn(
+                "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                filtro === k ? "bg-primary text-white" : "text-muted hover:bg-accent hover:text-ink"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button onClick={onVerCronograma} className="text-sm text-secondary hover:underline">
+          Ver tudo em cronograma →
+        </button>
+      </div>
+
+      {visiveis.length === 0 ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-line bg-card/50 px-6 py-14 text-center text-sm text-muted">
+          Sem casas nesta vista.
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {visiveis.map((c) => {
+            const estado = estadoHumanoObras(c.obras, fases, despesas, marcos);
+            const hex = ESTADO_HUMANO_HEX[estado];
+            const prog = Math.round(c.obras.reduce((s, o) => s + progressoReal(o, fases), 0) / c.obras.length);
+            return (
+              <button
+                key={`${c.kind}:${c.id}`}
+                onClick={() => navigate(`/comunidade/colaborativa/obras/${c.id}`)}
+                className="overflow-hidden rounded-2xl border border-line bg-card text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
+              >
+                <div className="relative h-36 bg-accent">
+                  {c.foto ? (
+                    <img src={c.foto} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted">
+                      {c.kind === "project" ? <Users2 size={26} /> : <Building2 size={26} />}
+                    </div>
+                  )}
+                </div>
+                <div className="p-4">
+                  <p className="truncate text-base font-semibold text-ink">{c.nome}</p>
+                  <p className="text-xs text-muted">
+                    {c.cidade} · {c.obras.length} {c.obras.length === 1 ? "obra" : "obras"}
+                  </p>
+                  <p className="mt-2.5 flex items-center gap-1.5 text-sm font-medium" style={{ color: hex }}>
+                    <span className="h-2 w-2 rounded-full" style={{ background: hex }} />
+                    {ESTADO_HUMANO_CASA[estado]}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-accent">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${prog}%`, background: hex }} />
+                    </div>
+                    <span className="num text-xs text-muted">{prog}%</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
