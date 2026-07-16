@@ -43,6 +43,7 @@ import {
   estadoHumanoObras,
   ESTADO_HUMANO_CASA,
   ESTADO_HUMANO_HEX,
+  custoObrasProjeto,
   type Obra,
   type Fase,
   type Marco,
@@ -53,6 +54,8 @@ import {
 import { useCollabStore } from "@/store/useCollabStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
+import { financasFlipProjeto } from "@/lib/calc/obraProjeto";
+import { EmpreiteirosDirectory } from "@/components/obras/EmpreiteirosDirectory";
 import { eur, pct, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { MemberStack, RoleAvatar, VotacaoPanel, EstadoAprovacaoBadge, nomeProprio } from "@/components/obras/CoGestao";
@@ -681,7 +684,7 @@ function CriticoCard({ issue }: { issue: Issue }) {
 
 // ───────────────────── Grelha de CASAS (nível 1 · caminho principal) ─────────────────────
 
-type CasaFiltro = "todas" | "decorrer" | "concluidas";
+type CasaFiltro = "todas" | "decorrer" | "concluidas" | "empreiteiros";
 
 interface CasaInfo {
   id: string;
@@ -733,17 +736,18 @@ function CasasGrid({
     <div className="mt-8">
       {/* Filtro simples — nada mais */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1.5">
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
           {([
             ["todas", "Todas"],
             ["decorrer", "Com obras a decorrer"],
             ["concluidas", "Concluídas"],
+            ["empreiteiros", "Empreiteiros"],
           ] as [CasaFiltro, string][]).map(([k, label]) => (
             <button
               key={k}
               onClick={() => setFiltro(k)}
               className={cn(
-                "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
                 filtro === k ? "bg-primary text-white" : "text-muted hover:bg-accent hover:text-ink"
               )}
             >
@@ -756,7 +760,9 @@ function CasasGrid({
         </button>
       </div>
 
-      {visiveis.length === 0 ? (
+      {filtro === "empreiteiros" ? (
+        <EmpreiteirosDirectory />
+      ) : visiveis.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-dashed border-line bg-card/50 px-6 py-14 text-center text-sm text-muted">
           Sem casas nesta vista.
         </div>
@@ -766,6 +772,11 @@ function CasasGrid({
             const estado = estadoHumanoObras(c.obras, fases, despesas, marcos);
             const hex = ESTADO_HUMANO_HEX[estado];
             const prog = Math.round(c.obras.reduce((s, o) => s + progressoReal(o, fases), 0) / c.obras.length);
+            // Radar de rentabilidade: projeto flip mostra lucro/ROI afetados pelas obras
+            const projFlip = c.kind === "project" ? projects.find((p) => p.id === c.id && p.type === "reabilitacao") : undefined;
+            const fin = projFlip ? financasFlipProjeto(projFlip, custoObrasProjeto(projFlip.id, c.obras, despesas)) : undefined;
+            const derrapagem = c.obras.reduce((s, o) => s + Math.max(0, gastoReal(o, despesas) - o.orcamento), 0);
+            const finTone = !fin ? "" : fin.lucroEstimado <= 0 ? "text-danger" : derrapagem > 0 ? "text-warning" : "text-success";
             return (
               <button
                 key={`${c.kind}:${c.id}`}
@@ -796,6 +807,12 @@ function CasasGrid({
                     </div>
                     <span className="num text-xs text-muted">{prog}%</span>
                   </div>
+                  {/* Obra → lucro: radar de rentabilidade do flip */}
+                  {fin && (
+                    <p className={cn("num mt-2 border-t border-line/60 pt-2 text-xs font-medium", finTone)}>
+                      Lucro estimado: {eur(fin.lucroEstimado)} · ROI {pct(fin.roi)}
+                    </p>
+                  )}
                 </div>
               </button>
             );

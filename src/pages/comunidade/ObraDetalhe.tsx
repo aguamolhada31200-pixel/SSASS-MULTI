@@ -21,12 +21,17 @@ import {
   ArrowDown,
   X,
   ChevronRight,
+  ChevronDown,
   Lock,
   Star,
   ShieldCheck,
-  TriangleAlert,
   AlertTriangle,
   Vote,
+  TrendingDown,
+  Send,
+  Wallet,
+  Clock,
+  Activity,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -65,6 +70,8 @@ import {
   ROLE_LABEL,
   divisaoDe,
   DIVISAO_LABEL,
+  saudePrazoScore,
+  custoObrasProjeto,
   type Obra,
   type ObraEstado,
   type MarcoEstado,
@@ -74,11 +81,16 @@ import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { useDocumentsStore } from "@/store/useDocumentsStore";
 import { useModalStore } from "@/store/useModalStore";
+import { useTechniciansStore } from "@/store/useTechniciansStore";
+import { useNotificationsStore } from "@/store/useNotificationsStore";
+import { financasFlipProjeto } from "@/lib/calc/obraProjeto";
+import { EmpreiteiroDialog, AvaliarEmpreiteiroDialog } from "@/components/obras/EmpreiteiroCard";
 import { eur, pct, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SaudeRing, MemberStack, RoleAvatar, VotacaoPanel, EstadoAprovacaoBadge, nomeProprio } from "@/components/obras/CoGestao";
 
-const TABS = ["Fases", "Despesas", "Marcos", "Fotos", "Notas"] as const;
+// Linguagem simples: Passos · Gastos · Pagamentos · Fotos · Notas
+const TABS = ["Passos", "Gastos", "Pagamentos", "Fotos", "Notas"] as const;
 type TabKey = (typeof TABS)[number];
 
 export default function ObraDetalhe() {
@@ -97,14 +109,22 @@ export default function ObraDetalhe() {
   const openObraForm = useModalStore((s) => s.openObraForm);
   const openGaleriaForm = useModalStore((s) => s.openGaleriaForm);
 
-  const [tab, setTab] = useState<TabKey>("Fases");
+  const [tab, setTab] = useState<TabKey>("Passos");
+  const [gestaoAberta, setGestaoAberta] = useState(false);
+  const [empreiteiroOpen, setEmpreiteiroOpen] = useState(false);
+  const [avaliarOpen, setAvaliarOpen] = useState(false);
+
+  const obrasAll = useObrasStore((s) => s.obras);
+  const marcosAll = useObrasStore((s) => s.marcos);
+  const updateObraProg = useObrasStore((s) => s.updateObra);
+  const technicians = useTechniciansStore((s) => s.technicians);
 
   if (!obra) {
     return (
       <div className="py-16 text-center">
         <p className="text-muted">Obra não encontrada.</p>
         <Link to="/comunidade/colaborativa/obras" className="mt-2 inline-block text-secondary hover:underline">
-          ← Voltar ao Centro de Comando
+          ← Voltar às obras
         </Link>
       </div>
     );
@@ -116,15 +136,13 @@ export default function ObraDetalhe() {
   const g = gastoReal(obra, despesas);
   const prog = progressoReal(obra, fases);
   const desv = g - obra.orcamento;
-  const previsto = gastoPrevistoAteHoje(obra);
   const dias = diasRestantes(obra);
   const atrasada = estaAtrasada(obra);
   const estOrc = estadoOrcamento(obra, despesas);
-  const marcosAll = useObrasStore((s) => s.marcos);
-  const marcosPend = useObrasStore((s) => s.marcosDe(obra.id)).filter((m) => m.estado !== "pago");
+  const marcosPend = marcosAll.filter((m) => m.obraId === obra.id && m.estado !== "pago").sort((a, b) => (a.dataPrevista < b.dataPrevista ? -1 : 1));
   const proxMarco = marcosPend[0];
 
-  // Co-gestão + saúde
+  // Co-gestão + saúde (50% dinheiro · 50% prazo — nunca verde com orçamento estourado)
   const saude = saudeObra(obra, fases, despesas, marcosAll);
   const temCoGestao = membrosDe(obra).length > 0;
   const souGestor = podeGerir(obra, CURRENT_USER_ID);
@@ -136,15 +154,78 @@ export default function ObraDetalhe() {
   const compVal = gastoComprovado(obra, despesas);
   const transpTone = toneTransparencia(pctComp);
 
-  // Barras paralelas orçamento vs prazo (obras sem datas mostram "—", nunca NaN)
+  // Barras (nunca NaN, nunca dias negativos mostrados)
   const temDatas = !!obra.dataInicio && !!obra.dataFimPrevista;
   const totalDias = temDatas
     ? Math.max(0, Math.round((new Date(`${obra.dataFimPrevista}T00:00:00`).getTime() - new Date(`${obra.dataInicio}T00:00:00`).getTime()) / 86400000))
     : 0;
   const decorridos = totalDias > 0 ? Math.max(0, Math.min(totalDias, Math.round((Date.now() - new Date(`${obra.dataInicio}T00:00:00`).getTime()) / 86400000))) : 0;
-  const prazoPct = totalDias > 0 ? Math.round((decorridos / totalDias) * 100) : 0;
+  const prazoPct = obra.estado === "concluida" ? 100 : totalDias > 0 ? Math.round((decorridos / totalDias) * 100) : 0;
   const gastoPct = obra.orcamento > 0 ? Math.round((g / obra.orcamento) * 100) : 0;
-  const gastoAFrente = temDatas && gastoPct > prazoPct + 5; // gasta-se mais depressa do que o tempo passa
+
+  // ── Cartão TEMPO: texto humano por estado (nunca dias negativos) ──
+  const hoje = new Date().toISOString().slice(0, 10);
+  const diasAteInicio = obra.dataInicio ? Math.round((new Date(`${obra.dataInicio}T00:00:00`).getTime() - new Date(`${hoje}T00:00:00`).getTime()) / 86400000) : 0;
+  const noPrazo = saudePrazoScore(obra) === 100;
+  let tempoTitulo: string;
+  let tempoTone: "success" | "warning" | "danger" | "neutral";
+  if (obra.estado === "concluida") {
+    const atrasoFinal = obra.dataFimReal && obra.dataFimReal > obra.dataFimPrevista
+      ? Math.round((new Date(`${obra.dataFimReal}T00:00:00`).getTime() - new Date(`${obra.dataFimPrevista}T00:00:00`).getTime()) / 86400000)
+      : 0;
+    tempoTitulo = atrasoFinal > 0 ? `Terminou ${atrasoFinal} ${atrasoFinal === 1 ? "dia" : "dias"} depois` : "Terminou no prazo";
+    tempoTone = atrasoFinal > 0 ? "warning" : "success";
+  } else if (obra.estado === "pausada") {
+    tempoTitulo = "Obra parada";
+    tempoTone = "warning";
+  } else if (obra.estado === "por_iniciar") {
+    tempoTitulo = diasAteInicio > 0 ? `Começa em ${diasAteInicio} ${diasAteInicio === 1 ? "dia" : "dias"}` : obra.dataInicio ? `Início a ${dataPT(obra.dataInicio)}` : "Por começar";
+    tempoTone = "neutral";
+  } else if (atrasada) {
+    tempoTitulo = `Atrasada ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "dia" : "dias"}`;
+    tempoTone = "danger";
+  } else {
+    tempoTitulo = Number.isFinite(dias) ? `Faltam ${dias} ${dias === 1 ? "dia" : "dias"}` : "Sem datas definidas";
+    tempoTone = "success";
+  }
+  const tempoSub = obra.estado === "concluida"
+    ? `Concluída · ${dataPT(obra.dataFimReal ?? obra.dataFimPrevista)}`
+    : temDatas
+      ? `${decorridos} de ${totalDias} dias · até ${dataPT(obra.dataFimPrevista)}`
+      : "Defina as datas na edição";
+
+  // ── Cartão DINHEIRO ──
+  const aindaNaoComecou = g === 0 && prog === 0;
+  const dinheiroVeredito = aindaNaoComecou
+    ? { texto: "Ainda não começou", tone: "neutral" as const }
+    : desv > 0
+      ? { texto: `${eur(desv)} acima do orçamento`, tone: "danger" as const }
+      : { texto: `Sobram ${eur(Math.abs(desv))}`, tone: "success" as const };
+
+  // ── Resumo humano (nota de causa) ──
+  const resumoHumano = desv > 0 && obra.notaCausa
+    ? `Ficou ${eur(desv)} acima do previsto — ${obra.notaCausa.toLowerCase()}.`
+    : desv > 0
+      ? `Está ${eur(desv)} acima do orçamento.`
+      : obra.estado === "por_iniciar"
+        ? obra.notas || "Adjudicada — à espera de início."
+        : atrasada && obra.notaCausa
+          ? `Atrasada — ${obra.notaCausa.toLowerCase()}.`
+          : atrasada
+            ? `Está ${Math.abs(dias)} dias atrasada.`
+            : obra.estado === "concluida"
+              ? "Concluída dentro do orçamento e do prazo."
+              : "Dentro do orçamento e no prazo.";
+
+  // ── Empreiteiro clicável (diretório) ──
+  const tecDaObra = technicians.find((t) => t.id === obra.empreiteiroId) ?? technicians.find((t) => t.nome === obra.empreiteiro);
+
+  // ── Impacto no lucro do projeto (flip) ──
+  const flip = project && project.type === "reabilitacao" ? project : undefined;
+  const custoObrasAtual = flip ? custoObrasProjeto(flip.id, obrasAll, despesas) : 0;
+  const finAtual = flip ? financasFlipProjeto(flip, custoObrasAtual) : undefined;
+  const derrapagemDesta = Math.max(0, desv);
+  const finSemDerrapagem = flip ? financasFlipProjeto(flip, custoObrasAtual - derrapagemDesta) : undefined;
 
   const ownerHref = project
     ? `/comunidade/colaborativa/${project.id}`
@@ -184,33 +265,39 @@ export default function ObraDetalhe() {
         <span className="font-medium text-ink">{obra.titulo}</span>
       </div>
 
-      {/* Header */}
+      {/* Header — 3 blocos apenas, grandes e legíveis */}
       <Card>
         <CardContent className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
+                <ObraEstadoBadge estado={obra.estado} />
                 <span className="rounded-full bg-accent px-2 py-0.5 text-muted">
                   {CATEGORIA_LABEL[obra.categoria]}
                 </span>
-                <Link
-                  to={ownerHref}
-                  className="flex items-center gap-1 text-muted hover:text-primary"
-                >
-                  {ownerIcon} {ownerTitle}
-                </Link>
-                <ObraEstadoBadge estado={obra.estado} />
-                {obra.empreiteiro && (
-                  <span className="text-muted">· {obra.empreiteiro}</span>
+                {souGestor && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 font-medium text-gold-dark">Gestor</span>
                 )}
+                {/* Empreiteiro CLICÁVEL → cartão de contacto */}
+                {tecDaObra ? (
+                  <button
+                    onClick={() => setEmpreiteiroOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2 py-0.5 font-medium text-secondary hover:bg-accent"
+                  >
+                    <Hammer size={10} /> {tecDaObra.nome}
+                  </button>
+                ) : obra.empreiteiro ? (
+                  <span className="text-muted">· {obra.empreiteiro}</span>
+                ) : null}
                 {obra.estado === "concluida" && obra.avaliacaoTecnico ? (
                   <Estrelas n={obra.avaliacaoTecnico} />
                 ) : null}
               </div>
               <h1 className="font-display text-2xl font-bold text-ink">{obra.titulo}</h1>
-              {obra.notas && (
-                <p className="mt-1 max-w-2xl text-sm text-muted">{obra.notas}</p>
-              )}
+              {/* Resumo humano — a nota de causa em 1 linha */}
+              <p className={cn("mt-1 max-w-2xl text-sm", desv > 0 ? "font-medium text-danger" : "text-muted")}>
+                {resumoHumano}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {souGestor ? (
@@ -241,6 +328,7 @@ export default function ObraDetalhe() {
                           description: "Quer criar um antes/depois com as fotos desta obra?",
                           action: { label: "Criar", onClick: () => openGaleriaForm({ initialObraId: obra.id }) },
                         });
+                        if (tecDaObra) setAvaliarOpen(true);
                       }}
                     >
                       <CheckCircle2 size={14} /> Marcar concluída
@@ -258,122 +346,149 @@ export default function ObraDetalhe() {
             </div>
           </div>
 
-          {/* KPIs */}
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <KpiMini label="Orçamento" value={eur(obra.orcamento)} tone="gold" />
-            <KpiMini
-              label="Gasto"
-              value={eur(g)}
-              tone={estOrc === "vermelho" ? "danger" : estOrc === "ambar" ? "warning" : "success"}
-            />
-            {/* Desvio em linguagem humana: só assusta (vermelho) quando há gasto REAL
-                acima do orçamento — obra por começar mostra "Ainda não começou". */}
-            {g === 0 && prog === 0 ? (
-              <KpiMini label="Desvio" value="Ainda não começou" tone="neutral" />
-            ) : (
-              <KpiMini
-                label="Desvio"
-                value={desv === 0 ? "—" : `${desv > 0 ? "+" : ""}${eur(desv)}`}
-                tone={desv > 0 ? "danger" : desv < 0 ? "success" : "neutral"}
-                sub={desv < 0 ? "dentro do orçamento" : desv > 0 ? "acima do orçamento" : undefined}
-              />
-            )}
-            <KpiMini label="Progresso" value={`${prog}%`} tone="info" />
-            <KpiMini
-              label={atrasada ? "Atrasada" : "Restantes"}
-              value={!temDatas || !Number.isFinite(dias) ? "—" : atrasada ? `${Math.abs(dias)}d` : `${dias}d`}
-              tone={atrasada ? "danger" : "info"}
-              sub={temDatas ? `${dataPT(obra.dataInicio)} → ${dataPT(obra.dataFimPrevista)}` : "Sem datas definidas"}
-            />
-            <KpiMini
-              label="Próximo marco"
-              value={proxMarco ? eur(proxMarco.valor) : "—"}
-              tone="warning"
-              sub={proxMarco ? dataPT(proxMarco.dataPrevista) : "Sem pendentes"}
-            />
+          {/* 3 cartões-história: DINHEIRO · TEMPO · ESTADO */}
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {/* DINHEIRO */}
+            <StoryCard icon={<Wallet size={15} />} label="Dinheiro">
+              <BarraHistoria pct={gastoPct} color={estOrc === "vermelho" ? "#9B3A2A" : estOrc === "ambar" ? "#C17E2A" : "#4A7C59"} pctLabel={`${gastoPct}%`} />
+              <p className="num mt-2 font-display text-xl font-bold text-ink">{eur(g)}</p>
+              <p className="num text-xs text-muted">de {eur(obra.orcamento)}</p>
+              <Veredito tone={dinheiroVeredito.tone}>{dinheiroVeredito.texto}</Veredito>
+            </StoryCard>
+
+            {/* TEMPO */}
+            <StoryCard icon={<Clock size={15} />} label="Tempo">
+              <BarraHistoria pct={prazoPct} color="#8B5E3C" pctLabel={`${prazoPct}%`} />
+              <p className="mt-2 font-display text-xl font-bold text-ink">{tempoTitulo}</p>
+              <p className="num text-xs text-muted">{tempoSub}</p>
+              <Veredito tone={tempoTone}>{noPrazo ? "a horas" : obra.estado === "concluida" ? "fora do prazo" : "em atraso"}</Veredito>
+            </StoryCard>
+
+            {/* ESTADO (índice de saúde 50% dinheiro + 50% prazo) */}
+            <StoryCard icon={<Activity size={15} />} label="Estado">
+              <div className="flex items-center gap-3">
+                <SaudeRing score={saude.score} saude={saude.saude} size={56} />
+                <div>
+                  <p className="font-display text-xl font-bold" style={{ color: SAUDE_HEX[saude.saude] }}>
+                    {SAUDE_LABEL[saude.saude]}
+                  </p>
+                  <p className="text-xs text-muted">{saude.problema ?? "Dinheiro e prazo em ordem"}</p>
+                </div>
+              </div>
+            </StoryCard>
           </div>
 
-          {/* Saúde + barras paralelas (orçamento vs prazo) */}
-          <div className="mt-5 grid gap-3 lg:grid-cols-[auto_1fr]">
-            <div className="flex items-center gap-3 rounded-xl border border-line/60 bg-bg/40 p-3">
-              <SaudeRing score={saude.score} saude={saude.saude} size={62} />
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Índice de saúde</p>
-                <p className="font-display text-base font-bold" style={{ color: SAUDE_HEX[saude.saude] }}>
-                  {SAUDE_LABEL[saude.saude]}
-                </p>
-                {saude.problema && <p className="text-[11px] text-muted">{saude.problema}</p>}
-              </div>
-            </div>
-            <div className="rounded-xl border border-line/60 bg-bg/40 p-3">
-              <ParallelBar
-                label="Orçamento"
-                value={`${eur(g)} de ${eur(obra.orcamento)} (${gastoPct}%)`}
-                pct={gastoPct}
-                color={estOrc === "vermelho" ? "#9B3A2A" : estOrc === "ambar" ? "#C17E2A" : "#4A7C59"}
-              />
-              <ParallelBar
-                label="Prazo"
-                value={temDatas ? `${decorridos} de ${totalDias} dias (${prazoPct}%)` : "Sem datas definidas"}
-                pct={prazoPct}
-                color="#8B5E3C"
-                className="mt-2.5"
-              />
-              {gastoAFrente && (
-                <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-danger">
-                  <TriangleAlert size={12} /> O dinheiro está a sair mais depressa do que o tempo passa.
-                </p>
+          {/* Progresso em 1 toque — slider + botões rápidos (só o gestor) */}
+          <ProgressoRapido
+            prog={prog}
+            temFases={fases.some((f) => f.obraId === obra.id)}
+            souGestor={souGestor}
+            concluida={obra.estado === "concluida"}
+            onChange={(v) => updateObraProg(obra.id, { progresso: v, ...(v >= 100 ? {} : {}) })}
+          />
+
+          {/* Impacto no lucro do projeto (flip) — discreto mas presente */}
+          {flip && finAtual && finSemDerrapagem && (
+            <Link
+              to={`/comunidade/colaborativa/${flip.id}`}
+              className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gold/25 bg-gold/5 px-3 py-2.5 text-[12px] text-ink transition-colors hover:bg-gold/10"
+            >
+              <TrendingDown size={14} className="shrink-0 text-gold-dark" />
+              {derrapagemDesta > 0 ? (
+                <span>
+                  Impacto no lucro do projeto: gastar <strong className="num">+{eur(derrapagemDesta)}</strong> nesta obra baixa o lucro estimado de{" "}
+                  <strong className="num">{eur(finSemDerrapagem.lucroEstimado)}</strong> para <strong className="num text-danger">{eur(finAtual.lucroEstimado)}</strong>{" "}
+                  (ROI {pct(finSemDerrapagem.roi)} → {pct(finAtual.roi)})
+                </span>
+              ) : (
+                <span>
+                  Lucro estimado do projeto: <strong className="num text-success">{eur(finAtual.lucroEstimado)}</strong> · ROI {pct(finAtual.roi)} — cada euro acima do orçamento sai daqui
+                </span>
               )}
-            </div>
-          </div>
-
-          {/* Co-gestão — membros + regras de aprovação */}
-          {temCoGestao && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-line/60 bg-bg/40 px-3 py-2.5">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Co-gestão</span>
-                {membrosDe(obra).map((m) => (
-                  <span key={m.userId} className="flex items-center gap-1.5">
-                    <RoleAvatar profile={profiles.find((p) => p.id === m.userId)} role={m.role} size="xs" />
-                    <span className="text-xs text-ink">{nomeProprio(profiles.find((p) => p.id === m.userId)?.fullName)}</span>
-                    <span className="text-[10px] text-muted">{ROLE_LABEL[m.role]}</span>
-                  </span>
-                ))}
-              </div>
-              <span className="flex items-center gap-1.5 text-[11px] text-muted">
-                <ShieldCheck size={12} className="text-gold-dark" />
-                Threshold: {eur(thresholdDe(obra))} (5%) · {REGRA_LABEL[obra.regraVotacao ?? "maioria_simples"]}
-                {souGestor && <button onClick={() => toast.message("Edição de regras em breve.")} className="ml-1 underline hover:text-ink">Editar</button>}
-              </span>
-            </div>
+              <ChevronRight size={13} className="ml-auto shrink-0 text-muted" />
+            </Link>
           )}
 
-          {/* Transparência — % do gasto comprovado */}
-          {g > 0 && (
-            <div className="mt-3 rounded-xl border border-line/60 bg-bg/40 px-3 py-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
-                  <ShieldCheck size={12} className="text-gold-dark" /> Transparência da obra
-                </p>
-                <p className="num text-xs font-semibold" style={{ color: TRANSP_HEX[transpTone] }}>
-                  {pctComp}% comprovado · {TRANSP_LABEL[transpTone]}
-                </p>
-              </div>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-accent">
-                <div className="h-full origin-left rounded-full animate-grow-x" style={{ width: `${pctComp}%`, background: TRANSP_HEX[transpTone] }} />
-              </div>
-              <p className="num mt-1.5 text-[11px] text-muted">
-                {eur(compVal)} comprovado
-                {naoComp > 0 && (
-                  <>
-                    {" "}· <span className="font-medium text-warning">{eur(naoComp)} por comprovar</span>
-                  </>
+          {/* Co-gestão + transparência — 1 linha discreta, expande ao clicar */}
+          {(temCoGestao || g > 0) && (
+            <div className="mt-3">
+              <button
+                onClick={() => setGestaoAberta((v) => !v)}
+                className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-line/60 bg-bg/40 px-3 py-2.5 text-left text-[12px] text-muted transition-colors hover:bg-bg/70"
+              >
+                {temCoGestao && (
+                  <span className="flex items-center gap-1.5">
+                    <Users2 size={13} />
+                    {membrosDe(obra)
+                      .map((m) => `${nomeProprio(profiles.find((p) => p.id === m.userId)?.fullName)}${m.role === "gestor" ? " (gestor)" : ""}`)
+                      .join(", ")}
+                  </span>
                 )}
-              </p>
+                {g > 0 && (
+                  <span className="flex items-center gap-1" style={{ color: TRANSP_HEX[transpTone] }}>
+                    <ShieldCheck size={13} /> {pctComp}% dos gastos comprovados
+                  </span>
+                )}
+                {temCoGestao && <span>· Threshold {eur(thresholdDe(obra))}</span>}
+                <ChevronDown size={14} className={cn("ml-auto shrink-0 transition-transform", gestaoAberta && "rotate-180")} />
+              </button>
+
+              {gestaoAberta && (
+                <div className="mt-2 space-y-3 rounded-xl border border-line/60 bg-bg/40 p-3 animate-fade-in">
+                  {temCoGestao && (
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {membrosDe(obra).map((m) => (
+                          <span key={m.userId} className="flex items-center gap-1.5">
+                            <RoleAvatar profile={profiles.find((p) => p.id === m.userId)} role={m.role} size="xs" />
+                            <span className="text-xs text-ink">{nomeProprio(profiles.find((p) => p.id === m.userId)?.fullName)}</span>
+                            <span className="text-[10px] text-muted">{ROLE_LABEL[m.role]}</span>
+                          </span>
+                        ))}
+                      </div>
+                      <span className="flex items-center gap-1.5 text-[11px] text-muted">
+                        <ShieldCheck size={12} className="text-gold-dark" />
+                        Threshold: {eur(thresholdDe(obra))} (5%) · {REGRA_LABEL[obra.regraVotacao ?? "maioria_simples"]}
+                      </span>
+                    </div>
+                  )}
+                  {g > 0 && (
+                    <div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Transparência da obra</p>
+                        <p className="num text-xs font-semibold" style={{ color: TRANSP_HEX[transpTone] }}>
+                          {pctComp}% comprovado · {TRANSP_LABEL[transpTone]}
+                        </p>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-accent">
+                        <div className="h-full origin-left rounded-full animate-grow-x" style={{ width: `${pctComp}%`, background: TRANSP_HEX[transpTone] }} />
+                      </div>
+                      <p className="num mt-1.5 text-[11px] text-muted">
+                        {eur(compVal)} comprovado
+                        {naoComp > 0 && (
+                          <> · <span className="font-medium text-warning">{eur(naoComp)} por comprovar</span></>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Diálogos: cartão do empreiteiro + avaliação ao concluir */}
+      {empreiteiroOpen && tecDaObra && <EmpreiteiroDialog technicianId={tecDaObra.id} onClose={() => setEmpreiteiroOpen(false)} />}
+      {avaliarOpen && tecDaObra && (
+        <AvaliarEmpreiteiroDialog
+          technician={tecDaObra}
+          onClose={(estrelas) => {
+            if (estrelas) updateObraProg(obra.id, { avaliacaoTecnico: estrelas });
+            setAvaliarOpen(false);
+          }}
+        />
+      )}
 
       {/* Tabs */}
       <div className="mt-5 flex gap-1 overflow-x-auto border-b border-line">
@@ -394,9 +509,9 @@ export default function ObraDetalhe() {
       </div>
 
       <div className="mt-5">
-        {tab === "Fases" && <FasesTab obraId={obra.id} souGestor={souGestor} />}
-        {tab === "Despesas" && <DespesasTab obra={obra} souGestor={souGestor} />}
-        {tab === "Marcos" && <MarcosTab obra={obra} souGestor={souGestor} />}
+        {tab === "Passos" && <FasesTab obraId={obra.id} souGestor={souGestor} />}
+        {tab === "Gastos" && <DespesasTab obra={obra} souGestor={souGestor} />}
+        {tab === "Pagamentos" && <MarcosTab obra={obra} souGestor={souGestor} />}
         {tab === "Fotos" && <FotosTab obraId={obra.id} />}
         {tab === "Notas" && <NotasTab obraId={obra.id} />}
       </div>
@@ -404,67 +519,98 @@ export default function ObraDetalhe() {
   );
 }
 
-// ───────────────────── KPI mini ─────────────────────
+// ───────────────────── Cartões-história (Dinheiro · Tempo · Estado) ─────────────────────
 
-function KpiMini({
-  label,
-  value,
-  tone,
-  sub,
-}: {
-  label: string;
-  value: string;
-  tone: "gold" | "success" | "danger" | "info" | "warning" | "neutral";
-  sub?: string;
-}) {
-  const colorMap = {
-    gold: "text-gold-dark",
-    success: "text-success",
-    danger: "text-danger",
-    info: "text-secondary",
-    warning: "text-warning",
-    neutral: "text-ink",
-  } as const;
+function StoryCard({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-line/60 bg-bg/40 p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-        {label}
+    <div className="rounded-xl border border-line/60 bg-bg/40 p-4">
+      <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+        {icon} {label}
       </p>
-      <p className={cn("num mt-1 font-display text-lg font-bold", colorMap[tone])}>
-        {value}
-      </p>
-      {sub && <p className="mt-0.5 text-[10px] text-muted">{sub}</p>}
+      {children}
     </div>
   );
 }
 
-// ───────────────────── Barra paralela (orçamento / prazo) ─────────────────────
-
-function ParallelBar({
-  label,
-  value,
-  pct,
-  color,
-  className,
-}: {
-  label: string;
-  value: string;
-  pct: number;
-  color: string;
-  className?: string;
-}) {
+function BarraHistoria({ pct: p, color, pctLabel }: { pct: number; color: string; pctLabel: string }) {
   return (
-    <div className={className}>
-      <div className="flex items-center justify-between text-[11px]">
-        <span className="font-medium text-muted">{label}</span>
-        <span className="num text-muted">{value}</span>
+    <div className="flex items-center gap-2">
+      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-accent">
+        <div className="h-full origin-left rounded-full animate-grow-x" style={{ width: `${Math.min(100, Math.max(0, p))}%`, background: color }} />
       </div>
-      <div className="mt-1 h-2 overflow-hidden rounded-full bg-accent">
-        <div
-          className="h-full origin-left rounded-full animate-grow-x"
-          style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: color }}
-        />
-      </div>
+      <span className="num text-xs font-semibold text-ink">{pctLabel}</span>
+    </div>
+  );
+}
+
+function Veredito({ tone, children }: { tone: "success" | "warning" | "danger" | "neutral"; children: React.ReactNode }) {
+  const cls = {
+    success: "text-success",
+    warning: "text-warning",
+    danger: "text-danger",
+    neutral: "text-muted",
+  }[tone];
+  const dot = { success: "bg-success", warning: "bg-warning", danger: "bg-danger", neutral: "bg-line" }[tone];
+  return (
+    <p className={cn("mt-1.5 flex items-center gap-1.5 text-xs font-medium", cls)}>
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} /> {children}
+    </p>
+  );
+}
+
+/** Slider de progresso + botões rápidos — fricção zero (só o gestor mexe). */
+function ProgressoRapido({
+  prog,
+  temFases,
+  souGestor,
+  concluida,
+  onChange,
+}: {
+  prog: number;
+  temFases: boolean;
+  souGestor: boolean;
+  concluida: boolean;
+  onChange: (v: number) => void;
+}) {
+  const bloqueado = !souGestor || temFases || concluida;
+  const motivo = !souGestor
+    ? "Só o gestor atualiza o progresso"
+    : temFases
+      ? "Automático: média dos passos (atualize cada passo)"
+      : concluida
+        ? "Obra concluída"
+        : undefined;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line/60 bg-bg/40 px-3 py-2.5" title={motivo}>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Progresso</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={prog}
+        disabled={bloqueado}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-2 min-w-[120px] flex-1 accent-[#C8A664] disabled:opacity-50"
+      />
+      <span className="num w-11 text-right text-sm font-bold text-ink">{prog}%</span>
+      {!bloqueado && (
+        <span className="flex gap-1.5">
+          <button
+            onClick={() => onChange(Math.min(100, prog + 25))}
+            className="rounded-full border border-line bg-card px-2.5 py-1 text-[11px] font-medium text-ink hover:bg-accent"
+          >
+            +25%
+          </button>
+          <button
+            onClick={() => onChange(100)}
+            className="rounded-full border border-success/40 bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success hover:bg-success/20"
+          >
+            Concluído
+          </button>
+        </span>
+      )}
+      {motivo && <span className="text-[10px] text-muted">{motivo}</span>}
     </div>
   );
 }
@@ -484,20 +630,51 @@ function Estrelas({ n }: { n: number }) {
 function FasesTab({ obraId, souGestor }: { obraId: string; souGestor: boolean }) {
   const fasesAll = useObrasStore((s) => s.fases);
   const despesas = useObrasStore((s) => s.despesas);
+  const obra = useObrasStore((s) => s.obras.find((o) => o.id === obraId));
   const addFase = useObrasStore((s) => s.addFase);
   const updateFase = useObrasStore((s) => s.updateFase);
   const removeFase = useObrasStore((s) => s.removeFase);
   const reorderFases = useObrasStore((s) => s.reorderFases);
+  const sugerirFase = useObrasStore((s) => s.sugerirFase);
+  const sugestoes = useObrasStore((s) => s.sugestoes.filter((x) => x.obraId === obraId && x.estado === "pendente"));
+  const resolverSugestao = useObrasStore((s) => s.resolverSugestao);
+  const addNotif = useNotificationsStore((s) => s.add);
+  const profiles = useProfilesStore((s) => s.profiles);
 
   const fases = fasesAll
     .filter((f) => f.obraId === obraId)
     .sort((a, b) => a.ordem - b.ordem);
+
+  const gestorId = obra ? membrosDe(obra).find((m) => m.role === "gestor")?.userId : undefined;
+  const nomeGestor = nomeProprio(profiles.find((p) => p.id === gestorId)?.fullName) || "o gestor";
 
   const [showForm, setShowForm] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [custoEst, setCustoEst] = useState(0);
+  const [sugestaoTexto, setSugestaoTexto] = useState("");
+  const [sugestaoOpen, setSugestaoOpen] = useState(false);
+
+  const enviarSugestao = () => {
+    if (!sugestaoTexto.trim()) {
+      toast.error("Descreva o passo que sugere");
+      return;
+    }
+    sugerirFase(obraId, sugestaoTexto.trim(), CURRENT_USER_ID);
+    if (gestorId && obra) {
+      addNotif({
+        userId: gestorId,
+        tipo: "geral",
+        titulo: `Sugestão de passo em «${obra.titulo}»`,
+        descricao: sugestaoTexto.trim(),
+        link: `/obra/${obraId}`,
+      });
+    }
+    setSugestaoTexto("");
+    setSugestaoOpen(false);
+    toast.success(`Sugestão enviada a ${nomeGestor}`, { description: "Ele decide se adiciona o passo." });
+  };
 
   const onAdd = () => {
     if (!titulo.trim()) {
@@ -536,17 +713,74 @@ function FasesTab({ obraId, souGestor }: { obraId: string; souGestor: boolean })
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {souGestor ? (
           <Button size="sm" variant={showForm ? "ghost" : "outline"} onClick={() => setShowForm(!showForm)}>
-            {showForm ? "Cancelar" : <><Plus size={14} /> Nova fase</>}
+            {showForm ? "Cancelar" : <><Plus size={14} /> Adicionar passo</>}
           </Button>
         ) : (
-          <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor")}>
-            <Lock size={13} /> Solicitar fase
+          <Button
+            size="sm"
+            variant="outline"
+            title={`Envia uma sugestão a ${nomeGestor} (gestor). Ele decide se adiciona.`}
+            onClick={() => setSugestaoOpen((v) => !v)}
+          >
+            <Send size={13} /> Sugerir passo ao gestor
           </Button>
         )}
       </div>
+
+      {/* Sócio investidor: caixa de sugestão (cria sugestão + notifica o gestor) */}
+      {sugestaoOpen && !souGestor && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="mb-2 text-xs text-muted">A sugestão vai para {nomeGestor} — ele decide se adiciona o passo.</p>
+            <div className="flex gap-2">
+              <input
+                value={sugestaoTexto}
+                onChange={(e) => setSugestaoTexto(e.target.value)}
+                placeholder="Ex.: Impermeabilização da varanda"
+                className={inputCls}
+                onKeyDown={(e) => { if (e.key === "Enter") enviarSugestao(); }}
+              />
+              <Button size="sm" onClick={enviarSugestao}><Send size={13} /> Enviar</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Gestor: sugestões pendentes dos sócios */}
+      {souGestor && sugestoes.length > 0 && (
+        <Card className="border-gold/30 bg-gold/5">
+          <CardContent className="space-y-2 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gold-dark">Sugestões dos sócios</p>
+            {sugestoes.map((sg) => (
+              <div key={sg.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-card px-3 py-2">
+                <span className="text-sm text-ink">
+                  {sg.titulo}
+                  <span className="ml-2 text-[11px] text-muted">por {nomeProprio(profiles.find((p) => p.id === sg.autorId)?.fullName)}</span>
+                </span>
+                <span className="flex gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="gold"
+                    onClick={() => {
+                      addFase({ obraId, titulo: sg.titulo, dataInicio: "", dataFim: "", progresso: 0, custoEstimado: 0, ordem: fases.length + 1 });
+                      resolverSugestao(sg.id, "aceite");
+                      toast.success("Passo adicionado a partir da sugestão");
+                    }}
+                  >
+                    <Plus size={13} /> Adicionar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { resolverSugestao(sg.id, "rejeitada"); toast.message("Sugestão rejeitada"); }}>
+                    Rejeitar
+                  </Button>
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {showForm && (
         <Card>
@@ -601,7 +835,16 @@ function FasesTab({ obraId, souGestor }: { obraId: string; souGestor: boolean })
         <Card>
           <CardContent className="py-10 text-center text-muted">
             <Hammer size={26} className="mx-auto mb-2" />
-            <p className="text-sm">Esta obra ainda não tem fases.</p>
+            <p className="text-sm">Divida a obra em passos (ex.: demolição, canalização, acabamentos).</p>
+            {souGestor ? (
+              <Button size="sm" variant="gold" className="mt-3" onClick={() => setShowForm(true)}>
+                <Plus size={14} /> Adicionar passo
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => setSugestaoOpen(true)}>
+                <Send size={13} /> Sugerir passo ao gestor
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -662,31 +905,37 @@ function FasesTab({ obraId, souGestor }: { obraId: string; souGestor: boolean })
                             </span>
                           )}
                         </span>
-                        <span>
-                          Progresso:{" "}
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={f.progresso}
-                            onChange={(e) =>
-                              updateFase(f.id, {
-                                progresso: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
-                              })
-                            }
-                            className="num w-14 rounded border border-line bg-card px-1 text-xs"
-                          />
-                          %
-                        </span>
                       </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-accent">
-                        <div
-                          className={cn(
-                            "h-full rounded-full",
-                            f.progresso === 100 ? "bg-success" : "bg-warning"
-                          )}
-                          style={{ width: `${f.progresso}%` }}
+                      {/* Progresso em 1 toque: slider + botões rápidos (só o gestor) */}
+                      <div className="mt-2 flex items-center gap-2" title={souGestor ? undefined : "Só o gestor atualiza o progresso"}>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={f.progresso}
+                          disabled={!souGestor}
+                          onChange={(e) => updateFase(f.id, { progresso: Number(e.target.value) })}
+                          className="h-2 flex-1 accent-[#C8A664] disabled:opacity-50"
                         />
+                        <span className={cn("num w-10 text-right text-xs font-bold", f.progresso === 100 ? "text-success" : "text-ink")}>{f.progresso}%</span>
+                        {souGestor && f.progresso < 100 && (
+                          <>
+                            <button
+                              onClick={() => updateFase(f.id, { progresso: Math.min(100, f.progresso + 25) })}
+                              className="rounded-full border border-line bg-card px-2 py-0.5 text-[10px] font-medium text-ink hover:bg-accent"
+                            >
+                              +25%
+                            </button>
+                            <button
+                              onClick={() => { updateFase(f.id, { progresso: 100 }); toast.success(`Passo concluído · ${f.titulo}`); }}
+                              className="rounded-full border border-success/40 bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success hover:bg-success/20"
+                            >
+                              Concluído
+                            </button>
+                          </>
+                        )}
+                        {f.progresso === 100 && <CheckCircle2 size={15} className="shrink-0 animate-fade-in text-success" />}
                       </div>
                     </div>
                   </div>
@@ -759,13 +1008,9 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
               <AlertTriangle size={13} /> Só por comprovar
             </button>
           )}
-          {souGestor ? (
-            <Button size="sm" variant="outline" onClick={() => openObraExpense(obraId)}>
-              <Plus size={14} /> Nova despesa
-            </Button>
-          ) : (
-            <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor")}>
-              <Lock size={13} /> Solicitar despesa
+          {souGestor && (
+            <Button size="sm" variant="gold" onClick={() => openObraExpense(obraId)}>
+              <Plus size={14} /> Registar gasto
             </Button>
           )}
         </div>
@@ -775,7 +1020,12 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
         <Card>
           <CardContent className="py-10 text-center text-muted">
             <Receipt size={26} className="mx-auto mb-2" />
-            <p className="text-sm">{soPorComprovar ? "Tudo comprovado" : "Nenhuma despesa registada."}</p>
+            <p className="text-sm">{soPorComprovar ? "Tudo comprovado" : "Registe o primeiro gasto com a fatura — o QR preenche tudo."}</p>
+            {!soPorComprovar && souGestor && (
+              <Button size="sm" variant="gold" className="mt-3" onClick={() => openObraExpense(obraId)}>
+                <Plus size={14} /> Registar gasto
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -974,6 +1224,8 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
 
   const totalPrev = marcos.reduce((s, m) => s + m.valor, 0);
   const pagosVal = marcos.filter((m) => m.estado === "pago").reduce((s, m) => s + m.valor, 0);
+  const porPagar = Math.max(0, totalPrev - pagosVal);
+  const proxPend = marcos.find((m) => m.estado !== "pago");
   const precisaVoto = requerAprovacao(obra, valor);
 
   const onAdd = () => {
@@ -999,18 +1251,33 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted">
-          Pago: <strong className="num font-semibold text-success">{eur(pagosVal)}</strong>{" "}
-          de <strong className="num font-semibold text-ink">{eur(totalPrev)}</strong>
-        </p>
-        {souGestor ? (
-          <Button size="sm" variant={showForm ? "ghost" : "outline"} onClick={() => setShowForm(!showForm)}>
-            {showForm ? "Cancelar" : <><Plus size={14} /> Novo marco</>}
-          </Button>
-        ) : (
-          <Button size="sm" variant="outline" onClick={() => toast.success("Pedido enviado ao gestor")}>
-            <Lock size={13} /> Solicitar marco
+      {/* TESOURARIA da obra — 3 números grandes */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl border border-success/30 bg-success/5 p-3 text-center">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Já pago</p>
+          <p className="num mt-0.5 font-display text-xl font-bold text-success">{eur(pagosVal)}</p>
+        </div>
+        <div className={cn("rounded-xl border p-3 text-center", porPagar > 0 ? "border-warning/30 bg-warning/5" : "border-line bg-bg/40")}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Por pagar</p>
+          <p className={cn("num mt-0.5 font-display text-xl font-bold", porPagar > 0 ? "text-warning" : "text-ink")}>{eur(porPagar)}</p>
+        </div>
+        <div className="rounded-xl border border-line bg-bg/40 p-3 text-center">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Próximo pagamento</p>
+          {proxPend ? (
+            <>
+              <p className="num mt-0.5 font-display text-xl font-bold text-ink">{eur(proxPend.valor)}</p>
+              <p className="num text-[10px] text-muted">{dataPT(proxPend.dataPrevista)}</p>
+            </>
+          ) : (
+            <p className="mt-0.5 font-display text-xl font-bold text-muted">—</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {souGestor && (
+          <Button size="sm" variant={showForm ? "ghost" : "gold"} onClick={() => setShowForm(!showForm)}>
+            {showForm ? "Cancelar" : <><Plus size={14} /> Novo pagamento</>}
           </Button>
         )}
       </div>
@@ -1053,7 +1320,12 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
         <Card>
           <CardContent className="py-10 text-center text-muted">
             <Banknote size={26} className="mx-auto mb-2" />
-            <p className="text-sm">Sem marcos de pagamento.</p>
+            <p className="text-sm">Planeie os pagamentos ao empreiteiro (ex.: 30% adjudicação · 40% a meio · 30% no fim).</p>
+            {souGestor && (
+              <Button size="sm" variant="gold" className="mt-3" onClick={() => setShowForm(true)}>
+                <Plus size={14} /> Novo pagamento
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -1098,7 +1370,7 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
                       )}
                       {m.estado !== "pago" && !pendenteVoto && souGestor && (
                         <Button size="sm" variant="gold" onClick={() => onPagar(m.id)}>
-                          <CheckCircle2 size={13} /> Marcar pago
+                          <CheckCircle2 size={13} /> Pagar
                         </Button>
                       )}
                       {souGestor && (

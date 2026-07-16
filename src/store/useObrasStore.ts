@@ -185,7 +185,11 @@ export interface Obra {
   /** Stored fallback when there are no fases linked. Auto-replaced by avg(fases.progresso). */
   progresso: number;
   empreiteiro?: string;
+  /** Liga ao diretório de empreiteiros (useTechniciansStore). */
+  empreiteiroId?: string;
   contactoEmpreiteiro?: string;
+  /** Nota de causa da derrapagem (ex.: "Troca de loiças") — vira o resumo humano do header. */
+  notaCausa?: string;
   fotos: string[];
   notas: string;
   createdAt: string;
@@ -254,6 +258,16 @@ export interface LogEntry {
   obraId: string;
   ts: string;
   texto: string;
+}
+
+/** Sugestão de passo enviada por um sócio investidor ao gestor da obra. */
+export interface SugestaoFase {
+  id: string;
+  obraId: string;
+  titulo: string;
+  autorId: string;
+  ts: string; // ISO
+  estado: "pendente" | "aceite" | "rejeitada";
 }
 
 // ───────────────────── Inputs ─────────────────────
@@ -333,6 +347,7 @@ const SEED_OBRAS: Obra[] = ([
     empreiteiro: "Hidroplan Porto",
     fotos: [],
     notas: "Custo extra com substituição de prumadas que estavam corroídas.",
+    notaCausa: "Substituição de prumadas corroídas",
     createdAt: "2026-04-15",
   },
   {
@@ -364,9 +379,11 @@ const SEED_OBRAS: Obra[] = ([
     dataFimPrevista: "2026-06-01",
     estado: "atrasada",
     progresso: 95,
-    empreiteiro: "Elétrica Norte",
+    empreiteiro: "ElectroPorto",
+    empreiteiroId: "tec-electroporto",
     fotos: [],
     notas: "Atrasada 5 dias — fornecimento de quadro com atraso.",
+    notaCausa: "Fornecimento do quadro elétrico com atraso",
     createdAt: "2026-04-20",
   },
 
@@ -384,6 +401,7 @@ const SEED_OBRAS: Obra[] = ([
     estado: "em_curso",
     progresso: 61,
     empreiteiro: "Pintor Joaquim",
+    empreiteiroId: "tec-pintor-joaquim",
     contactoEmpreiteiro: "joaquim.pintor@gmail.com · 96 333 22 11",
     fotos: [],
     notas: "",
@@ -402,6 +420,7 @@ const SEED_OBRAS: Obra[] = ([
     estado: "por_iniciar",
     progresso: 0,
     empreiteiro: "Cozinhas Modernas Lx",
+    empreiteiroId: "tec-cozinhas-lx",
     fotos: [],
     notas: "Adjudicação assinada — espera de início.",
     createdAt: "2026-06-01",
@@ -416,10 +435,12 @@ const SEED_OBRAS: Obra[] = ([
     gasto: 3700,
     dataInicio: "2026-04-01",
     dataFimPrevista: "2026-05-05",
-    dataFimReal: "2026-05-10",
+    dataFimReal: "2026-05-05",
     estado: "concluida",
     progresso: 100,
     empreiteiro: "Hidro Lisboa",
+    empreiteiroId: "tec-hidro-lisboa",
+    notaCausa: "Troca de loiças",
     avaliacaoTecnico: 4,
     fotos: [],
     notas: "Excedeu orçamento em 200€ por troca de loiças.",
@@ -963,50 +984,74 @@ export interface SaudeObra {
   problema?: string; // problema-chave, se houver
 }
 
-/** Saúde da obra: cruza orçamento + ritmo + marcos vencidos. */
+/** Sub-índice de ORÇAMENTO (0–100): dentro=100 · até +5%=55 · +5% a +15%=35 · >+15%=15. */
+export function saudeOrcamentoScore(obra: Obra, despesas: Despesa[]): number {
+  const gasto = gastoReal(obra, despesas);
+  if (obra.orcamento <= 0) return gasto > 0 ? 15 : 100;
+  const over = (gasto - obra.orcamento) / obra.orcamento;
+  if (over <= 0) return 100;
+  if (over <= 0.05) return 55;
+  if (over <= 0.15) return 35;
+  return 15;
+}
+
+/** Sub-índice de PRAZO (0–100): no prazo=100 · atraso até 15% do tempo=60 · >15%=25. */
+export function saudePrazoScore(obra: Obra): number {
+  const total = diffDays(obra.dataInicio, obra.dataFimPrevista);
+  const fimReferencia = obra.estado === "concluida" ? (obra.dataFimReal ?? obra.dataFimPrevista) : todayISO();
+  const atrasoDias = diffDays(obra.dataFimPrevista, fimReferencia);
+  if (atrasoDias <= 0) return 100; // terminou/está dentro do prazo
+  const pctAtraso = total > 0 ? atrasoDias / total : 1;
+  if (pctAtraso <= 0.15) return 60;
+  return 25;
+}
+
+/**
+ * Saúde da obra = 50% dinheiro + 50% prazo (nunca só progresso).
+ * ≥80 Saudável (verde) · 50–79 Atenção (âmbar) · <50 Em risco (vermelho).
+ * REGRA DURA: com o orçamento estourado, o sub-índice de dinheiro ≤55
+ * ⇒ o índice final nunca chega a 80 nem fica verde.
+ */
 export function saudeObra(
   obra: Obra,
-  fases: Fase[],
+  _fases: Fase[],
   despesas: Despesa[],
   marcos: Marco[]
 ): SaudeObra {
-  if (obra.estado === "concluida") return { saude: "saudavel", score: 100 };
-  if (obra.estado === "pausada") return { saude: "parada", score: 15, problema: "Obra parada" };
+  if (obra.estado === "pausada") return { saude: "parada", score: 25, problema: "Obra parada" };
 
-  const gasto = gastoReal(obra, despesas);
-  const orcRatio = obra.orcamento > 0 ? gasto / obra.orcamento : 0;
-  const overPct = Math.max(0, (orcRatio - 1) * 100);
-  const ritmo = estadoRitmo(obra, fases);
-  const atrasada = estaAtrasada(obra);
-  const marcoVencido = marcos.some(
-    (m) => m.obraId === obra.id && m.estado !== "pago" && m.dataPrevista < todayISO()
-  );
+  const sOrc = saudeOrcamentoScore(obra, despesas);
+  const sPrazo = saudePrazoScore(obra);
+  const score = Math.round(sOrc * 0.5 + sPrazo * 0.5);
 
-  // penalizações de tempo
-  const total = diffDays(obra.dataInicio, obra.dataFimPrevista);
-  const decorridos = total > 0 ? Math.max(0, Math.min(total, diffDays(obra.dataInicio, todayISO()))) : 0;
-  const pctTempo = total > 0 ? (decorridos / total) * 100 : 0;
-  const lag = Math.max(0, pctTempo - progressoReal(obra, fases));
+  const saude: Saude = score >= 80 ? "saudavel" : score >= 50 ? "atencao" : "risco";
 
-  let score = 100 - overPct * 1.5 - lag;
-  if (atrasada) score -= 15;
-  if (marcoVencido) score -= 10;
-  score = Math.max(0, Math.min(100, Math.round(score)));
-
-  let saude: Saude;
+  // O problema-chave: aquilo que puxou o índice para baixo.
   let problema: string | undefined;
-  if (orcRatio > 1 || atrasada || ritmo === "atrasada" || marcoVencido) {
-    saude = "risco";
-    if (orcRatio > 1) problema = `${Math.round(overPct)}% acima do orçamento`;
-    else if (marcoVencido) problema = "Marco de pagamento vencido";
-    else problema = "Prazo ultrapassado";
-  } else if (orcRatio >= 0.85 || ritmo === "a_abrandar") {
-    saude = "atencao";
-    problema = orcRatio >= 0.85 ? "Orçamento quase esgotado" : "Ritmo a abrandar";
-  } else {
-    saude = "saudavel";
+  const gasto = gastoReal(obra, despesas);
+  const marcoVencido =
+    obra.estado !== "concluida" &&
+    marcos.some((m) => m.obraId === obra.id && m.estado !== "pago" && m.dataPrevista < todayISO());
+  if (sOrc < 100 && gasto > obra.orcamento) {
+    const overPct = obra.orcamento > 0 ? Math.round(((gasto - obra.orcamento) / obra.orcamento) * 100) : 100;
+    problema = `${overPct}% acima do orçamento`;
+  } else if (sPrazo < 100) {
+    problema = obra.estado === "concluida" ? "Terminou fora do prazo" : "Prazo ultrapassado";
+  } else if (marcoVencido) {
+    problema = "Marco de pagamento vencido";
   }
   return { saude, score, problema };
+}
+
+/**
+ * Custo total das obras de um projeto (para o lucro do flip):
+ * por obra, o MAIOR entre orçamento e gasto real — se já derrapou, conta a
+ * derrapagem; se ainda não gastou, conta o orçamento previsto.
+ */
+export function custoObrasProjeto(projectId: string, obras: Obra[], despesas: Despesa[]): number {
+  return obras
+    .filter((o) => o.projectId === projectId)
+    .reduce((s, o) => s + Math.max(o.orcamento, gastoReal(o, despesas)), 0);
 }
 
 // ── Estado humano de um conjunto de obras (capa da casa / cartão da divisão) ──
@@ -1128,6 +1173,11 @@ interface ObrasState {
   despesas: Despesa[];
   marcos: Marco[];
   logs: LogEntry[];
+  sugestoes: SugestaoFase[];
+
+  // Sugestões de passo (sócio investidor → gestor)
+  sugerirFase: (obraId: string, titulo: string, autorId: string) => string;
+  resolverSugestao: (id: string, estado: "aceite" | "rejeitada") => void;
 
   // CRUD obras
   addObra: (input: ObraInput) => string;
@@ -1210,6 +1260,29 @@ export const useObrasStore = create<ObrasState>()(
       despesas: SEED_DESPESAS,
       marcos: SEED_MARCOS,
       logs: SEED_LOGS,
+      sugestoes: [],
+
+      sugerirFase: (obraId, titulo, autorId) => {
+        const id = uid("sug");
+        set((s) => ({
+          sugestoes: [
+            { id, obraId, titulo: titulo.trim(), autorId, ts: new Date().toISOString(), estado: "pendente" },
+            ...s.sugestoes,
+          ],
+          logs: appendLog(s, obraId, `Sugestão de passo enviada ao gestor: "${titulo.trim()}".`),
+        }));
+        return id;
+      },
+      resolverSugestao: (id, estado) =>
+        set((s) => {
+          const sug = s.sugestoes.find((x) => x.id === id);
+          return {
+            sugestoes: s.sugestoes.map((x) => (x.id === id ? { ...x, estado } : x)),
+            logs: sug
+              ? appendLog(s, sug.obraId, estado === "aceite" ? `Sugestão aceite: "${sug.titulo}".` : `Sugestão rejeitada: "${sug.titulo}".`)
+              : s.logs,
+          };
+        }),
 
       addObra: (input) => {
         const id = uid("o");
@@ -1529,13 +1602,14 @@ export const useObrasStore = create<ObrasState>()(
           despesas: SEED_DESPESAS,
           marcos: SEED_MARCOS,
           logs: SEED_LOGS,
+          sugestoes: [],
         }),
     }),
     {
       name: "redegest-obras",
-      version: 8,
+      version: 9,
       // v4: co-gestão. v5/v6: obra parada + marcos espalhados. v7: comprovativos + confirmações.
-      // v8: divisão da casa (navegação Casa → Divisão → Obra).
+      // v8: divisão da casa. v9: empreiteiroId + notaCausa + sugestões + saúde 50/50.
       // Re-semeia os exemplos mantendo obras/itens criados pelo utilizador.
       migrate: (persisted: unknown, version: number) => {
         const s = (persisted ?? {}) as {
@@ -1544,8 +1618,10 @@ export const useObrasStore = create<ObrasState>()(
           despesas?: Despesa[];
           marcos?: Marco[];
           logs?: LogEntry[];
+          sugestoes?: SugestaoFase[];
         };
-        if (version < 8) {
+        s.sugestoes = s.sugestoes ?? [];
+        if (version < 9) {
           const seedObraIds = new Set(SEED_OBRAS.map((o) => o.id));
           const seedFaseIds = new Set(SEED_FASES.map((f) => f.id));
           const seedDespIds = new Set(SEED_DESPESAS.map((d) => d.id));

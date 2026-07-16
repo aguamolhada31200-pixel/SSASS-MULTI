@@ -16,6 +16,8 @@ import {
 } from "@/store/useObrasStore";
 import { DIVISAO_ICON } from "@/components/obras/Divisoes";
 import { MoneyBox } from "@/components/ui/MoneyField";
+import { useTechniciansStore, ESPECIALIDADE_LABEL } from "@/store/useTechniciansStore";
+import { eur } from "@/lib/format";
 import { useCollabStore } from "@/store/useCollabStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { cn } from "@/lib/utils";
@@ -34,9 +36,11 @@ interface FormState {
   dataFimPrevista: string;
   estado: ObraEstado;
   empreiteiro: string;
+  empreiteiroId: string;
   contactoEmpreiteiro: string;
   descricao: string;
   addFases: boolean;
+  addTranches: boolean;
 }
 
 function emptyForm(initial: {
@@ -55,9 +59,11 @@ function emptyForm(initial: {
     dataFimPrevista: "",
     estado: "por_iniciar",
     empreiteiro: "",
+    empreiteiroId: "",
     contactoEmpreiteiro: "",
     descricao: "",
     addFases: false,
+    addTranches: false,
   };
 }
 
@@ -70,8 +76,10 @@ export function NewObraModal() {
   const updateObra = useObrasStore((s) => s.updateObra);
   const editingObra = useObrasStore((s) => (editingId ? s.obras.find((o) => o.id === editingId) : undefined));
   const addFase = useObrasStore((s) => s.addFase);
+  const addMarco = useObrasStore((s) => s.addMarco);
   const projects = useCollabStore((s) => s.projects);
   const properties = usePropertiesStore((s) => s.properties);
+  const technicians = useTechniciansStore((s) => s.technicians);
 
   const [form, setForm] = useState<FormState>(() =>
     emptyForm({ projectId: initialProjectId, propertyId: initialPropertyId })
@@ -96,9 +104,11 @@ export function NewObraModal() {
           dataFimPrevista: editingObra.dataFimPrevista,
           estado: editingObra.estado,
           empreiteiro: editingObra.empreiteiro ?? "",
+          empreiteiroId: editingObra.empreiteiroId ?? "",
           contactoEmpreiteiro: editingObra.contactoEmpreiteiro ?? "",
           descricao: editingObra.notas ?? "",
           addFases: false,
+          addTranches: false,
         });
       } else {
         setForm(emptyForm({ projectId: initialProjectId, propertyId: initialPropertyId }));
@@ -146,6 +156,7 @@ export function NewObraModal() {
         dataFimPrevista: form.dataFimPrevista,
         estado: form.estado,
         empreiteiro: form.empreiteiro.trim() || undefined,
+        empreiteiroId: form.empreiteiroId || undefined,
         contactoEmpreiteiro: form.contactoEmpreiteiro.trim() || undefined,
         notas: form.descricao.trim(),
       });
@@ -167,9 +178,25 @@ export function NewObraModal() {
       estado: form.estado,
       progresso: 0,
       empreiteiro: form.empreiteiro.trim() || undefined,
+      empreiteiroId: form.empreiteiroId || undefined,
       contactoEmpreiteiro: form.contactoEmpreiteiro.trim() || undefined,
       notas: form.descricao.trim(),
     });
+
+    // Plano de pagamentos sugerido: 30% adjudicação · 40% a meio · 30% no fim
+    if (form.addTranches && form.orcamento > 0) {
+      const ini = form.dataInicio || new Date().toISOString().slice(0, 10);
+      const fim = form.dataFimPrevista || ini;
+      const meio = new Date((new Date(`${ini}T00:00:00`).getTime() + new Date(`${fim}T00:00:00`).getTime()) / 2)
+        .toISOString()
+        .slice(0, 10);
+      const emp = form.empreiteiro.trim() || undefined;
+      const t30 = Math.round(form.orcamento * 0.3);
+      const t40 = Math.round(form.orcamento * 0.4);
+      addMarco({ obraId, titulo: "Adjudicação (30%)", valor: t30, dataPrevista: ini, estado: "pendente", empreiteiro: emp });
+      addMarco({ obraId, titulo: "A meio da obra (40%)", valor: t40, dataPrevista: meio, estado: "pendente", empreiteiro: emp });
+      addMarco({ obraId, titulo: "Conclusão (30%)", valor: form.orcamento - t30 - t40, dataPrevista: fim, estado: "pendente", empreiteiro: emp });
+    }
 
     if (form.addFases && sugeridas.length > 0) {
       const ini = form.dataInicio || new Date().toISOString().slice(0, 10);
@@ -399,11 +426,31 @@ export function NewObraModal() {
             </Field>
 
             <Field label="Empreiteiro (opcional)">
+              <select
+                value={form.empreiteiroId || (form.empreiteiro ? "__manual" : "")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "__manual") { patch({ empreiteiroId: "" }); return; }
+                  const tec = technicians.find((t) => t.id === v);
+                  patch({
+                    empreiteiroId: v,
+                    empreiteiro: tec?.nome ?? "",
+                    contactoEmpreiteiro: tec ? [tec.email, tec.telefone].filter(Boolean).join(" · ") : form.contactoEmpreiteiro,
+                  });
+                }}
+                className={inputCls}
+              >
+                <option value="">— Do diretório —</option>
+                {technicians.map((t) => (
+                  <option key={t.id} value={t.id}>{t.nome}{t.especialidades[0] ? ` · ${ESPECIALIDADE_LABEL[t.especialidades[0]]}` : ""}</option>
+                ))}
+                <option value="__manual">Outro (escrever abaixo)</option>
+              </select>
               <input
                 value={form.empreiteiro}
-                onChange={(e) => patch({ empreiteiro: e.target.value })}
+                onChange={(e) => patch({ empreiteiro: e.target.value, empreiteiroId: "" })}
                 placeholder="Nome da empresa"
-                className={inputCls}
+                className={cn(inputCls, "mt-1.5")}
               />
             </Field>
 
@@ -462,6 +509,31 @@ export function NewObraModal() {
                       form.addFases ? "translate-x-4" : "translate-x-0"
                     )}
                   />
+                </div>
+              </button>
+            </div>}
+
+            {/* Plano de pagamentos sugerido — só na criação */}
+            {!isEditing && <div className="sm:col-span-2">
+              <button
+                type="button"
+                onClick={() => patch({ addTranches: !form.addTranches })}
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+                  form.addTranches ? "border-gold bg-gold/10" : "border-line bg-bg/40 hover:bg-accent"
+                )}
+              >
+                <Sparkles size={18} className={form.addTranches ? "text-gold-dark" : "text-muted"} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-ink">Criar plano de pagamentos sugerido</p>
+                  <p className="mt-0.5 text-[11px] text-muted">
+                    30% adjudicação · 40% a meio · 30% no fim
+                    {form.orcamento > 0 ? ` — ${eur(Math.round(form.orcamento * 0.3))} · ${eur(Math.round(form.orcamento * 0.4))} · ${eur(form.orcamento - Math.round(form.orcamento * 0.3) - Math.round(form.orcamento * 0.4))}` : ""}
+                    {" "}· editável depois
+                  </p>
+                </div>
+                <div className={cn("h-5 w-9 rounded-full p-0.5 transition-colors", form.addTranches ? "bg-gold" : "bg-line")}>
+                  <div className={cn("h-4 w-4 rounded-full bg-white shadow-sm transition-transform", form.addTranches ? "translate-x-4" : "translate-x-0")} />
                 </div>
               </button>
             </div>}

@@ -1,24 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { X, Upload, CheckCircle2, Trash2, ScanLine, Banknote } from "lucide-react";
+import { X, CheckCircle2, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
 import { useObrasStore } from "@/store/useObrasStore";
 import { useDocumentsStore } from "@/store/useDocumentsStore";
+import { useTransactionsStore } from "@/store/useTransactionsStore";
 import { CURRENT_USER_ID } from "@/store/useProfilesStore";
+import { FaturaScanZone, type FilePreview } from "@/components/obras/FaturaScanZone";
 import { eur, dataPT } from "@/lib/format";
-import { cn } from "@/lib/utils";
-
-type FilePreview = { name: string; mime: string; dataUrl: string; size: number };
-
-async function fileToPreview(f: File): Promise<FilePreview> {
-  const dataUrl = await new Promise<string>((res) => {
-    const r = new FileReader();
-    r.onload = () => res(String(r.result));
-    r.readAsDataURL(f);
-  });
-  return { name: f.name, mime: f.type || "application/octet-stream", dataUrl, size: f.size };
-}
 
 export function MarcoPayModal() {
   const { marcoPayForm, closeMarcoPay } = useModalStore();
@@ -28,10 +18,10 @@ export function MarcoPayModal() {
   const obra = useObrasStore((s) => (marco ? s.obras.find((o) => o.id === marco.obraId) : undefined));
   const pagarMarcoComProva = useObrasStore((s) => s.pagarMarcoComProva);
   const addDoc = useDocumentsStore((s) => s.add);
+  const addTransaction = useTransactionsStore((s) => s.add);
 
   const [comprovativo, setComprovativo] = useState<FilePreview | null>(null);
   const [valorLido, setValorLido] = useState<number | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -41,22 +31,6 @@ export function MarcoPayModal() {
   }, [open]);
 
   if (!open || !marco || !obra) return null;
-
-  const onPickFile = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const f = files[0];
-    if (f.size > 8 * 1024 * 1024) {
-      toast.error("Ficheiro demasiado grande (máx 8 MB)");
-      return;
-    }
-    setComprovativo(await fileToPreview(f));
-  };
-
-  const lerComprovativo = () => {
-    if (!comprovativo) return;
-    setValorLido(marco.valor);
-    toast.success("Comprovativo lido", { description: `Valor confirmado: ${eur(marco.valor)}` });
-  };
 
   const guardar = () => {
     if (!comprovativo) {
@@ -87,7 +61,22 @@ export function MarcoPayModal() {
       },
       CURRENT_USER_ID
     );
-    toast.success(`Marco pago · ${eur(marco.valor)}`, {
+    // Tesouraria: o pagamento entra na Contabilidade (obras de imóvel solo)
+    if (obra.propertyId) {
+      addTransaction({
+        tipo: "despesa",
+        propertyId: obra.propertyId,
+        categoria: "Obras",
+        valor: marco.valor,
+        data: new Date().toISOString().slice(0, 10),
+        descricao: `${obra.titulo} — pagamento "${marco.titulo}"`,
+        recorrente: false,
+        deduzivelIrs: true,
+        notas: marco.empreiteiro ? `Empreiteiro: ${marco.empreiteiro}` : undefined,
+        reciboUrl: comprovativo.dataUrl,
+      });
+    }
+    toast.success(`Pagamento efetuado · ${eur(marco.valor)}`, {
       description: "Comprovativo arquivado · sócios notificados.",
     });
     closeMarcoPay();
@@ -119,52 +108,14 @@ export function MarcoPayModal() {
             </p>
           </div>
 
-          {/* Upload */}
-          <label
-            htmlFor="marcopay-input"
-            className={cn(
-              "block rounded-2xl border-2 border-dashed p-4 text-center transition-colors cursor-pointer",
-              comprovativo ? "border-success/40 bg-success/5" : "border-gold/30 bg-gold/5 hover:border-gold/60"
-            )}
-          >
-            <input id="marcopay-input" ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => onPickFile(e.target.files)} />
-            {comprovativo ? (
-              <>
-                <CheckCircle2 size={22} className="mx-auto mb-1 text-success" />
-                <p className="text-sm font-medium text-ink">{comprovativo.name}</p>
-                <p className="text-[11px] text-muted">{Math.round(comprovativo.size / 1024)} KB</p>
-                <div className="mt-2 flex justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      lerComprovativo();
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-medium text-gold-dark hover:bg-gold/20"
-                  >
-                    <ScanLine size={12} /> Ler comprovativo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setComprovativo(null);
-                      setValorLido(null);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-xs text-muted hover:text-danger"
-                  >
-                    <Trash2 size={12} /> Remover
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <Upload size={22} className="mx-auto mb-1 text-gold-dark" />
-                <p className="text-sm font-medium text-ink">Anexar transferência / recibo</p>
-                <p className="mt-0.5 text-[11px] text-muted">Obrigatório · PDF ou foto da transferência.</p>
-              </>
-            )}
-          </label>
+          {/* Upload/scan partilhado — leitura real do QR quando for foto de fatura */}
+          <FaturaScanZone
+            comprovativo={comprovativo}
+            onComprovativo={(f) => { setComprovativo(f); if (!f) setValorLido(null); }}
+            onLido={(fat) => { if (fat.total != null) setValorLido(fat.total); }}
+            titulo="Anexar transferência / recibo"
+            subtitulo="Obrigatório · PDF ou foto do comprovativo de pagamento"
+          />
 
           <p className="rounded-lg bg-secondary/10 px-3 py-2 text-[11px] text-secondary">
             Sem comprovativo de pagamento, o marco não pode ser marcado como pago.
