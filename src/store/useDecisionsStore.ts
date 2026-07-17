@@ -133,33 +133,32 @@ export function estadoDerivado(d: Decisao, partners: Partner[]): DecisaoEstado |
 // ───────────────────────── Seed ─────────────────────────
 
 const SEED: Decisao[] = [
-  // Aberta — Príncipe Real (Daniel a favor 50%, falta Mariana/Carlos)
+  // Aberta — Príncipe Real (Pedro propôs 40% a favor... não: Rita 25% a favor, falta o voto do Daniel)
   {
-    id: "dec-tinta-premium",
+    id: "dec-renovacao-contrato",
     projectId: "principe-real",
-    titulo: "Aprovar tinta premium para sala e quartos",
+    titulo: "Renovar contrato da Sofia por mais 1 ano (renda 1.950 €)",
     descricao:
-      "O pintor sugeriu Robbialac REP Extra Mate em vez da tinta standard — melhor cobertura e lavável. Diferença de custo total: 1.500€. Proponho aprovar para valorizar o acabamento antes de fotografias.",
-    tipo: "despesa",
-    valor: 1500,
-    prazo: "2026-07-12",
+      "O contrato termina em janeiro. A Sofia quer renovar e aceita atualização da renda de 1.850 € para 1.950 € (+5,4%). Alternativa é ir a mercado com risco de 1–2 meses vazios. Proponho renovar.",
+    tipo: "geral",
+    prazo: "2026-07-25",
     maioria: "simples",
-    proposedBy: CURRENT_USER_ID,
-    createdAt: "2026-07-02T10:15:00.000Z",
+    proposedBy: "pedro-alves",
+    createdAt: "2026-07-10T10:15:00.000Z",
     estado: "pendente",
-    votos: [{ userId: CURRENT_USER_ID, valor: "a_favor", ts: "2026-07-02T10:16:00.000Z" }],
+    votos: [{ userId: "rita-santos", valor: "a_favor", ts: "2026-07-11T09:30:00.000Z" }],
     comentarios: [
       {
-        id: "c-tinta-1",
-        userId: "mariana-sousa",
-        texto: "@Daniel a diferença inclui a mão de obra ou é só material?",
-        ts: "2026-07-02T14:40:00.000Z",
+        id: "c-renov-1",
+        userId: CURRENT_USER_ID,
+        texto: "@Pedro a atualização já considera o coeficiente de 2026 ou é acordo direto?",
+        ts: "2026-07-10T14:40:00.000Z",
       },
       {
-        id: "c-tinta-2",
-        userId: CURRENT_USER_ID,
-        texto: "@Mariana só material — a mão de obra mantém-se. Fatura pró-forma na pasta de documentos.",
-        ts: "2026-07-02T15:05:00.000Z",
+        id: "c-renov-2",
+        userId: "pedro-alves",
+        texto: "@Daniel acordo direto, acima do coeficiente. Minuta na pasta de documentos.",
+        ts: "2026-07-10T15:05:00.000Z",
       },
     ],
   },
@@ -174,20 +173,20 @@ const SEED: Decisao[] = [
     valor: 2300,
     prazo: "2026-06-20",
     maioria: "simples",
-    proposedBy: "mariana-sousa",
+    proposedBy: "rita-santos",
     createdAt: "2026-06-14T09:00:00.000Z",
     estado: "aprovada",
     fechadaEm: "2026-06-16T18:30:00.000Z",
     aplicada: true,
     votos: [
-      { userId: "mariana-sousa", valor: "a_favor", ts: "2026-06-14T09:01:00.000Z" },
+      { userId: "rita-santos", valor: "a_favor", ts: "2026-06-14T09:01:00.000Z" },
       { userId: CURRENT_USER_ID, valor: "a_favor", ts: "2026-06-15T08:20:00.000Z" },
-      { userId: "carlos-monteiro", valor: "a_favor", ts: "2026-06-16T18:30:00.000Z" },
+      { userId: "pedro-alves", valor: "a_favor", ts: "2026-06-16T18:30:00.000Z" },
     ],
     comentarios: [
       {
         id: "c-bomba-1",
-        userId: "carlos-monteiro",
+        userId: "pedro-alves",
         texto: "Aprovado da minha parte — o certificado energético agradece.",
         ts: "2026-06-16T18:29:00.000Z",
       },
@@ -284,6 +283,18 @@ export const useDecisionsStore = create<DecisionsState>()(
         })),
       resetSeed: () => set({ decisoes: SEED }),
     }),
-    { name: "redegest-decisions", version: 1 }
+    {
+      name: "redegest-decisions",
+      version: 2,
+      // v2: sócios do Príncipe Real passaram a Pedro (gestor) / Daniel / Rita — re-semeia mantendo decisões do utilizador.
+      migrate: (persisted: unknown, version: number) => {
+        const state = (persisted ?? {}) as { decisoes?: Decisao[] };
+        if (version < 2) {
+          const antigas = new Set(["dec-tinta-premium", "dec-bomba-calor", ...SEED.map((d) => d.id)]);
+          state.decisoes = [...SEED, ...(state.decisoes ?? []).filter((d) => !antigas.has(d.id))];
+        }
+        return state as DecisionsState;
+      },
+    }
   )
 );

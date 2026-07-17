@@ -17,6 +17,7 @@ import {
   type Saude,
 } from "@/store/useObrasStore";
 import { useProfilesStore, CURRENT_USER_ID, type Profile } from "@/store/useProfilesStore";
+import { useNotificationsStore } from "@/store/useNotificationsStore";
 import { eur } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -176,6 +177,8 @@ export function VotacaoPanel({
 }) {
   const profiles = useProfilesStore((s) => s.profiles);
   const votar = useObrasStore((s) => s.votar);
+  const addNotif = useNotificationsStore((s) => s.add);
+  const broadcast = useNotificationsStore((s) => s.broadcast);
   const investidores = investidoresDe(obra);
   const resumo = votosResumo(obra, aprovacao);
   const meuRole = roleDe(obra, CURRENT_USER_ID);
@@ -184,9 +187,38 @@ export function VotacaoPanel({
 
   const onVote = (valorVoto: "a_favor" | "contra") => {
     const estado = votar(tipo, itemId, CURRENT_USER_ID, valorVoto);
-    if (estado === "aplicado") toast.success("Decisão aprovada · sócios notificados");
-    else if (estado === "rejeitado") toast("Decisão rejeitada", { description: "Os sócios foram notificados." });
-    else toast.success(`Voto registado · ${valorVoto === "a_favor" ? "a favor" : "contra"}`);
+    const meuNome = nomeProprio(profiles.find((p) => p.id === CURRENT_USER_ID)?.fullName) || "Sócio";
+    const labelVoto = valorVoto === "a_favor" ? "a favor" : "contra";
+    const gestorId = membrosDe(obra).find((m) => m.role === "gestor")?.userId;
+    if (estado === "pendente") {
+      // O gestor fica a saber que o sócio votou
+      if (gestorId && gestorId !== CURRENT_USER_ID)
+        addNotif({
+          userId: gestorId,
+          tipo: "decisao_voto",
+          titulo: `${meuNome} votou ${labelVoto} em «${titulo}»`,
+          descricao: `${eur(valor)} · ${obra.titulo}`,
+          actorId: CURRENT_USER_ID,
+          link: `/obra/${obra.id}`,
+        });
+      toast.success(`Voto registado · ${labelVoto}`, { description: "O gestor foi notificado." });
+    } else {
+      broadcast(
+        membrosDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID),
+        {
+          tipo: "decisao_fechada",
+          titulo:
+            estado === "aplicado"
+              ? `Aprovado: «${titulo}» — o gestor pode aplicar`
+              : `Rejeitado: «${titulo}»`,
+          descricao: `${eur(valor)} · ${obra.titulo}`,
+          actorId: CURRENT_USER_ID,
+          link: `/obra/${obra.id}`,
+        }
+      );
+      if (estado === "aplicado") toast.success("Decisão aprovada · sócios notificados");
+      else toast("Decisão rejeitada", { description: "Os sócios foram notificados." });
+    }
     onResolved?.();
   };
 

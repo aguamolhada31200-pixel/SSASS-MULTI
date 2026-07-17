@@ -57,7 +57,17 @@ type RendaStatus = "Pago" | "Pendente" | "Atrasado" | "—";
 
 const TODAS_CATEGORIAS = Array.from(new Set<string>([...CATEGORIAS_DESPESA, ...CATEGORIAS_RECEITA]));
 
-export function FinancasTab({ property }: { property: Property }) {
+export function FinancasTab({
+  property,
+  podeEditar = true,
+  motivoBloqueio,
+}: {
+  property: Property;
+  /** false = utilizador só consulta (ex.: sócio investidor num projeto partilhado). */
+  podeEditar?: boolean;
+  /** Tooltip/explicação de porque não pode editar. */
+  motivoBloqueio?: string;
+}) {
   const { enabled } = useExampleData();
   const allTransactions = useTransactionsStore((s) => s.transactions);
   const removeTx = useTransactionsStore((s) => s.remove);
@@ -245,14 +255,18 @@ export function FinancasTab({ property }: { property: Property }) {
         icon={Wallet}
         title="Sem movimentos para este imóvel"
         description={
-          enabled
-            ? "Registe a primeira receita ou despesa para começar a acompanhar o desempenho financeiro deste imóvel."
-            : "Active o toggle «Dados de exemplo» no topo da página para popular movimentos, ou registe o primeiro."
+          !podeEditar
+            ? motivoBloqueio ?? "Só o gestor pode registar movimentos."
+            : enabled
+              ? "Registe a primeira receita ou despesa para começar a acompanhar o desempenho financeiro deste imóvel."
+              : "Active o toggle «Dados de exemplo» no topo da página para popular movimentos, ou registe o primeiro."
         }
-        ctaLabel="+ Registar primeiro movimento"
-        onCta={() =>
-          openExpenseForm({ initialTipo: "despesa", initialPropertyId: property.id })
-        }
+        {...(podeEditar
+          ? {
+              ctaLabel: "+ Registar primeiro movimento",
+              onCta: () => openExpenseForm({ initialTipo: "despesa", initialPropertyId: property.id }),
+            }
+          : {})}
       />
     );
   }
@@ -277,10 +291,11 @@ export function FinancasTab({ property }: { property: Property }) {
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2" title={podeEditar ? undefined : motivoBloqueio}>
           <Button
             variant="outline"
             size="sm"
+            disabled={!podeEditar}
             onClick={() =>
               openExpenseForm({ initialTipo: "receita", initialPropertyId: property.id })
             }
@@ -289,6 +304,7 @@ export function FinancasTab({ property }: { property: Property }) {
           </Button>
           <Button
             size="sm"
+            disabled={!podeEditar}
             onClick={() =>
               openExpenseForm({ initialTipo: "despesa", initialPropertyId: property.id })
             }
@@ -297,6 +313,11 @@ export function FinancasTab({ property }: { property: Property }) {
           </Button>
         </div>
       </div>
+      {!podeEditar && motivoBloqueio && (
+        <div className="-mt-2 rounded-lg border border-line bg-bg/40 px-3 py-2 text-[11px] text-muted">
+          {motivoBloqueio}
+        </div>
+      )}
 
       {/* KPIs do período */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
@@ -523,8 +544,8 @@ export function FinancasTab({ property }: { property: Property }) {
                       return (
                         <tr
                           key={t.id}
-                          onClick={() => openExpenseForm({ editingId: t.id })}
-                          className="cursor-pointer border-t border-line/60 hover:bg-bg"
+                          onClick={() => podeEditar && openExpenseForm({ editingId: t.id })}
+                          className={cn("border-t border-line/60 hover:bg-bg", podeEditar && "cursor-pointer")}
                         >
                           <td className="px-5 py-3 text-muted">{dataPTShort(t.data)}</td>
                           <td className="px-2 py-3">
@@ -571,7 +592,7 @@ export function FinancasTab({ property }: { property: Property }) {
                             </div>
                           </td>
                           <td className="px-5 py-3 text-right">
-                            <div className="inline-flex items-center gap-1">
+                            <div className={cn("inline-flex items-center gap-1", !podeEditar && "hidden")}>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -608,7 +629,7 @@ export function FinancasTab({ property }: { property: Property }) {
                   return (
                     <button
                       key={t.id}
-                      onClick={() => openExpenseForm({ editingId: t.id })}
+                      onClick={() => podeEditar && openExpenseForm({ editingId: t.id })}
                       className="flex w-full items-start justify-between gap-3 rounded-xl border border-line bg-card p-3 text-left hover:bg-bg"
                     >
                       <div className="min-w-0 flex-1">

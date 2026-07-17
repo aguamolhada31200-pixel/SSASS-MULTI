@@ -173,8 +173,9 @@ const SEED: CollabProject[] = [
     coverImageUrl: IMG("1502672260266-1c1ef2d93688"),
     status: "obras",
     createdAt: "2026-02-15",
+    // Daniel (utilizador atual) é o GESTOR aqui — vista de gestor.
     partners: [
-      { id: "jose-felix", name: "José Félix", pct: 40, color: "#5C3D2E", role: "gestor", status: "ativo", capitalInvestido: 168000, convidadoEm: "2026-02-15" },
+      { id: "me-daniel", name: "Daniel Silva", pct: 40, color: "#5C3D2E", role: "gestor", status: "ativo", capitalInvestido: 168000, convidadoEm: "2026-02-15" },
       { id: "pedro-alves", name: "Pedro Alves", pct: 35, color: "#C8A664", role: "investidor", status: "ativo", capitalInvestido: 147000, convidadoEm: "2026-02-15" },
       { id: "rita-santos", name: "Rita Santos", pct: 25, color: "#4A7C59", role: "investidor", status: "ativo", capitalInvestido: 105000, convidadoEm: "2026-02-16" },
     ],
@@ -236,10 +237,11 @@ const SEED: CollabProject[] = [
     status: "arrendado",
     createdAt: "2026-03-05",
     propertyId: "seed-principe-real",
+    // Pedro é o GESTOR aqui; Daniel (utilizador atual) é sócio INVESTIDOR 35% — vista de investidor.
     partners: [
-      { id: "me-daniel", name: "Daniel Silva", pct: 50, color: "#5C3D2E", role: "gestor", status: "ativo", capitalInvestido: 57000, convidadoEm: "2026-03-05" },
-      { id: "mariana-sousa", name: "Mariana Sousa", pct: 30, color: "#C8A664", role: "investidor", status: "ativo", capitalInvestido: 34200, convidadoEm: "2026-03-05" },
-      { id: "carlos-monteiro", name: "Carlos Monteiro", pct: 20, color: "#4A7C59", role: "investidor", status: "ativo", capitalInvestido: 22800, convidadoEm: "2026-03-06" },
+      { id: "pedro-alves", name: "Pedro Alves", pct: 40, color: "#5C3D2E", role: "gestor", status: "ativo", capitalInvestido: 45600, convidadoEm: "2026-03-05" },
+      { id: "me-daniel", name: "Daniel Silva", pct: 35, color: "#C8A664", role: "investidor", status: "ativo", capitalInvestido: 39900, convidadoEm: "2026-03-05" },
+      { id: "rita-santos", name: "Rita Santos", pct: 25, color: "#4A7C59", role: "investidor", status: "ativo", capitalInvestido: 28500, convidadoEm: "2026-03-06" },
     ],
     precoImovel: 380000,
     capitalInvestido: 114000,
@@ -345,11 +347,12 @@ export const useCollabStore = create<CollabState>()(
     }),
     {
       name: "redegest-collab",
-      version: 2,
-      // v2: propertyId + sócios estendidos (role/capital/status). Mantém projetos do utilizador.
+      version: 3,
+      // v2: propertyId + sócios estendidos (role/capital/status).
+      // v3: papéis de exemplo — Daniel gestor no #001 (Porto) e investidor 35% no #003 (Príncipe Real).
       migrate: (persisted: unknown, version: number) => {
         const state = (persisted ?? {}) as { projects?: CollabProject[] };
-        if (state.projects && version < 2) {
+        if (state.projects && version < 3) {
           const seedIds = new Set(SEED.map((p) => p.id));
           const userProjects = state.projects.filter((p) => !seedIds.has(p.id));
           state.projects = [...SEED, ...userProjects];
@@ -375,6 +378,26 @@ export function podeGerir(project: CollabProject, userId: string): boolean {
   // Projetos antigos sem roles: o primeiro sócio é o gestor por convenção.
   return project.partners[0]?.id === userId;
 }
+
+/** Papel do utilizador no projeto (com a mesma retro-compat do podeGerir). */
+export function roleNoProjeto(project: CollabProject, userId: string): SocioRole | undefined {
+  const eu = socioDe(project, userId);
+  if (!eu) return undefined;
+  if (eu.role) return eu.role;
+  return project.partners[0]?.id === userId ? "gestor" : "investidor";
+}
+
+/** Sócio gestor do projeto (para mensagens tipo "Só o gestor (Pedro) pode…"). */
+export function gestorDoProjeto(project: CollabProject): Partner | undefined {
+  return project.partners.find((s) => roleNoProjeto(project, s.id) === "gestor");
+}
+
+/** Rótulo do badge de papel — "Tu: Gestor" / "Tu: Sócio investidor" / "Tu: Observador". */
+export const TU_ROLE_LABEL: Record<SocioRole, string> = {
+  gestor: "Tu: Gestor",
+  investidor: "Tu: Sócio investidor",
+  observador: "Tu: Observador",
+};
 
 /** Soma das percentagens dos sócios ativos (para validação = 100). */
 export function somaPercentagens(partners: Partner[]): number {

@@ -10,10 +10,8 @@ import {
   ChartGantt,
   CircleAlert,
   TriangleAlert,
-  Vote,
   CheckCircle2,
   Sparkles,
-  X,
   SlidersHorizontal,
   MoreHorizontal,
   PauseCircle,
@@ -36,7 +34,6 @@ import {
   saudeObra,
   podeGerir,
   membrosDe,
-  relativaTempo,
   SAUDE_LABEL,
   SAUDE_HEX,
   gastoNaoComprovado,
@@ -56,9 +53,10 @@ import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { financasFlipProjeto } from "@/lib/calc/obraProjeto";
 import { EmpreiteirosDirectory } from "@/components/obras/EmpreiteirosDirectory";
+import { BlocoAguardarDecisao, BlocoPedirAosSocios } from "@/components/collab/PendingDecisions";
 import { eur, pct, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { MemberStack, RoleAvatar, VotacaoPanel, EstadoAprovacaoBadge, nomeProprio } from "@/components/obras/CoGestao";
+import { MemberStack, RoleAvatar, nomeProprio } from "@/components/obras/CoGestao";
 
 // ───────────────────── Helpers de contexto ─────────────────────
 
@@ -202,8 +200,14 @@ export default function CentroDeComando() {
   const [tab, setTab] = useState<TabKey>("todas");
   const [socioFiltro, setSocioFiltro] = useState<Set<string>>(new Set());
   const [projetoFiltro, setProjetoFiltro] = useState<Set<string>>(new Set());
-  const [decisao, setDecisao] = useState<Decisao | null>(null);
   const ganttRef = useRef<HTMLDivElement>(null);
+
+  // Projetos partilhados de que faço parte — alimentam os blocos de decisões por papel
+  const collabProjects = useCollabStore((s) => s.projects);
+  const meusProjetos = useMemo(
+    () => (enabled ? collabProjects.filter((p) => p.partners.some((s) => s.id === CURRENT_USER_ID)) : []),
+    [collabProjects, enabled]
+  );
 
   // Atalhos de teclado: G cronograma · L lista · N nova obra
   useEffect(() => {
@@ -289,6 +293,14 @@ export default function CentroDeComando() {
           </div>
         ) : (
           <>
+            {/* Decisões por papel: o investidor vota aqui; o gestor acompanha, lembra e aplica */}
+            {(meusProjetos.length > 0) && (
+              <div className="mt-6 space-y-3">
+                <BlocoAguardarDecisao projects={meusProjetos} />
+                <BlocoPedirAosSocios projects={meusProjetos} />
+              </div>
+            )}
+
             {/* 3 cartões críticos */}
             <CartoesCriticos
               ativas={ativas}
@@ -297,7 +309,6 @@ export default function CentroDeComando() {
               marcos={marcos}
               todayISO={todayISO}
               onPagarMarco={(m) => openMarcoPay(m.id)}
-              onAbrirDecisao={setDecisao}
               onFocar={focarObra}
             />
 
@@ -359,56 +370,7 @@ export default function CentroDeComando() {
         )}
       </div>
 
-      {/* Modal de decisão (votação) */}
-      {decisao && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
-          onMouseDown={() => setDecisao(null)}
-        >
-          <div
-            className="w-full max-w-md overflow-hidden rounded-t-2xl border border-line bg-card shadow-2xl sm:rounded-2xl"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-line px-5 py-4">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/15 text-warning">
-                  <Vote size={16} />
-                </span>
-                <h2 className="font-display text-base font-semibold text-ink">Decisão dos sócios</h2>
-              </div>
-              <button onClick={() => setDecisao(null)} className="text-muted hover:text-ink">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-5">
-              <DecisaoLive decisao={decisao} onResolved={() => setDecisao(null)} />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
-
-/** Lê a aprovação fresca do store para o painel de votação. */
-function DecisaoLive({ decisao, onResolved }: { decisao: Decisao; onResolved: () => void }) {
-  const despesa = useObrasStore((s) => s.despesas.find((d) => d.id === decisao.itemId));
-  const marco = useObrasStore((s) => s.marcos.find((m) => m.id === decisao.itemId));
-  const obra = useObrasStore((s) => s.obras.find((o) => o.id === decisao.obra.id)) ?? decisao.obra;
-  const ap = decisao.tipo === "despesa" ? despesa?.aprovacao : marco?.aprovacao;
-  if (!ap) return <p className="text-sm text-muted">Decisão já resolvida.</p>;
-  return (
-    <VotacaoPanel
-      obra={obra}
-      tipo={decisao.tipo}
-      itemId={decisao.itemId}
-      aprovacao={ap}
-      titulo={decisao.titulo}
-      valor={decisao.valor}
-      onResolved={() => {
-        if (ap.estado !== "pendente") onResolved();
-      }}
-    />
   );
 }
 
@@ -503,7 +465,6 @@ function CartoesCriticos({
   marcos,
   todayISO,
   onPagarMarco,
-  onAbrirDecisao,
   onFocar,
 }: {
   ativas: Obra[];
@@ -512,12 +473,8 @@ function CartoesCriticos({
   marcos: Marco[];
   todayISO: string;
   onPagarMarco: (m: Marco) => void;
-  onAbrirDecisao: (d: Decisao) => void;
   onFocar: (id: string) => void;
 }) {
-  const profiles = useProfilesStore((s) => s.profiles);
-  const nome = (id?: string) => nomeProprio(profiles.find((p) => p.id === id)?.fullName);
-
   const issues: Issue[] = [];
 
   // 1) Marco vencido por pagar
@@ -541,37 +498,7 @@ function CartoesCriticos({
     });
   });
 
-  // 2) Decisão a aguardar voto há >48h
-  const horas48 = (iso?: string) => {
-    if (!iso) return 999;
-    return (Date.now() - new Date(`${iso}T00:00:00`).getTime()) / 3600000;
-  };
-  const pushDecisao = (tipo: "despesa" | "marco", itemId: string, obra: Obra, titulo: string, valor: number, ap: NonNullable<Despesa["aprovacao"]>) => {
-    const idade = horas48(ap.requeridoEm);
-    const euInvestidor = membrosDe(obra).some((mm) => mm.userId === CURRENT_USER_ID && mm.role === "investidor");
-    issues.push({
-      key: `dec-${tipo}-${itemId}`,
-      peso: idade > 48 ? 95 : 70,
-      tone: "warning",
-      icon: <Vote size={16} />,
-      badge: idade > 48 ? "Voto há +48h" : "A aguardar voto",
-      titulo: `${titulo} — ${obra.titulo}`,
-      contexto: `${eur(valor)} · pedido por ${nome(ap.requeridoPor)} ${relativaTempo(`${ap.requeridoEm}T09:00:00`)}`,
-      obra,
-      cta: {
-        label: euInvestidor ? "Votar agora" : "Ver decisão",
-        onClick: () => onAbrirDecisao({ tipo, itemId, obra, titulo, valor }),
-      },
-    });
-  };
-  despesas.forEach((d) => {
-    const o = ativas.find((x) => x.id === d.obraId);
-    if (o && d.aprovacao?.estado === "pendente") pushDecisao("despesa", d.id, o, d.descricao, d.valor, d.aprovacao);
-  });
-  marcos.forEach((m) => {
-    const o = ativas.find((x) => x.id === m.obraId);
-    if (o && m.aprovacao?.estado === "pendente") pushDecisao("marco", m.id, o, m.titulo, m.valor, m.aprovacao);
-  });
+  // 2) Decisões a aguardar voto vivem agora nos blocos "A aguardar a tua decisão" / "A pedir aos sócios" (topo da página).
 
   // 3) Desvio orçamental > 15%
   ativas.forEach((o) => {

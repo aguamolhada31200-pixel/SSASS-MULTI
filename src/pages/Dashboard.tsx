@@ -40,6 +40,10 @@ import { useContractsStore, statusEfetivo, diasAteFim } from "@/store/useContrac
 import { useTransactionsStore } from "@/store/useTransactionsStore";
 import { useObrasStore } from "@/store/useObrasStore";
 import { useAccountStore } from "@/store/useAccountStore";
+import { useCollabStore } from "@/store/useCollabStore";
+import { CURRENT_USER_ID } from "@/store/useProfilesStore";
+import { usePendentes } from "@/components/collab/PendingDecisions";
+import { Vote } from "lucide-react";
 import { computeImovel } from "@/lib/calc/imovel";
 import { eur, pct, dataPTShort } from "@/lib/format";
 
@@ -327,6 +331,9 @@ export default function Dashboard() {
         <QuickAction icon={ReceiptText} label="Nova despesa" onClick={() => openExpenseForm({ initialTipo: "despesa" })} />
       </div>
 
+      {/* Decisões de parceria à espera do teu voto */}
+      <DecisoesEspera />
+
       {/* Próximo passo sugerido (contextual, nunca uma checklist) */}
       <ProximoPasso />
 
@@ -443,6 +450,41 @@ interface Sugestao {
 }
 
 /** Sugestão contextual (uma de cada vez), fechável e rotativa. Nunca uma checklist. */
+/** "2 decisões à tua espera na parceria X" — atalho para a sala do projeto onde falta o teu voto. */
+function DecisoesEspera() {
+  const { enabled } = useExampleData();
+  const projects = useCollabStore((s) => s.projects);
+  const meus = useMemo(
+    () => (enabled ? projects.filter((p) => p.partners.some((s) => s.id === CURRENT_USER_ID)) : []),
+    [projects, enabled]
+  );
+  const { paraMim } = usePendentes(meus);
+  if (paraMim.length === 0) return null;
+
+  const porProjeto = new Map<string, { titulo: string; n: number }>();
+  paraMim.forEach((it) => {
+    const cur = porProjeto.get(it.project.id) ?? { titulo: it.project.title, n: 0 };
+    cur.n += 1;
+    porProjeto.set(it.project.id, cur);
+  });
+
+  return (
+    <div className="mt-4 space-y-2">
+      {[...porProjeto.entries()].map(([pid, { titulo, n }]) => (
+        <Link
+          key={pid}
+          to={`/comunidade/colaborativa/${pid}`}
+          className="flex items-center gap-2 rounded-xl border-2 border-gold/50 bg-accent px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-gold/15"
+        >
+          <Vote size={16} className="shrink-0 text-gold-dark" />
+          {n === 1 ? "1 decisão à tua espera" : `${n} decisões à tua espera`} na parceria {titulo}
+          <ArrowRight size={15} className="ml-auto shrink-0 text-muted" />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function ProximoPasso() {
   const navigate = useNavigate();
   const properties = usePropertiesStore((s) => s.properties);

@@ -46,9 +46,17 @@ import {
   STATUS_TONE,
   SOCIO_ROLE_LABEL,
   podeGerir,
+  roleNoProjeto,
+  gestorDoProjeto,
+  socioDe,
   type CollabProject,
   type ObraItem,
 } from "@/store/useCollabStore";
+import { useDecisionsStore } from "@/store/useDecisionsStore";
+import { useNotificationsStore } from "@/store/useNotificationsStore";
+import { BlocoAguardarDecisao, BlocoPedirAosSocios, BadgePapel } from "@/components/collab/PendingDecisions";
+import { nomeProprio } from "@/components/obras/CoGestao";
+import { sociosIds } from "@/components/collab/shared";
 import {
   useObrasStore,
   CATEGORIA_LABEL,
@@ -172,6 +180,7 @@ function HeroProject({ project: p }: { project: CollabProject }) {
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", isReab ? "bg-secondary/20 text-white" : "bg-success/20 text-white")}>
                 {isReab ? "Compra e Revenda" : "Arrendamento"}
               </span>
+              <BadgePapel project={p} />
             </div>
             <h1 className="mt-1 font-display text-2xl font-bold text-white sm:text-3xl">{p.title}</h1>
             <p className="text-sm text-white/70">{p.city} · {p.partners.length} sócios</p>
@@ -180,6 +189,16 @@ function HeroProject({ project: p }: { project: CollabProject }) {
             <div className="mr-2 text-right">
               <p className="text-xs text-white/50">{isReab ? "Lucro líquido est." : "Cashflow anual"}</p>
               <p className="num text-2xl font-bold text-success">{eur(lucro)}</p>
+              {/* Fatia do investidor — o mesmo número, a parte dele em concreto */}
+              {(() => {
+                const eu = socioDe(p, CURRENT_USER_ID);
+                if (!eu || roleNoProjeto(p, CURRENT_USER_ID) !== "investidor") return null;
+                return (
+                  <p className="num text-xs font-medium text-gold-soft">
+                    A tua parte ({eu.pct}%): {eur(lucro * (eu.pct / 100))}
+                  </p>
+                );
+              })()}
             </div>
             {gestor && (
               <>
@@ -192,6 +211,17 @@ function HeroProject({ project: p }: { project: CollabProject }) {
         </div>
       </div>
     </>
+  );
+}
+
+/** Blocos por papel no topo da sala: "A aguardar a tua decisão" (investidor) + "A pedir aos sócios" (gestor). */
+function BlocosProjeto({ project, onVerDecisao }: { project: CollabProject; onVerDecisao: () => void }) {
+  const projs = useMemo(() => [project], [project]);
+  return (
+    <div className="mt-4 space-y-3">
+      <BlocoAguardarDecisao projects={projs} onVerDecisao={onVerDecisao} />
+      <BlocoPedirAosSocios projects={projs} onVerDecisao={onVerDecisao} />
+    </div>
   );
 }
 
@@ -294,6 +324,9 @@ function ReabRoom({ project: p }: { project: CollabProject }) {
   return (
     <>
       <HeroProject project={p} />
+
+      {/* Decisões pendentes — adaptado ao papel do utilizador */}
+      <BlocosProjeto project={p} onVerDecisao={() => setTab("Decisões")} />
 
       {/* KPI strip */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -546,6 +579,40 @@ function ObrasTab({ project: p }: { project: CollabProject }) {
   const fases = useObrasStore((s) => s.fases);
   const despesas = useObrasStore((s) => s.despesas);
   const openObraForm = useModalStore((s) => s.openObraForm);
+  const addDecisao = useDecisionsStore((s) => s.add);
+  const broadcast = useNotificationsStore((s) => s.broadcast);
+  const meuRole = roleNoProjeto(p, CURRENT_USER_ID);
+  const gestor = gestorDoProjeto(p);
+  const [proporOpen, setProporOpen] = useState(false);
+  const [propTitulo, setPropTitulo] = useState("");
+  const [propValor, setPropValor] = useState(0);
+
+  const proporObra = () => {
+    if (!propTitulo.trim()) {
+      toast.error("Descreva a obra que propõe");
+      return;
+    }
+    addDecisao({
+      projectId: p.id,
+      titulo: propTitulo.trim(),
+      descricao: `Obra proposta por um sócio investidor. ${propValor > 0 ? `Orçamento estimado: ${eur(propValor)}.` : ""} Se for aprovada, o gestor aplica-a e a obra entra no plano.`,
+      tipo: "obra",
+      valor: propValor > 0 ? propValor : undefined,
+      maioria: "simples",
+      proposedBy: CURRENT_USER_ID,
+    });
+    broadcast(sociosIds(p, CURRENT_USER_ID), {
+      tipo: "decisao_criada",
+      titulo: `Nova proposta de obra: «${propTitulo.trim()}»`,
+      descricao: propValor > 0 ? eur(propValor) : undefined,
+      actorId: CURRENT_USER_ID,
+      link: `/comunidade/colaborativa/${p.id}`,
+    });
+    setPropTitulo("");
+    setPropValor(0);
+    setProporOpen(false);
+    toast.success("Enviado aos sócios ✓", { description: "A proposta entrou nas Decisões para votação." });
+  };
 
   const total = obras.reduce((s, o) => s + o.orcamento, 0);
   const gastoTot = obras.reduce((s, o) => s + gastoReal(o, despesas), 0);
@@ -571,19 +638,66 @@ function ObrasTab({ project: p }: { project: CollabProject }) {
           <MC label="Atrasadas" value={String(atrasadasCount)} tone={atrasadasCount > 0 ? "danger" : undefined} />
           <MC label="Gasto / Orç." value={`${eur(gastoTot)} / ${eur(total)}`} tone={gastoTot > total ? "danger" : "gold"} highlighted />
         </div>
-        <Button size="sm" variant="gold" onClick={() => openObraForm({ initialProjectId: p.id })}>
-          <Plus size={14} /> Nova obra
-        </Button>
+        {meuRole === "gestor" ? (
+          <Button size="sm" variant="gold" onClick={() => openObraForm({ initialProjectId: p.id })}>
+            <Plus size={14} /> Nova obra
+          </Button>
+        ) : meuRole === "investidor" ? (
+          <Button
+            size="sm"
+            variant="outline"
+            title={`Só o gestor${gestor ? ` (${nomeProprio(gestor.name)})` : ""} cria obras. A tua proposta vai a votação dos sócios.`}
+            onClick={() => setProporOpen((v) => !v)}
+          >
+            <Plus size={14} /> Propor obra aos sócios
+          </Button>
+        ) : null}
       </div>
+
+      {/* Investidor: propor obra → cria uma decisão a votação (sistema de decisões existente) */}
+      {proporOpen && meuRole === "investidor" && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="mb-2 text-xs text-muted">
+              A proposta entra nas Decisões — se a maioria aprovar, o gestor aplica-a e a obra é criada.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-[1fr_160px_auto]">
+              <input
+                value={propTitulo}
+                onChange={(e) => setPropTitulo(e.target.value)}
+                placeholder="Ex.: Impermeabilizar o terraço"
+                className="h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary"
+              />
+              <div className="flex items-center rounded-lg border border-line bg-card">
+                <input
+                  type="number"
+                  value={propValor || ""}
+                  onChange={(e) => setPropValor(Number(e.target.value) || 0)}
+                  placeholder="Orçamento est."
+                  className="h-10 w-full bg-transparent px-3 text-sm outline-none"
+                />
+                <span className="px-3 text-sm text-muted">€</span>
+              </div>
+              <Button size="sm" onClick={proporObra}>Enviar aos sócios</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Kanban */}
       {obras.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-muted">
           <Hammer size={28} className="mx-auto mb-2" />
           <p className="text-sm">Nenhuma obra registada neste projeto.</p>
-          <Button size="sm" variant="outline" className="mt-3" onClick={() => openObraForm({ initialProjectId: p.id })}>
-            <Plus size={14} /> Adicionar primeira obra
-          </Button>
+          {meuRole === "gestor" ? (
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => openObraForm({ initialProjectId: p.id })}>
+              <Plus size={14} /> Adicionar primeira obra
+            </Button>
+          ) : meuRole === "investidor" ? (
+            <Button size="sm" variant="outline" className="mt-3" onClick={() => setProporOpen(true)}>
+              <Plus size={14} /> Propor obra aos sócios
+            </Button>
+          ) : null}
         </CardContent></Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -682,6 +796,9 @@ function ArrRoom({ project: p }: { project: CollabProject }) {
     <>
       <HeroProject project={p} />
 
+      {/* Decisões pendentes — adaptado ao papel do utilizador */}
+      <BlocosProjeto project={p} onVerDecisao={() => setTab("Decisões")} />
+
       {/* KPI strip */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <BigKpi label="Capital investido" value={eur(p.capitalInvestido ?? 0)} tone="gold" />
@@ -777,8 +894,12 @@ function FinancasComSocios({ project: p }: { project: CollabProject }) {
         </CardContent>
       </Card>
 
-      {/* Deep dive financeiro do imóvel (reutilizado dos imóveis solo) */}
-      <FinancasTab property={property} />
+      {/* Deep dive financeiro do imóvel (reutilizado dos imóveis solo) — ações só para o gestor */}
+      <FinancasTab
+        property={property}
+        podeEditar={roleNoProjeto(p, CURRENT_USER_ID) === "gestor"}
+        motivoBloqueio={`Só o gestor${gestorDoProjeto(p) ? ` (${nomeProprio(gestorDoProjeto(p)!.name)})` : ""} pode registar receitas e despesas. Podes consultar tudo e votar nas decisões.`}
+      />
     </div>
   );
 }

@@ -15,13 +15,20 @@ import {
   requerAprovacao,
   thresholdDe,
   gastoReal,
+  membrosDe,
+  investidoresDe,
+  custoObrasProjeto,
   PROVA_TIPO_LABEL,
   type ProvaTipo,
 } from "@/store/useObrasStore";
 import { useDocumentsStore } from "@/store/useDocumentsStore";
 import { useTransactionsStore } from "@/store/useTransactionsStore";
 import { useTechniciansStore } from "@/store/useTechniciansStore";
-import { CURRENT_USER_ID } from "@/store/useProfilesStore";
+import { useNotificationsStore } from "@/store/useNotificationsStore";
+import { useCollabStore } from "@/store/useCollabStore";
+import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
+import { financasFlipProjeto } from "@/lib/calc/obraProjeto";
+import { nomeProprio } from "@/components/obras/CoGestao";
 import { FaturaScanZone, type FilePreview } from "@/components/obras/FaturaScanZone";
 import { MoneyBox } from "@/components/ui/MoneyField";
 import { eur } from "@/lib/format";
@@ -45,6 +52,10 @@ export function ObraExpenseModal() {
   const obra = useObrasStore((s) => (obraId ? s.obras.find((o) => o.id === obraId) : undefined));
   const fasesAll = useObrasStore((s) => s.fases);
   const despesasAll = useObrasStore((s) => s.despesas);
+  const obrasAll = useObrasStore((s) => s.obras);
+  const collabProjects = useCollabStore((s) => s.projects);
+  const broadcast = useNotificationsStore((s) => s.broadcast);
+  const perfilEu = useProfilesStore((s) => s.profiles.find((p) => p.id === CURRENT_USER_ID));
   const registarDespesa = useObrasStore((s) => s.registarDespesa);
   const adicionarComprovativo = useObrasStore((s) => s.adicionarComprovativo);
   const updateObra = useObrasStore((s) => s.updateObra);
@@ -179,6 +190,57 @@ export function ObraExpenseModal() {
     // 4. Nota de causa da derrapagem → vira o resumo humano do header da obra
     if (vaiEstourar && notaCausa.trim()) {
       updateObra(obra.id, { notaCausa: notaCausa.trim() });
+    }
+
+    // 5. Notificações por papel (transparência total)
+    const meuNome = nomeProprio(perfilEu?.fullName) || "O gestor";
+    const outros = membrosDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID);
+    if (outros.length > 0) {
+      if (precisaVoto) {
+        // Acima do threshold → cada investidor é chamado a votar
+        broadcast(
+          investidoresDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID),
+          {
+            tipo: "decisao_criada",
+            titulo: `Gasto «${descricao.trim()}» aguarda o teu voto`,
+            descricao: `${eur(valor)} · ${obra.titulo}`,
+            actorId: CURRENT_USER_ID,
+            link: `/obra/${obra.id}`,
+          }
+        );
+      } else {
+        // Abaixo do threshold → aplicado já, sócios só são informados
+        broadcast(outros, {
+          tipo: "geral",
+          titulo: `${meuNome} registou um gasto de ${eur(valor)} em ${obra.titulo}`,
+          descricao: descricao.trim(),
+          actorId: CURRENT_USER_ID,
+          link: `/obra/${obra.id}`,
+        });
+      }
+    }
+
+    // 6. Lucro do flip mudou >5% com este gasto? Avisar os sócios em concreto.
+    const flip = obra.projectId
+      ? collabProjects.find((p) => p.id === obra.projectId && p.type === "reabilitacao")
+      : undefined;
+    if (flip && !precisaVoto && outros.length > 0) {
+      const custoAntes = custoObrasProjeto(flip.id, obrasAll, despesasAll);
+      const gastoAntes = gastoReal(obra, despesasAll);
+      const custoDepois =
+        custoAntes - Math.max(obra.orcamento, gastoAntes) + Math.max(obra.orcamento, gastoAntes + valor);
+      const finAntes = financasFlipProjeto(flip, custoAntes);
+      const finDepois = financasFlipProjeto(flip, custoDepois);
+      const base = Math.abs(finAntes.lucroEstimado);
+      if (base > 0 && Math.abs(finDepois.lucroEstimado - finAntes.lucroEstimado) / base > 0.05) {
+        broadcast(outros, {
+          tipo: "geral",
+          titulo: `Lucro estimado do projeto mudou: ${eur(finAntes.lucroEstimado)} → ${eur(finDepois.lucroEstimado)}`,
+          descricao: `${obra.titulo} · ${flip.title}`,
+          actorId: CURRENT_USER_ID,
+          link: `/comunidade/colaborativa/${flip.id}`,
+        });
+      }
     }
 
     // mensagem

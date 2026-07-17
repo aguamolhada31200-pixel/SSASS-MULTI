@@ -260,7 +260,7 @@ export interface LogEntry {
   texto: string;
 }
 
-/** Sugestão de passo enviada por um sócio investidor ao gestor da obra. */
+/** Sugestão enviada por um sócio investidor ao gestor da obra (passo ou gasto proposto). */
 export interface SugestaoFase {
   id: string;
   obraId: string;
@@ -268,6 +268,10 @@ export interface SugestaoFase {
   autorId: string;
   ts: string; // ISO
   estado: "pendente" | "aceite" | "rejeitada";
+  /** "passo" (default, retro-compat) ou "gasto" proposto pelo sócio. */
+  tipo?: "passo" | "gasto";
+  /** Valor estimado quando tipo === "gasto". */
+  valor?: number;
 }
 
 // ───────────────────── Inputs ─────────────────────
@@ -590,7 +594,7 @@ const SEED_DESPESAS: Despesa[] = [
       "https://images.unsplash.com/photo-1591628001888-76bf6747c8d3?auto=format&fit=crop&w=800&q=70",
     ],
   },
-  // Mão de obra de pintura — SEM COMPROVATIVO (por_comprovar) → dispara transparência baixa
+  // Mão de obra de pintura — SEM COMPROVATIVO (por_comprovar) e CONTESTADA pela Rita → âmbar
   {
     id: "d3",
     obraId: "o-principe-1",
@@ -602,6 +606,14 @@ const SEED_DESPESAS: Despesa[] = [
     registadoPor: "pedro-alves",
     registadoEm: "2026-06-03T18:00:00.000Z",
     // sem comprovativos → por_comprovar
+    confirmacoes: [
+      {
+        userId: "rita-santos",
+        valor: "contesta",
+        comentario: "Sem fatura não consigo confirmar — pedi o documento ao Joaquim.",
+        ts: "2026-07-14T12:00:00.000Z",
+      },
+    ],
   },
   {
     id: "d-estuque",
@@ -623,22 +635,48 @@ const SEED_DESPESAS: Despesa[] = [
       ],
     },
   },
+  // Acima do threshold → a aguardar votos: Rita já votou a favor, FALTA O VOTO DO DANIEL.
   {
     id: "d-tinta",
     obraId: "o-principe-1",
     faseId: "f7",
     descricao: "Tinta especial premium (Farrow & Ball)",
     valor: 1500,
-    data: "2026-06-25",
+    data: "2026-07-12",
     fornecedor: "Farrow & Ball",
     registadoPor: "pedro-alves",
+    registadoEm: "2026-07-12T09:00:00.000Z",
     aprovacao: {
       estado: "pendente",
       requeridoPor: "pedro-alves",
-      requeridoEm: "2026-06-25",
-      prazoVoto: "2026-07-02",
-      votos: [{ userId: CURRENT_USER_ID, valor: "a_favor", ts: "2026-06-26T08:00:00" }],
+      requeridoEm: "2026-07-12",
+      prazoVoto: "2026-07-22",
+      votos: [{ userId: "rita-santos", valor: "a_favor", ts: "2026-07-13T08:00:00" }],
     },
+  },
+  // Abaixo do threshold → aplicado logo, sócios só foram notificados.
+  {
+    id: "d-material",
+    obraId: "o-principe-1",
+    faseId: "f7",
+    descricao: "Material de pintura (rolos, fitas, lonas)",
+    valor: 300,
+    data: "2026-07-06",
+    fornecedor: "AKI",
+    nif: "503000000",
+    registadoPor: "pedro-alves",
+    registadoEm: "2026-07-06T10:00:00.000Z",
+    comprovativos: [
+      {
+        id: "cp-d-material",
+        documentId: "seed-doc-fatura-material",
+        tipo: "fatura",
+        nomeFicheiro: "Fatura AKI 06-07.pdf",
+        valorNoComprovativo: 300,
+        addedBy: "pedro-alves",
+        addedAt: "2026-07-06T10:05:00.000Z",
+      },
+    ],
   },
 
   // CASA DE BANHO (#003) — totalmente comprovada, confirmada por 3/3 sócios
@@ -732,6 +770,24 @@ const SEED_DESPESAS: Despesa[] = [
 
   // REFORÇO ESTRUTURAL PORTO (#001) — custo extra aprovado por @Pedro e @Rita
   { id: "d-estr-1", obraId: "o-porto-3", descricao: "Mão-de-obra reforço estrutural", valor: 2700, data: "2026-05-20", fornecedor: "Constru Forte Lda.", registadoPor: CURRENT_USER_ID },
+  // Submetido pelo DANIEL (gestor no Porto) — Pedro já votou, falta a Rita → vista "A pedir aos sócios".
+  {
+    id: "d-caixilharia",
+    obraId: "o-porto-3",
+    descricao: "Caixilharia acústica (vidro duplo)",
+    valor: 2600,
+    data: "2026-07-10",
+    fornecedor: "Constru Forte Lda.",
+    registadoPor: CURRENT_USER_ID,
+    registadoEm: "2026-07-10T09:30:00.000Z",
+    aprovacao: {
+      estado: "pendente",
+      requeridoPor: CURRENT_USER_ID,
+      requeridoEm: "2026-07-10",
+      prazoVoto: "2026-07-20",
+      votos: [{ userId: "pedro-alves", valor: "a_favor", ts: "2026-07-11T08:00:00" }],
+    },
+  },
   {
     id: "d-estr-2",
     obraId: "o-porto-3",
@@ -759,7 +815,24 @@ const SEED_DESPESAS: Despesa[] = [
 
 const SEED_MARCOS: Marco[] = [
   { id: "m1", obraId: "o-principe-2", titulo: "Adjudicação cozinha (30%)", valor: 3600, dataPrevista: "2026-06-01", dataPago: "2026-06-01", estado: "pago", empreiteiro: "Cozinhas Modernas Lx", registadoPor: "pedro-alves", pagoPor: "pedro-alves" },
-  { id: "m2", obraId: "o-principe-2", titulo: "A meio da obra (40%)", valor: 4800, dataPrevista: "2026-07-20", estado: "pendente", empreiteiro: "Cozinhas Modernas Lx", registadoPor: "pedro-alves" },
+  // Acima do threshold → precisa do voto dos sócios antes de poder ser pago (falta o Daniel e a Rita).
+  {
+    id: "m2",
+    obraId: "o-principe-2",
+    titulo: "A meio da obra (40%)",
+    valor: 4800,
+    dataPrevista: "2026-07-20",
+    estado: "pendente",
+    empreiteiro: "Cozinhas Modernas Lx",
+    registadoPor: "pedro-alves",
+    aprovacao: {
+      estado: "pendente",
+      requeridoPor: "pedro-alves",
+      requeridoEm: "2026-07-13",
+      prazoVoto: "2026-07-19",
+      votos: [],
+    },
+  },
   { id: "m3", obraId: "o-principe-2", titulo: "Conclusão (30%)", valor: 3600, dataPrevista: "2026-08-15", estado: "pendente", empreiteiro: "Cozinhas Modernas Lx", registadoPor: "pedro-alves" },
 
   {
@@ -816,10 +889,15 @@ function diffDays(aISO: string, bISO: string): number {
   return Math.round((b - a) / 86400000);
 }
 
+/** Uma despesa só CONTA no gasto quando não está pendente/rejeitada em votação. */
+export function despesaAplicada(d: Despesa): boolean {
+  return d.aprovacao?.estado !== "pendente" && d.aprovacao?.estado !== "rejeitado";
+}
+
 export function gastoReal(obra: Obra, despesas: Despesa[]): number {
   const ds = despesas.filter((d) => d.obraId === obra.id);
   if (ds.length === 0) return obra.gasto;
-  return ds.reduce((s, d) => s + d.valor, 0);
+  return ds.filter(despesaAplicada).reduce((s, d) => s + d.valor, 0);
 }
 
 export function progressoReal(obra: Obra, fases: Fase[]): number {
@@ -829,7 +907,7 @@ export function progressoReal(obra: Obra, fases: Fase[]): number {
 }
 
 export function custoRealFase(faseId: string, despesas: Despesa[]): number {
-  return despesas.filter((d) => d.faseId === faseId).reduce((s, d) => s + d.valor, 0);
+  return despesas.filter((d) => d.faseId === faseId && despesaAplicada(d)).reduce((s, d) => s + d.valor, 0);
 }
 
 /** Linear: orcamento × (dias_decorridos / dias_totais). */
@@ -1118,17 +1196,17 @@ export function estadoProvaDe(d: Despesa): EstadoProva {
 
 export function gastoComprovado(obra: Obra, despesas: Despesa[]): number {
   return despesas
-    .filter((d) => d.obraId === obra.id && estadoProvaDe(d) === "comprovada")
+    .filter((d) => d.obraId === obra.id && despesaAplicada(d) && estadoProvaDe(d) === "comprovada")
     .reduce((s, d) => s + d.valor, 0);
 }
 
 export function gastoNaoComprovado(obra: Obra, despesas: Despesa[]): number {
-  const total = despesas.filter((d) => d.obraId === obra.id).reduce((s, d) => s + d.valor, 0);
+  const total = despesas.filter((d) => d.obraId === obra.id && despesaAplicada(d)).reduce((s, d) => s + d.valor, 0);
   return Math.max(0, total - gastoComprovado(obra, despesas));
 }
 
 export function pctTransparencia(obra: Obra, despesas: Despesa[]): number {
-  const totalDoObra = despesas.filter((d) => d.obraId === obra.id).reduce((s, d) => s + d.valor, 0);
+  const totalDoObra = despesas.filter((d) => d.obraId === obra.id && despesaAplicada(d)).reduce((s, d) => s + d.valor, 0);
   if (totalDoObra <= 0) return 100;
   return Math.round((gastoComprovado(obra, despesas) / totalDoObra) * 100);
 }
@@ -1175,8 +1253,10 @@ interface ObrasState {
   logs: LogEntry[];
   sugestoes: SugestaoFase[];
 
-  // Sugestões de passo (sócio investidor → gestor)
+  // Sugestões (sócio investidor → gestor)
   sugerirFase: (obraId: string, titulo: string, autorId: string) => string;
+  /** Sócio investidor propõe um gasto — o gestor decide se o regista. */
+  sugerirGasto: (obraId: string, titulo: string, valor: number, autorId: string) => string;
   resolverSugestao: (id: string, estado: "aceite" | "rejeitada") => void;
 
   // CRUD obras
@@ -1266,10 +1346,21 @@ export const useObrasStore = create<ObrasState>()(
         const id = uid("sug");
         set((s) => ({
           sugestoes: [
-            { id, obraId, titulo: titulo.trim(), autorId, ts: new Date().toISOString(), estado: "pendente" },
+            { id, obraId, titulo: titulo.trim(), autorId, ts: new Date().toISOString(), estado: "pendente", tipo: "passo" as const },
             ...s.sugestoes,
           ],
           logs: appendLog(s, obraId, `Sugestão de passo enviada ao gestor: "${titulo.trim()}".`),
+        }));
+        return id;
+      },
+      sugerirGasto: (obraId, titulo, valor, autorId) => {
+        const id = uid("sug");
+        set((s) => ({
+          sugestoes: [
+            { id, obraId, titulo: titulo.trim(), autorId, ts: new Date().toISOString(), estado: "pendente", tipo: "gasto" as const, valor },
+            ...s.sugestoes,
+          ],
+          logs: appendLog(s, obraId, `Gasto proposto ao gestor: "${titulo.trim()}" (${valor.toLocaleString("pt-PT")} €).`),
         }));
         return id;
       },
@@ -1607,9 +1698,10 @@ export const useObrasStore = create<ObrasState>()(
     }),
     {
       name: "redegest-obras",
-      version: 9,
+      version: 10,
       // v4: co-gestão. v5/v6: obra parada + marcos espalhados. v7: comprovativos + confirmações.
       // v8: divisão da casa. v9: empreiteiroId + notaCausa + sugestões + saúde 50/50.
+      // v10: camada de papéis — d-tinta aguarda o voto do Daniel, m2 em votação, gasto contestado, proposta do Daniel no Porto.
       // Re-semeia os exemplos mantendo obras/itens criados pelo utilizador.
       migrate: (persisted: unknown, version: number) => {
         const s = (persisted ?? {}) as {
@@ -1621,7 +1713,7 @@ export const useObrasStore = create<ObrasState>()(
           sugestoes?: SugestaoFase[];
         };
         s.sugestoes = s.sugestoes ?? [];
-        if (version < 9) {
+        if (version < 10) {
           const seedObraIds = new Set(SEED_OBRAS.map((o) => o.id));
           const seedFaseIds = new Set(SEED_FASES.map((f) => f.id));
           const seedDespIds = new Set(SEED_DESPESAS.map((d) => d.id));

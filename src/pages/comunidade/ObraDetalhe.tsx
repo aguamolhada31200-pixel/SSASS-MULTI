@@ -72,13 +72,17 @@ import {
   DIVISAO_LABEL,
   saudePrazoScore,
   custoObrasProjeto,
+  investidoresDe,
+  despesaAplicada,
   type Obra,
   type ObraEstado,
   type MarcoEstado,
+  type Despesa,
+  type Marco,
 } from "@/store/useObrasStore";
-import { useCollabStore } from "@/store/useCollabStore";
+import { useCollabStore, roleNoProjeto } from "@/store/useCollabStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
-import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
+import { useProfilesStore, CURRENT_USER_ID, type Profile } from "@/store/useProfilesStore";
 import { useDocumentsStore } from "@/store/useDocumentsStore";
 import { useModalStore } from "@/store/useModalStore";
 import { useTechniciansStore } from "@/store/useTechniciansStore";
@@ -113,11 +117,15 @@ export default function ObraDetalhe() {
   const [gestaoAberta, setGestaoAberta] = useState(false);
   const [empreiteiroOpen, setEmpreiteiroOpen] = useState(false);
   const [avaliarOpen, setAvaliarOpen] = useState(false);
+  const [editandoRegras, setEditandoRegras] = useState(false);
+  const [thVal, setThVal] = useState(0);
+  const [regraVal, setRegraVal] = useState<"maioria_simples" | "unanimidade">("maioria_simples");
 
   const obrasAll = useObrasStore((s) => s.obras);
   const marcosAll = useObrasStore((s) => s.marcos);
   const updateObraProg = useObrasStore((s) => s.updateObra);
   const technicians = useTechniciansStore((s) => s.technicians);
+  const broadcastNotif = useNotificationsStore((s) => s.broadcast);
 
   if (!obra) {
     return (
@@ -227,6 +235,12 @@ export default function ObraDetalhe() {
   const derrapagemDesta = Math.max(0, desv);
   const finSemDerrapagem = flip ? financasFlipProjeto(flip, custoObrasAtual - derrapagemDesta) : undefined;
 
+  // Papel no PROJETO + fatia do investidor (o mesmo número para todos; o investidor vê a parte dele)
+  const socioEu = project?.partners.find((s) => s.id === CURRENT_USER_ID);
+  const souInvestidorProj = project ? roleNoProjeto(project, CURRENT_USER_ID) === "investidor" : false;
+  const arr = project && project.type === "arrendamento" ? project : undefined;
+  const cashflowAnualProj = arr ? ((arr.rendaMensal ?? 0) - (arr.despesasMensais ?? 0)) * 12 : 0;
+
   const ownerHref = project
     ? `/comunidade/colaborativa/${project.id}`
     : property
@@ -275,8 +289,27 @@ export default function ObraDetalhe() {
                 <span className="rounded-full bg-accent px-2 py-0.5 text-muted">
                   {CATEGORIA_LABEL[obra.categoria]}
                 </span>
-                {souGestor && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 font-medium text-gold-dark">Gestor</span>
+                {/* Badge de papel sempre visível — "Tu: Gestor" / "Tu: Sócio investidor" / "Tu: Observador" */}
+                {temCoGestao && (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-semibold",
+                      souGestor
+                        ? "border-gold/40 bg-gold/15 text-gold-dark"
+                        : meuRole === "investidor"
+                          ? "border-primary/30 bg-primary/10 text-primary"
+                          : "border-line bg-accent text-muted"
+                    )}
+                    title={
+                      souGestor
+                        ? "Executas as ações; acima do threshold os sócios votam."
+                        : meuRole === "investidor"
+                          ? "Vês tudo, votas e propões. O gestor executa."
+                          : "Acesso só de leitura."
+                    }
+                  >
+                    {souGestor ? "Tu: Gestor" : meuRole === "investidor" ? "Tu: Sócio investidor" : "Tu: Observador"}
+                  </span>
                 )}
                 {/* Empreiteiro CLICÁVEL → cartão de contacto */}
                 {tecDaObra ? (
@@ -324,6 +357,15 @@ export default function ObraDetalhe() {
                       variant="gold"
                       onClick={() => {
                         marcarConcluida(obra.id);
+                        const outros = membrosDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID);
+                        if (outros.length > 0)
+                          broadcastNotif(outros, {
+                            tipo: "geral",
+                            titulo: `Obra concluída: «${obra.titulo}»`,
+                            descricao: project ? project.title : property?.name,
+                            actorId: CURRENT_USER_ID,
+                            link: `/obra/${obra.id}`,
+                          });
                         toast.success("Obra concluída", {
                           description: "Quer criar um antes/depois com as fotos desta obra?",
                           action: { label: "Criar", onClick: () => openGaleriaForm({ initialObraId: obra.id }) },
@@ -338,9 +380,16 @@ export default function ObraDetalhe() {
                     <Trash2 size={14} /> Eliminar
                   </Button>
                 </>
+              ) : meuRole === "investidor" ? (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-bg/40 px-3 py-1.5 text-xs text-muted"
+                  title="Podes votar nas decisões, confirmar gastos e propor passos/gastos ao gestor."
+                >
+                  <Vote size={12} /> Vês tudo · votas · o gestor executa
+                </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-bg/40 px-3 py-1.5 text-xs text-muted">
-                  <Lock size={12} /> {meuRole ? ROLE_LABEL[meuRole] : "Observador"} · só leitura
+                  <Lock size={12} /> Observador · só leitura
                 </span>
               )}
             </div>
@@ -405,6 +454,31 @@ export default function ObraDetalhe() {
                   Lucro estimado do projeto: <strong className="num text-success">{eur(finAtual.lucroEstimado)}</strong> · ROI {pct(finAtual.roi)} — cada euro acima do orçamento sai daqui
                 </span>
               )}
+              {souInvestidorProj && socioEu && (
+                <span className="whitespace-nowrap">
+                  · A tua parte ({socioEu.pct}%): <strong className="num">{eur(finAtual.lucroEstimado * (socioEu.pct / 100))}</strong>
+                </span>
+              )}
+              <ChevronRight size={13} className="ml-auto shrink-0 text-muted" />
+            </Link>
+          )}
+
+          {/* Impacto no resultado do projeto (arrendamento) — o investidor vê a fatia dele */}
+          {arr && (
+            <Link
+              to={`/comunidade/colaborativa/${arr.id}`}
+              className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gold/25 bg-gold/5 px-3 py-2.5 text-[12px] text-ink transition-colors hover:bg-gold/10"
+            >
+              <TrendingDown size={14} className="shrink-0 text-gold-dark" />
+              <span>
+                Cashflow anual do projeto: <strong className="num text-success">{eur(cashflowAnualProj)}</strong>
+                {souInvestidorProj && socioEu && (
+                  <> · A tua parte ({socioEu.pct}%): <strong className="num">{eur(cashflowAnualProj * (socioEu.pct / 100))}</strong></>
+                )}
+                {desv > 0 && (
+                  <> — esta obra vai <strong className="num text-danger">{eur(desv)}</strong> acima do orçamento</>
+                )}
+              </span>
               <ChevronRight size={13} className="ml-auto shrink-0 text-muted" />
             </Link>
           )}
@@ -446,10 +520,61 @@ export default function ObraDetalhe() {
                           </span>
                         ))}
                       </div>
-                      <span className="flex items-center gap-1.5 text-[11px] text-muted">
-                        <ShieldCheck size={12} className="text-gold-dark" />
-                        Threshold: {eur(thresholdDe(obra))} (5%) · {REGRA_LABEL[obra.regraVotacao ?? "maioria_simples"]}
-                      </span>
+                      {!editandoRegras ? (
+                        <span className="flex items-center gap-1.5 text-[11px] text-muted">
+                          <ShieldCheck size={12} className="text-gold-dark" />
+                          Threshold: {eur(thresholdDe(obra))}
+                          {obra.orcamento > 0 && <> ({Math.round((thresholdDe(obra) / obra.orcamento) * 100)}%)</>}
+                          {" · "}{REGRA_LABEL[obra.regraVotacao ?? "maioria_simples"]}
+                          {souGestor && (
+                            <button
+                              onClick={() => {
+                                setThVal(thresholdDe(obra));
+                                setRegraVal(obra.regraVotacao ?? "maioria_simples");
+                                setEditandoRegras(true);
+                              }}
+                              className="ml-1 font-medium text-secondary underline hover:text-ink"
+                            >
+                              Editar
+                            </button>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="flex flex-wrap items-center gap-2 text-[11px]">
+                          <span className="text-muted">Acima de</span>
+                          <span className="flex items-center rounded-lg border border-line bg-card">
+                            <input
+                              type="number"
+                              value={thVal || ""}
+                              onChange={(e) => setThVal(Number(e.target.value) || 0)}
+                              className="num h-7 w-20 bg-transparent px-2 text-xs outline-none"
+                            />
+                            <span className="pr-2 text-muted">€</span>
+                          </span>
+                          <span className="text-muted">vai a votos ·</span>
+                          <select
+                            value={regraVal}
+                            onChange={(e) => setRegraVal(e.target.value as "maioria_simples" | "unanimidade")}
+                            className="h-7 rounded-lg border border-line bg-card px-1.5 text-xs outline-none"
+                          >
+                            <option value="maioria_simples">Maioria simples</option>
+                            <option value="unanimidade">Unanimidade</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              updateObraProg(obra.id, { thresholdAprovacao: Math.max(0, thVal), regraVotacao: regraVal });
+                              setEditandoRegras(false);
+                              toast.success("Regras de aprovação atualizadas ✓");
+                            }}
+                            className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-medium text-white hover:bg-primary/90"
+                          >
+                            Guardar
+                          </button>
+                          <button onClick={() => setEditandoRegras(false)} className="text-muted hover:text-ink">
+                            Cancelar
+                          </button>
+                        </span>
+                      )}
                     </div>
                   )}
                   {g > 0 && (
@@ -512,8 +637,8 @@ export default function ObraDetalhe() {
         {tab === "Passos" && <FasesTab obraId={obra.id} souGestor={souGestor} />}
         {tab === "Gastos" && <DespesasTab obra={obra} souGestor={souGestor} />}
         {tab === "Pagamentos" && <MarcosTab obra={obra} souGestor={souGestor} />}
-        {tab === "Fotos" && <FotosTab obraId={obra.id} />}
-        {tab === "Notas" && <NotasTab obraId={obra.id} />}
+        {tab === "Fotos" && <FotosTab obraId={obra.id} souGestor={souGestor} />}
+        {tab === "Notas" && <NotasTab obraId={obra.id} souGestor={souGestor} />}
       </div>
     </>
   );
@@ -647,6 +772,7 @@ function FasesTab({ obraId, souGestor }: { obraId: string; souGestor: boolean })
 
   const gestorId = obra ? membrosDe(obra).find((m) => m.role === "gestor")?.userId : undefined;
   const nomeGestor = nomeProprio(profiles.find((p) => p.id === gestorId)?.fullName) || "o gestor";
+  const souInvestidorFase = obra ? roleDe(obra, CURRENT_USER_ID) === "investidor" : false;
 
   const [showForm, setShowForm] = useState(false);
   const [titulo, setTitulo] = useState("");
@@ -718,7 +844,7 @@ function FasesTab({ obraId, souGestor }: { obraId: string; souGestor: boolean })
           <Button size="sm" variant={showForm ? "ghost" : "outline"} onClick={() => setShowForm(!showForm)}>
             {showForm ? "Cancelar" : <><Plus size={14} /> Adicionar passo</>}
           </Button>
-        ) : (
+        ) : souInvestidorFase ? (
           <Button
             size="sm"
             variant="outline"
@@ -727,7 +853,7 @@ function FasesTab({ obraId, souGestor }: { obraId: string; souGestor: boolean })
           >
             <Send size={13} /> Sugerir passo ao gestor
           </Button>
-        )}
+        ) : null}
       </div>
 
       {/* Sócio investidor: caixa de sugestão (cria sugestão + notifica o gestor) */}
@@ -970,9 +1096,76 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
   const [votandoId, setVotandoId] = useState<string | null>(null);
   const [soPorComprovar, setSoPorComprovar] = useState(false);
 
+  // Propor gasto (sócio investidor) + sugestões pendentes (gestor decide)
+  const sugerirGasto = useObrasStore((s) => s.sugerirGasto);
+  const registarDespesa = useObrasStore((s) => s.registarDespesa);
+  const resolverSugestao = useObrasStore((s) => s.resolverSugestao);
+  const sugestoesGasto = useObrasStore((s) =>
+    s.sugestoes.filter((x) => x.obraId === obraId && x.estado === "pendente" && x.tipo === "gasto")
+  );
+  const addNotif = useNotificationsStore((s) => s.add);
+  const broadcast = useNotificationsStore((s) => s.broadcast);
+  const [proporOpen, setProporOpen] = useState(false);
+  const [propDesc, setPropDesc] = useState("");
+  const [propValor, setPropValor] = useState(0);
+  const gestorId = membrosDe(obra).find((m) => m.role === "gestor")?.userId;
+  const nomeGestor = nomeProprio(profiles.find((p) => p.id === gestorId)?.fullName) || "o gestor";
+
+  const proporGasto = () => {
+    if (!propDesc.trim() || propValor <= 0) {
+      toast.error("Descreva o gasto e indique o valor");
+      return;
+    }
+    sugerirGasto(obraId, propDesc.trim(), propValor, CURRENT_USER_ID);
+    if (gestorId)
+      addNotif({
+        userId: gestorId,
+        tipo: "geral",
+        titulo: `Gasto proposto em «${obra.titulo}»`,
+        descricao: `${propDesc.trim()} · ${eur(propValor)}`,
+        actorId: CURRENT_USER_ID,
+        link: `/obra/${obraId}`,
+      });
+    setPropDesc("");
+    setPropValor(0);
+    setProporOpen(false);
+    toast.success(`Enviado a ${nomeGestor} ✓`, { description: "Ele decide se regista o gasto." });
+  };
+
+  const aceitarSugestao = (sgId: string, titulo: string, valor: number, autorId: string) => {
+    registarDespesa({ obraId, descricao: titulo, valor, data: new Date().toISOString().slice(0, 10) }, CURRENT_USER_ID);
+    resolverSugestao(sgId, "aceite");
+    const precisaVoto = requerAprovacao(obra, valor);
+    if (precisaVoto) {
+      broadcast(
+        investidoresDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID),
+        {
+          tipo: "decisao_criada",
+          titulo: `Gasto «${titulo}» aguarda o teu voto`,
+          descricao: `${eur(valor)} · ${obra.titulo}`,
+          actorId: CURRENT_USER_ID,
+          link: `/obra/${obraId}`,
+        }
+      );
+    } else if (autorId !== CURRENT_USER_ID) {
+      addNotif({
+        userId: autorId,
+        tipo: "geral",
+        titulo: `A tua proposta «${titulo}» foi registada`,
+        descricao: `${eur(valor)} · ${obra.titulo}`,
+        actorId: CURRENT_USER_ID,
+        link: `/obra/${obraId}`,
+      });
+    }
+    toast.success(precisaVoto ? "Registado — acima do threshold, entrou em votação" : "Gasto registado ✓");
+  };
+
   const lista = soPorComprovar ? despesasObra.filter((d) => estadoProvaDe(d) === "por_comprovar") : despesasObra;
 
-  const totalGasto = despesasObra.reduce((s, d) => s + d.valor, 0);
+  const totalGasto = despesasObra.filter(despesaAplicada).reduce((s, d) => s + d.valor, 0);
+  const pendenteAprovacao = despesasObra
+    .filter((d) => d.aprovacao?.estado === "pendente")
+    .reduce((s, d) => s + d.valor, 0);
   const comprovado = gastoComprovado(obra, despesasObra);
   const naoComprovado = gastoNaoComprovado(obra, despesasObra);
   const pctComp = pctTransparencia(obra, despesasObra);
@@ -987,6 +1180,11 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
           <span>
             Total: <strong className="num font-semibold text-ink">{eur(totalGasto)}</strong> em {despesasObra.length} despesas
           </span>
+          {pendenteAprovacao > 0 && (
+            <span className="flex items-center gap-1 text-warning">
+              <Vote size={13} /> {eur(pendenteAprovacao)} a aguardar aprovação (não conta ainda)
+            </span>
+          )}
           <span className="flex items-center gap-1 text-success">
             <ShieldCheck size={13} /> {eur(comprovado)} comprovado ({pctComp}%)
           </span>
@@ -1008,13 +1206,94 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
               <AlertTriangle size={13} /> Só por comprovar
             </button>
           )}
-          {souGestor && (
+          {souGestor ? (
             <Button size="sm" variant="gold" onClick={() => openObraExpense(obraId)}>
               <Plus size={14} /> Registar gasto
             </Button>
-          )}
+          ) : souInvestidor ? (
+            <Button
+              size="sm"
+              variant="outline"
+              title={`Só o gestor (${nomeGestor}) pode registar gastos. Podes propor ou votar.`}
+              onClick={() => setProporOpen((v) => !v)}
+            >
+              <Plus size={14} /> Propor gasto
+            </Button>
+          ) : null}
         </div>
       </div>
+
+      {/* Sócio investidor: propor gasto (o gestor decide se regista) */}
+      {proporOpen && souInvestidor && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="mb-2 text-xs text-muted">A proposta vai para {nomeGestor} — ele decide se regista o gasto.</p>
+            <div className="grid gap-2 sm:grid-cols-[1fr_150px_auto]">
+              <input
+                value={propDesc}
+                onChange={(e) => setPropDesc(e.target.value)}
+                placeholder="Ex.: Tinta anti-humidade para o teto"
+                className={inputCls}
+                onKeyDown={(e) => { if (e.key === "Enter") proporGasto(); }}
+              />
+              <div className="flex items-center rounded-lg border border-line bg-card">
+                <input
+                  type="number"
+                  value={propValor || ""}
+                  onChange={(e) => setPropValor(Number(e.target.value) || 0)}
+                  placeholder="Valor"
+                  className="num h-10 w-full bg-transparent px-3 text-sm outline-none"
+                />
+                <span className="px-3 text-sm text-muted">€</span>
+              </div>
+              <Button size="sm" onClick={proporGasto}><Send size={13} /> Enviar</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Gestor: gastos propostos pelos sócios */}
+      {souGestor && sugestoesGasto.length > 0 && (
+        <Card className="border-gold/30 bg-gold/5">
+          <CardContent className="space-y-2 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gold-dark">Gastos propostos pelos sócios</p>
+            {sugestoesGasto.map((sg) => (
+              <div key={sg.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-card px-3 py-2">
+                <span className="text-sm text-ink">
+                  {sg.titulo} <span className="num font-semibold">{eur(sg.valor ?? 0)}</span>
+                  <span className="ml-2 text-[11px] text-muted">
+                    por {nomeProprio(profiles.find((p) => p.id === sg.autorId)?.fullName)} {relativaTempo(sg.ts)}
+                  </span>
+                </span>
+                <span className="flex gap-1.5">
+                  <Button size="sm" variant="gold" onClick={() => aceitarSugestao(sg.id, sg.titulo, sg.valor ?? 0, sg.autorId)}>
+                    <Plus size={13} /> Registar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      resolverSugestao(sg.id, "rejeitada");
+                      if (sg.autorId !== CURRENT_USER_ID)
+                        addNotif({
+                          userId: sg.autorId,
+                          tipo: "geral",
+                          titulo: `A tua proposta «${sg.titulo}» foi rejeitada`,
+                          descricao: obra.titulo,
+                          actorId: CURRENT_USER_ID,
+                          link: `/obra/${obraId}`,
+                        });
+                      toast.message("Proposta rejeitada — o sócio foi avisado");
+                    }}
+                  >
+                    Rejeitar
+                  </Button>
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {lista.length === 0 ? (
         <Card>
@@ -1024,6 +1303,11 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
             {!soPorComprovar && souGestor && (
               <Button size="sm" variant="gold" className="mt-3" onClick={() => openObraExpense(obraId)}>
                 <Plus size={14} /> Registar gasto
+              </Button>
+            )}
+            {!soPorComprovar && !souGestor && souInvestidor && (
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => setProporOpen(true)}>
+                <Plus size={14} /> Propor gasto
               </Button>
             )}
           </CardContent>
@@ -1044,7 +1328,8 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
                 key={d.id}
                 className={cn(
                   pendente && "border-warning/40 bg-warning/5",
-                  !pendente && estProva === "por_comprovar" && "border-warning/30 bg-warning/[0.03]"
+                  !pendente && estProva === "por_comprovar" && "border-warning/30 bg-warning/[0.03]",
+                  conf.contestadosBy.length > 0 && "border-warning/60 bg-warning/8"
                 )}
               >
                 <CardContent className="p-4">
@@ -1122,7 +1407,21 @@ function DespesasTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
                         <CheckCircle2 size={11} /> Confirmada por {conf.confirmadosBy.length}/{conf.totalInvestidores} sócios
                       </span>
                     )}
+                    {/* Contestação visível a todos — a prova anti-disputa */}
+                    {conf.contestadosBy.length > 0 && (() => {
+                      const contest = (d.confirmacoes ?? []).find((c) => c.valor === "contesta");
+                      return (
+                        <span className="flex items-center gap-1 font-medium text-warning" title={contest?.comentario}>
+                          <AlertTriangle size={11} />
+                          {conf.contestadosBy.map((id) => nomeProprio(profiles.find((p) => p.id === id)?.fullName)).join(", ")} contestou
+                          {contest?.ts ? ` · ${relativaTempo(contest.ts)}` : ""}
+                        </span>
+                      );
+                    })()}
                   </div>
+
+                  {/* Registo de responsabilidade — timeline expansível */}
+                  <VerHistorico eventos={historicoDespesa(d, profiles)} />
 
                   {/* Botões de confirmação (só para sócios investidores em despesas comprovadas) */}
                   {souInvestidor && estProva === "comprovada" && !pendente && (
@@ -1200,6 +1499,7 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
   const profiles = useProfilesStore((s) => s.profiles);
   const docs = useDocumentsStore((s) => s.documents);
   const openMarcoPay = useModalStore((s) => s.openMarcoPay);
+  const broadcastNotif = useNotificationsStore((s) => s.broadcast);
 
   const todayISO = new Date().toISOString().slice(0, 10);
   const marcos = marcosAll
@@ -1237,12 +1537,34 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
       { obraId, titulo: titulo.trim(), valor, dataPrevista: dataPrev, estado: "pendente", empreiteiro: empreiteiro.trim() || undefined },
       CURRENT_USER_ID
     );
+    // Notificações por papel: acima do threshold pede voto; abaixo é só informativo.
+    const outros = membrosDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID);
+    if (precisaVoto) {
+      broadcastNotif(
+        investidoresDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID),
+        {
+          tipo: "decisao_criada",
+          titulo: `Pagamento «${titulo.trim()}» aguarda o teu voto`,
+          descricao: `${eur(valor)} · ${obra.titulo}`,
+          actorId: CURRENT_USER_ID,
+          link: `/obra/${obraId}`,
+        }
+      );
+    } else if (outros.length > 0) {
+      broadcastNotif(outros, {
+        tipo: "geral",
+        titulo: `Novo pagamento planeado em «${obra.titulo}»`,
+        descricao: `${titulo.trim()} · ${eur(valor)}`,
+        actorId: CURRENT_USER_ID,
+        link: `/obra/${obraId}`,
+      });
+    }
     setTitulo("");
     setValor(0);
     setDataPrev("");
     setEmpreiteiro("");
     setShowForm(false);
-    toast.success(precisaVoto ? "Marco submetido a votação dos sócios" : "Marco criado");
+    toast.success(precisaVoto ? "Submetido a votação — sócios notificados ✓" : "Marco criado");
   };
 
   const onPagar = (id: string) => {
@@ -1425,6 +1747,9 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
                       <VotacaoPanel obra={obra} tipo="marco" itemId={m.id} aprovacao={m.aprovacao} titulo={m.titulo} valor={m.valor} onResolved={() => setVotandoId(null)} />
                     </div>
                   )}
+
+                  {/* Registo de responsabilidade — timeline expansível */}
+                  <VerHistorico eventos={historicoMarco(m, profiles)} />
                 </CardContent>
               </Card>
             );
@@ -1437,7 +1762,7 @@ function MarcosTab({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
 
 // ───────────────────── Fotos tab ─────────────────────
 
-function FotosTab({ obraId }: { obraId: string }) {
+function FotosTab({ obraId, souGestor }: { obraId: string; souGestor: boolean }) {
   const obra = useObrasStore((s) => s.obras.find((o) => o.id === obraId));
   const addFoto = useObrasStore((s) => s.addFoto);
   const removeFoto = useObrasStore((s) => s.removeFoto);
@@ -1458,28 +1783,30 @@ function FotosTab({ obraId }: { obraId: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="Colar URL da imagem…"
-          className={cn(inputCls, "max-w-md flex-1")}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onAdd();
-            }
-          }}
-        />
-        <Button size="sm" variant="outline" onClick={onAdd}>
-          <ImagePlus size={14} /> Adicionar foto
-        </Button>
-        {totalFotos > 0 && (
-          <Button size="sm" variant="gold" onClick={() => openGaleriaForm({ initialObraId: obraId })}>
-            <Star size={14} /> Criar antes/depois com estas fotos
+      {souGestor && (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Colar URL da imagem…"
+            className={cn(inputCls, "max-w-md flex-1")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onAdd();
+              }
+            }}
+          />
+          <Button size="sm" variant="outline" onClick={onAdd}>
+            <ImagePlus size={14} /> Adicionar foto
           </Button>
-        )}
-      </div>
+          {totalFotos > 0 && (
+            <Button size="sm" variant="gold" onClick={() => openGaleriaForm({ initialObraId: obraId })}>
+              <Star size={14} /> Criar antes/depois com estas fotos
+            </Button>
+          )}
+        </div>
+      )}
 
       {obra.fotos.length === 0 ? (
         <Card>
@@ -1512,7 +1839,7 @@ function FotosTab({ obraId }: { obraId: string }) {
 
 // ───────────────────── Notas tab ─────────────────────
 
-function NotasTab({ obraId }: { obraId: string }) {
+function NotasTab({ obraId, souGestor }: { obraId: string; souGestor: boolean }) {
   const obra = useObrasStore((s) => s.obras.find((o) => o.id === obraId));
   const setNotas = useObrasStore((s) => s.setNotas);
   const logsAll = useObrasStore((s) => s.logs);
@@ -1539,11 +1866,20 @@ function NotasTab({ obraId }: { obraId: string }) {
           <textarea
             rows={10}
             value={text}
+            readOnly={!souGestor}
             onChange={(e) => setText(e.target.value)}
-            className="w-full rounded-lg border border-line bg-card p-3 text-sm outline-none focus:border-secondary"
+            className={cn(
+              "w-full rounded-lg border border-line bg-card p-3 text-sm outline-none focus:border-secondary",
+              !souGestor && "opacity-70"
+            )}
+            title={souGestor ? undefined : "Só o gestor edita as notas"}
           />
           <div className="mt-2 flex justify-end">
-            <Button size="sm" onClick={save}>Guardar</Button>
+            {souGestor ? (
+              <Button size="sm" onClick={save}>Guardar</Button>
+            ) : (
+              <span className="text-[11px] text-muted">Só o gestor edita as notas — o registo é visível a todos.</span>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1566,6 +1902,92 @@ function NotasTab({ obraId }: { obraId: string }) {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ───────────────────── Registo de responsabilidade (histórico por item) ─────────────────────
+
+interface EventoHistorico {
+  ts: string;
+  texto: string;
+  tone?: "success" | "danger" | "warning";
+}
+
+function nomeDePerfil(profiles: Profile[], id?: string): string {
+  return nomeProprio(profiles.find((p) => p.id === id)?.fullName) || "Sócio";
+}
+
+function eventosAprovacao(ap: NonNullable<Despesa["aprovacao"]>, profiles: Profile[]): EventoHistorico[] {
+  const evs: EventoHistorico[] = [
+    { ts: `${ap.requeridoEm}T09:00:00`, texto: `Submetido a votação por ${nomeDePerfil(profiles, ap.requeridoPor)} (acima do threshold)` },
+    ...ap.votos.map((v) => ({
+      ts: v.ts,
+      texto: `${nomeDePerfil(profiles, v.userId)} votou ${v.valor === "a_favor" ? "a favor" : "contra"}`,
+      tone: (v.valor === "a_favor" ? "success" : "danger") as EventoHistorico["tone"],
+    })),
+  ];
+  if (ap.decididoEm && ap.estado !== "pendente")
+    evs.push({
+      ts: `${ap.decididoEm}T18:00:00`,
+      texto: ap.estado === "aplicado" ? "Aprovado pela maioria — aplicado" : "Rejeitado pelos sócios",
+      tone: ap.estado === "aplicado" ? "success" : "danger",
+    });
+  return evs;
+}
+
+function historicoDespesa(d: Despesa, profiles: Profile[]): EventoHistorico[] {
+  const evs: EventoHistorico[] = [
+    { ts: d.registadoEm ?? `${d.data}T09:00:00`, texto: `Registado por ${nomeDePerfil(profiles, d.registadoPor)}` },
+  ];
+  if (d.aprovacao) evs.push(...eventosAprovacao(d.aprovacao, profiles));
+  (d.comprovativos ?? []).forEach((c) =>
+    evs.push({ ts: c.addedAt, texto: `${nomeDePerfil(profiles, c.addedBy)} anexou ${PROVA_TIPO_LABEL[c.tipo].toLowerCase()} «${c.nomeFicheiro}»` })
+  );
+  (d.confirmacoes ?? []).forEach((c) =>
+    evs.push({
+      ts: c.ts,
+      texto: `${nomeDePerfil(profiles, c.userId)} ${c.valor === "confirma" ? "confirmou o gasto" : "contestou o gasto"}${c.comentario ? ` — «${c.comentario}»` : ""}`,
+      tone: c.valor === "confirma" ? "success" : "warning",
+    })
+  );
+  return evs.sort((a, b) => (a.ts < b.ts ? -1 : 1));
+}
+
+function historicoMarco(m: Marco, profiles: Profile[]): EventoHistorico[] {
+  const evs: EventoHistorico[] = [];
+  if (m.registadoPor) evs.push({ ts: `${m.dataPrevista}T08:00:00`, texto: `Criado por ${nomeDePerfil(profiles, m.registadoPor)}` });
+  if (m.aprovacao) evs.push(...eventosAprovacao(m.aprovacao, profiles));
+  if (m.estado === "pago" && m.dataPago)
+    evs.push({
+      ts: `${m.dataPago}T17:00:00`,
+      texto: `Pago por ${nomeDePerfil(profiles, m.pagoPor)}${m.comprovativoPagamento ? ` · comprovativo «${m.comprovativoPagamento.nomeFicheiro}»` : ""}`,
+      tone: "success",
+    });
+  return evs.sort((a, b) => (a.ts < b.ts ? -1 : 1));
+}
+
+/** "Ver histórico" — mini-timeline expansível de quem fez o quê e quando. Igual para todos os papéis. */
+function VerHistorico({ eventos }: { eventos: EventoHistorico[] }) {
+  const [open, setOpen] = useState(false);
+  if (eventos.length === 0) return null;
+  return (
+    <div className="mt-2">
+      <button onClick={() => setOpen((v) => !v)} className="inline-flex items-center gap-1 text-[11px] text-secondary hover:underline">
+        <Clock size={11} /> {open ? "Fechar histórico" : `Ver histórico (${eventos.length})`}
+      </button>
+      {open && (
+        <ul className="mt-1.5 space-y-1 border-l-2 border-line pl-3 animate-fade-in">
+          {eventos.map((e, i) => (
+            <li key={i} className="text-[11px]">
+              <span className="num text-muted">{dataPT(e.ts.slice(0, 10))} · </span>
+              <span className={e.tone === "success" ? "text-success" : e.tone === "danger" ? "text-danger" : e.tone === "warning" ? "text-warning" : "text-ink"}>
+                {e.texto}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

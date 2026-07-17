@@ -3,9 +3,10 @@ import { toast } from "sonner";
 import { X, CheckCircle2, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
-import { useObrasStore } from "@/store/useObrasStore";
+import { useObrasStore, membrosDe } from "@/store/useObrasStore";
 import { useDocumentsStore } from "@/store/useDocumentsStore";
 import { useTransactionsStore } from "@/store/useTransactionsStore";
+import { useNotificationsStore } from "@/store/useNotificationsStore";
 import { CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { FaturaScanZone, type FilePreview } from "@/components/obras/FaturaScanZone";
 import { eur, dataPT } from "@/lib/format";
@@ -19,6 +20,7 @@ export function MarcoPayModal() {
   const pagarMarcoComProva = useObrasStore((s) => s.pagarMarcoComProva);
   const addDoc = useDocumentsStore((s) => s.add);
   const addTransaction = useTransactionsStore((s) => s.add);
+  const broadcast = useNotificationsStore((s) => s.broadcast);
 
   const [comprovativo, setComprovativo] = useState<FilePreview | null>(null);
   const [valorLido, setValorLido] = useState<number | null>(null);
@@ -76,6 +78,16 @@ export function MarcoPayModal() {
         reciboUrl: comprovativo.dataUrl,
       });
     }
+    // Sócios ficam a saber que o marco foi pago (com comprovativo arquivado)
+    const outros = membrosDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID);
+    if (outros.length > 0)
+      broadcast(outros, {
+        tipo: "geral",
+        titulo: `Pagamento efetuado: «${marco.titulo}» · ${eur(marco.valor)}`,
+        descricao: `${obra.titulo} · comprovativo arquivado`,
+        actorId: CURRENT_USER_ID,
+        link: `/obra/${obra.id}`,
+      });
     toast.success(`Pagamento efetuado · ${eur(marco.valor)}`, {
       description: "Comprovativo arquivado · sócios notificados.",
     });

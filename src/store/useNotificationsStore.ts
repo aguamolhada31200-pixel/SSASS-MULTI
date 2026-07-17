@@ -31,14 +31,25 @@ export type NotificacaoInput = Omit<Notificacao, "id" | "createdAt" | "lida">;
 
 const SEED: Notificacao[] = [
   {
-    id: "ntf-tinta-voto",
+    id: "ntf-decisoes-espera",
     userId: CURRENT_USER_ID,
-    tipo: "decisao_comentario",
-    titulo: "Mariana comentou a decisão «Tinta premium»",
-    descricao: "«a diferença inclui a mão de obra ou é só material?»",
+    tipo: "decisao_criada",
+    titulo: "2 decisões à tua espera na parceria Príncipe Real",
+    descricao: "Gasto «Tinta especial premium» (1.500 €) · Pagamento «A meio da obra» (4.800 €)",
     link: "/comunidade/colaborativa/principe-real",
-    actorId: "mariana-sousa",
-    createdAt: "2026-07-02T14:40:00.000Z",
+    actorId: "pedro-alves",
+    createdAt: "2026-07-13T09:00:00.000Z",
+    lida: false,
+  },
+  {
+    id: "ntf-material-300",
+    userId: CURRENT_USER_ID,
+    tipo: "geral",
+    titulo: "Pedro registou um gasto de 300 € em Pintura completa",
+    descricao: "Material de pintura · abaixo do threshold — aplicado logo",
+    link: "/obra/o-principe-1",
+    actorId: "pedro-alves",
+    createdAt: "2026-07-06T10:05:00.000Z",
     lida: false,
   },
   {
@@ -48,7 +59,7 @@ const SEED: Notificacao[] = [
     titulo: "Decisão aprovada: «Substituir esquentador por bomba de calor»",
     descricao: "3 votos a favor · 100% do capital",
     link: "/comunidade/colaborativa/principe-real",
-    actorId: "carlos-monteiro",
+    actorId: "pedro-alves",
     createdAt: "2026-06-16T18:30:00.000Z",
     lida: false,
   },
@@ -115,7 +126,19 @@ export const useNotificationsStore = create<NotificationsState>()(
       remove: (id) => set((s) => ({ notificacoes: s.notificacoes.filter((n) => n.id !== id) })),
       resetSeed: () => set({ notificacoes: SEED }),
     }),
-    { name: "redegest-notifications", version: 1 }
+    {
+      name: "redegest-notifications",
+      version: 2,
+      // v2: seed alinhado com a camada de papéis (decisões à espera do Daniel). Mantém notificações geradas.
+      migrate: (persisted: unknown, version: number) => {
+        const state = (persisted ?? {}) as { notificacoes?: Notificacao[] };
+        if (version < 2) {
+          const seedIds = new Set(["ntf-tinta-voto", ...SEED.map((n) => n.id)]);
+          state.notificacoes = [...SEED, ...(state.notificacoes ?? []).filter((n) => !seedIds.has(n.id))];
+        }
+        return state as NotificationsState;
+      },
+    }
   )
 );
 
