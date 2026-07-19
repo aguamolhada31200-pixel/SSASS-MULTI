@@ -54,6 +54,8 @@ import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { financasFlipProjeto } from "@/lib/calc/obraProjeto";
 import { EmpreiteirosDirectory } from "@/components/obras/EmpreiteirosDirectory";
 import { BlocoAguardarDecisao, BlocoPedirAosSocios } from "@/components/collab/PendingDecisions";
+import { VerComoToggle } from "@/components/collab/VerComoToggle";
+import { useViewAs } from "@/store/useViewAs";
 import { eur, pct, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { MemberStack, RoleAvatar, nomeProprio } from "@/components/obras/CoGestao";
@@ -155,6 +157,7 @@ export default function CentroDeComando() {
   const marcos = useObrasStore((s) => s.marcos);
   const openMarcoPay = useModalStore((s) => s.openMarcoPay);
   const openObraForm = useModalStore((s) => s.openObraForm);
+  useViewAs((s) => s.modo); // "Ver como" — re-renderiza os cartões críticos ao alternar o papel
 
   const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -271,7 +274,8 @@ export default function CentroDeComando() {
                 {sociosCount} {sociosCount === 1 ? "sócio" : "sócios"}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <VerComoToggle tomEscuro />
               <ExampleDataToggle />
               <Button variant="gold" onClick={() => openObraForm()}>
                 <Plus size={15} /> Nova obra

@@ -21,6 +21,7 @@ import {
 } from "@/store/useCollabStore";
 import { useNotificationsStore } from "@/store/useNotificationsStore";
 import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
+import { useViewAs } from "@/store/useViewAs";
 import { useModalStore } from "@/store/useModalStore";
 import { nomeProprio } from "@/components/obras/CoGestao";
 import { sociosIds } from "./shared";
@@ -65,6 +66,7 @@ export function usePendentes(projects: CollabProject[]): {
   const marcos = useObrasStore((s) => s.marcos);
   const decisoes = useDecisionsStore((s) => s.decisoes);
   const profiles = useProfilesStore((s) => s.profiles);
+  const modo = useViewAs((s) => s.modo); // "Ver como" — recalcula ao alternar o papel
 
   return useMemo(() => {
     const nomeDe = (id: string) =>
@@ -153,17 +155,18 @@ export function usePendentes(projects: CollabProject[]): {
         });
     });
 
+    const souGestorDe = (project: CollabProject) => roleNoProjeto(project, CURRENT_USER_ID) === "gestor";
+    // Investidor: itens onde sou votante e ainda não votei (nunca quando estou a ver como gestor).
     const paraMim = itens.filter((it) => {
+      if (souGestorDe(it.project)) return false;
       const eu = it.votantes.find((v) => v.userId === CURRENT_USER_ID);
       return !!eu && !eu.voto;
     });
-    const submetidos = itens.filter((it) => roleNoProjeto(it.project, CURRENT_USER_ID) === "gestor");
-    const marcosDoGestor = marcosAprovados.filter(
-      (x) => roleNoProjeto(x.project, CURRENT_USER_ID) === "gestor"
-    );
+    const submetidos = itens.filter((it) => souGestorDe(it.project));
+    const marcosDoGestor = marcosAprovados.filter((x) => souGestorDe(x.project));
 
     return { paraMim, submetidos, marcosAprovados: marcosDoGestor };
-  }, [projects, obras, despesas, marcos, decisoes, profiles]);
+  }, [projects, obras, despesas, marcos, decisoes, profiles, modo]);
 }
 
 /* ═════════════════ Votar (liga aos stores existentes + notifica) ═════════════════ */
@@ -430,6 +433,7 @@ export function BlocoPedirAosSocios({
 /* ═════════════════ Badge de papel — "Tu: Gestor" / "Tu: Sócio investidor" ═════════════════ */
 
 export function BadgePapel({ project }: { project: CollabProject }) {
+  useViewAs((s) => s.modo); // re-renderiza ao alternar "Ver como"
   const role = roleNoProjeto(project, CURRENT_USER_ID);
   if (!role) return null;
   const cls =

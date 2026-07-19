@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CURRENT_USER_ID } from "./useProfilesStore";
+import { papelOverride } from "./useViewAs";
 
 // ───────────────────── Types ─────────────────────
 
@@ -984,12 +985,17 @@ export function temCoGestao(obra: Obra): boolean {
 }
 
 export function roleDe(obra: Obra, userId: string): ObraRole | undefined {
-  return membrosDe(obra).find((m) => m.userId === userId)?.role;
+  const real = membrosDe(obra).find((m) => m.userId === userId)?.role;
+  if (!real) return undefined; // não é membro → nunca impõe papel
+  // "Ver como": pré-visualização do papel do utilizador atual.
+  return papelOverride(userId) ?? real;
 }
 
 /** Pode gerir = gestor da obra, OU obra solo (sem co-gestão). */
 export function podeGerir(obra: Obra, userId: string): boolean {
   if (!temCoGestao(obra)) return true;
+  const ov = papelOverride(userId);
+  if (ov && membrosDe(obra).some((m) => m.userId === userId)) return ov === "gestor";
   return roleDe(obra, userId) === "gestor";
 }
 

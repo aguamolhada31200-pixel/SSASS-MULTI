@@ -86,6 +86,8 @@ import { useProfilesStore, CURRENT_USER_ID, type Profile } from "@/store/useProf
 import { useDocumentsStore } from "@/store/useDocumentsStore";
 import { useModalStore } from "@/store/useModalStore";
 import { useTechniciansStore } from "@/store/useTechniciansStore";
+import { useViewAs } from "@/store/useViewAs";
+import { VerComoToggle } from "@/components/collab/VerComoToggle";
 import { useNotificationsStore } from "@/store/useNotificationsStore";
 import { financasFlipProjeto } from "@/lib/calc/obraProjeto";
 import { EmpreiteiroDialog, AvaliarEmpreiteiroDialog } from "@/components/obras/EmpreiteiroCard";
@@ -126,6 +128,7 @@ export default function ObraDetalhe() {
   const updateObraProg = useObrasStore((s) => s.updateObra);
   const technicians = useTechniciansStore((s) => s.technicians);
   const broadcastNotif = useNotificationsStore((s) => s.broadcast);
+  useViewAs((s) => s.modo); // "Ver como" — re-renderiza o detalhe ao alternar o papel
 
   if (!obra) {
     return (
@@ -268,15 +271,18 @@ export default function ObraDetalhe() {
 
   return (
     <>
-      {/* Breadcrumb visual: Casa › Divisão › Obra */}
-      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-sm">
-        <Link to={casaHref} className="inline-flex items-center gap-1.5 text-muted hover:text-ink">
-          <ArrowLeft size={15} /> {casaNome}
-        </Link>
-        <span className="text-muted/50">›</span>
-        <Link to={casaHref} className="text-muted hover:text-ink">{DIVISAO_LABEL[divisao]}</Link>
-        <span className="text-muted/50">›</span>
-        <span className="font-medium text-ink">{obra.titulo}</span>
+      {/* Breadcrumb visual: Casa › Divisão › Obra + toggle "Ver como" (só em obras partilhadas) */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 text-sm">
+          <Link to={casaHref} className="inline-flex items-center gap-1.5 text-muted hover:text-ink">
+            <ArrowLeft size={15} /> {casaNome}
+          </Link>
+          <span className="text-muted/50">›</span>
+          <Link to={casaHref} className="text-muted hover:text-ink">{DIVISAO_LABEL[divisao]}</Link>
+          <span className="text-muted/50">›</span>
+          <span className="font-medium text-ink">{obra.titulo}</span>
+        </div>
+        {temCoGestao && <VerComoToggle />}
       </div>
 
       {/* Header — 3 blocos apenas, grandes e legíveis */}

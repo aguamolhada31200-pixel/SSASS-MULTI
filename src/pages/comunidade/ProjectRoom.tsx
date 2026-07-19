@@ -55,6 +55,8 @@ import {
 import { useDecisionsStore } from "@/store/useDecisionsStore";
 import { useNotificationsStore } from "@/store/useNotificationsStore";
 import { BlocoAguardarDecisao, BlocoPedirAosSocios, BadgePapel } from "@/components/collab/PendingDecisions";
+import { VerComoToggle } from "@/components/collab/VerComoToggle";
+import { useViewAs } from "@/store/useViewAs";
 import { nomeProprio } from "@/components/obras/CoGestao";
 import { sociosIds } from "@/components/collab/shared";
 import {
@@ -149,6 +151,7 @@ function HeroProject({ project: p }: { project: CollabProject }) {
   const navigate = useNavigate();
   const openCollabForm = useModalStore((s) => s.openCollabForm);
   const removeProject = useCollabStore((s) => s.remove);
+  useViewAs((s) => s.modo); // re-renderiza ao alternar "Ver como"
   const isReab = p.type === "reabilitacao";
   const gestor = podeGerir(p, CURRENT_USER_ID);
   const inv = isReab ? (p.precoAquisicao ?? 0) + (p.custosAquisicao ?? 0) + (p.orcamentoObras ?? 0) : (p.capitalInvestido ?? 0);
@@ -165,9 +168,12 @@ function HeroProject({ project: p }: { project: CollabProject }) {
 
   return (
     <>
-      <Link to="/comunidade/colaborativa" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
-        <ArrowLeft size={15} /> Gestão colaborativa
-      </Link>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <Link to="/comunidade/colaborativa" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
+          <ArrowLeft size={15} /> Gestão colaborativa
+        </Link>
+        <VerComoToggle />
+      </div>
       <div className="relative overflow-hidden rounded-2xl">
         {p.coverImageUrl ? <img src={p.coverImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 bg-gradient-to-br from-[#2E1A0E] to-[#5C3D2E]" />}
         <div className="azulejo absolute inset-0 opacity-[0.06]" />
@@ -581,6 +587,7 @@ function ObrasTab({ project: p }: { project: CollabProject }) {
   const openObraForm = useModalStore((s) => s.openObraForm);
   const addDecisao = useDecisionsStore((s) => s.add);
   const broadcast = useNotificationsStore((s) => s.broadcast);
+  useViewAs((s) => s.modo); // re-renderiza ao alternar "Ver como"
   const meuRole = roleNoProjeto(p, CURRENT_USER_ID);
   const gestor = gestorDoProjeto(p);
   const [proporOpen, setProporOpen] = useState(false);
@@ -850,6 +857,7 @@ function ProjectPropertyTab({ project: p, render }: { project: CollabProject; re
 function FinancasComSocios({ project: p }: { project: CollabProject }) {
   const property = usePropertiesStore((s) => (p.propertyId ? s.properties.find((x) => x.id === p.propertyId) : undefined));
   const txs = useTransactionsStore((s) => s.transactions);
+  useViewAs((s) => s.modo); // re-renderiza ao alternar "Ver como"
 
   const resultado = useMemo(() => {
     if (!p.propertyId) return 0;

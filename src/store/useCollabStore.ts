@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CURRENT_USER_ID } from "./useProfilesStore";
+import { papelOverride } from "./useViewAs";
 
 // ── Types ──
 
@@ -374,6 +375,8 @@ export function socioDe(project: CollabProject, userId: string): Partner | undef
 export function podeGerir(project: CollabProject, userId: string): boolean {
   const eu = socioDe(project, userId);
   if (!eu) return false;
+  const ov = papelOverride(userId); // "Ver como": pré-visualização
+  if (ov) return ov === "gestor";
   if (eu.role) return eu.role === "gestor";
   // Projetos antigos sem roles: o primeiro sócio é o gestor por convenção.
   return project.partners[0]?.id === userId;
@@ -383,6 +386,8 @@ export function podeGerir(project: CollabProject, userId: string): boolean {
 export function roleNoProjeto(project: CollabProject, userId: string): SocioRole | undefined {
   const eu = socioDe(project, userId);
   if (!eu) return undefined;
+  const ov = papelOverride(userId); // "Ver como": pré-visualização
+  if (ov) return ov;
   if (eu.role) return eu.role;
   return project.partners[0]?.id === userId ? "gestor" : "investidor";
 }
