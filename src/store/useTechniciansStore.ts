@@ -7,6 +7,7 @@ import { persist } from "zustand/middleware";
 export type Especialidade =
   | "canalizacao"
   | "eletricidade"
+  | "aquecimento"
   | "pintura"
   | "cozinhas"
   | "carpintaria"
@@ -16,6 +17,7 @@ export type Especialidade =
 export const ESPECIALIDADE_LABEL: Record<Especialidade, string> = {
   canalizacao: "Canalização",
   eletricidade: "Eletricidade",
+  aquecimento: "Aquecimento / gás",
   pintura: "Pintura",
   cozinhas: "Cozinhas",
   carpintaria: "Carpintaria",
@@ -103,6 +105,34 @@ const SEED: Technician[] = [
     notas: "Certificação ITED. Muito rigorosos.",
     ultimoTrabalho: "2026-04-20",
   },
+  // Técnicos de MANUTENÇÃO (mesmo diretório das Obras — fonte única)
+  {
+    id: "tec-joao-silva",
+    nome: "João Silva",
+    especialidades: ["aquecimento", "canalizacao"],
+    telefone: "+351 912 345 678",
+    email: "joao.silva.gas@gmail.com",
+    nif: "231444555",
+    zonas: ["Lisboa"],
+    avaliacaoMedia: 4.7,
+    numTrabalhos: 9,
+    favorito: true,
+    notas: "Credenciado para aparelhos a gás. Atende urgências.",
+    ultimoTrabalho: "2026-07-17",
+  },
+  {
+    id: "tec-carlos-pinto",
+    nome: "Carlos Pinto",
+    especialidades: ["pintura"],
+    telefone: "+351 934 555 210",
+    email: "carlospinto.pinturas@gmail.com",
+    zonas: ["Lisboa"],
+    avaliacaoMedia: 4.5,
+    numTrabalhos: 6,
+    favorito: false,
+    notas: "Bom para retoques rápidos entre inquilinos.",
+    ultimoTrabalho: "2026-06-20",
+  },
 ];
 
 interface TechniciansState {
@@ -164,6 +194,18 @@ export const useTechniciansStore = create<TechniciansState>()(
       getById: (id) => get().technicians.find((t) => t.id === id),
       byNif: (nif) => get().technicians.find((t) => t.nif === nif),
     }),
-    { name: "redegest-technicians", version: 1 }
+    {
+      name: "redegest-technicians",
+      version: 2,
+      // v2: +João Silva (aquecimento/gás) e Carlos Pinto (pintura) — técnicos de manutenção.
+      migrate: (persisted: unknown, version: number) => {
+        const s = (persisted ?? {}) as { technicians?: Technician[] };
+        if (version < 2) {
+          const presentes = new Set((s.technicians ?? []).map((t) => t.id));
+          s.technicians = [...(s.technicians ?? []), ...SEED.filter((t) => !presentes.has(t.id))];
+        }
+        return s as TechniciansState;
+      },
+    }
   )
 );

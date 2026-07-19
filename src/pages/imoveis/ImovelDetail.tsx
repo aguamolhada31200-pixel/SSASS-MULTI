@@ -32,7 +32,9 @@ import {
   TIPO_LABEL as CONTRACT_TIPO_LABEL,
 } from "@/store/useContractsStore";
 import { useDocumentsStore, DOC_CATEGORIAS, type DocCategoria } from "@/store/useDocumentsStore";
-import { useMaintenanceStore, PRIORIDADE_LABEL, ESTADO_PEDIDO_LABEL, type Prioridade, type EstadoPedido } from "@/store/useMaintenanceStore";
+import { useMaintenanceStore, PRIORIDADE_LABEL, type Prioridade } from "@/store/useMaintenanceStore";
+import { KpisManutencao, FraseResumo, PedidosBoard } from "@/components/manutencao/PedidosBoard";
+import { PrevencaoSection } from "@/components/manutencao/PrevencaoSection";
 import { useTransactionsStore } from "@/store/useTransactionsStore";
 import { useModalStore } from "@/store/useModalStore";
 import { useArrendamentosStore, rendaRecorrente, ocupaImovel } from "@/store/useArrendamentosStore";
@@ -1077,157 +1079,34 @@ export function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
 }
 
 // ───────────────────────── Manutenção ─────────────────────────
-
-const PRIORIDADE_TONE: Record<Prioridade, string> = {
-  urgente: "bg-danger/12 text-danger",
-  alta: "bg-warning/15 text-warning",
-  normal: "bg-secondary/12 text-secondary",
-  baixa: "bg-accent text-muted",
-};
+// Fonte única: os MESMOS componentes do centro de comando (/manutencao),
+// filtrados por propertyId. Um pedido criado aqui aparece lá e vice-versa.
 
 function ImovelManutencaoTab({ propertyId }: { propertyId: string }) {
-  const requests = useMaintenanceStore((s) => s.requests.filter((r) => r.propertyId === propertyId));
-  const add = useMaintenanceStore((s) => s.add);
-  const update = useMaintenanceStore((s) => s.update);
-  const remove = useMaintenanceStore((s) => s.remove);
-
-  const [prioFiltro, setPrioFiltro] = useState<"todos" | Prioridade>("todos");
-  const [estadoFiltro, setEstadoFiltro] = useState<"todos" | EstadoPedido>("todos");
-  const [showForm, setShowForm] = useState(false);
-  const [titulo, setTitulo] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [prioridade, setPrioridade] = useState<Prioridade>("normal");
-  const [tecnico, setTecnico] = useState("");
-  const [contacto, setContacto] = useState("");
-  const [custoEst, setCustoEst] = useState(0);
-
-  const filtrados = requests
-    .filter((r) => prioFiltro === "todos" || r.prioridade === prioFiltro)
-    .filter((r) => estadoFiltro === "todos" || r.estado === estadoFiltro);
-
-  const onAdd = () => {
-    if (!titulo.trim()) { toast.error("Indique o título do pedido"); return; }
-    add({
-      propertyId,
-      titulo: titulo.trim(),
-      descricao: descricao.trim(),
-      categoria: "Geral",
-      prioridade,
-      estado: "aberto",
-      tecnicoNome: tecnico.trim() || undefined,
-      tecnicoContacto: contacto.trim() || undefined,
-      custoEstimado: custoEst || undefined,
-    });
-    setTitulo(""); setDescricao(""); setPrioridade("normal"); setTecnico(""); setContacto(""); setCustoEst(0);
-    setShowForm(false);
-    toast.success("Pedido de manutenção criado");
-  };
-
+  const openMaintenanceForm = useModalStore((s) => s.openMaintenanceForm);
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          <select value={prioFiltro} onChange={(e) => setPrioFiltro(e.target.value as typeof prioFiltro)} className="h-9 rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary">
-            <option value="todos">Prioridade: Todas</option>
-            {(Object.keys(PRIORIDADE_LABEL) as Prioridade[]).map((p) => <option key={p} value={p}>{PRIORIDADE_LABEL[p]}</option>)}
-          </select>
-          <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value as typeof estadoFiltro)} className="h-9 rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary">
-            <option value="todos">Estado: Todos</option>
-            {(Object.keys(ESTADO_PEDIDO_LABEL) as EstadoPedido[]).map((e) => <option key={e} value={e}>{ESTADO_PEDIDO_LABEL[e]}</option>)}
-          </select>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FraseResumo propertyId={propertyId} />
+        <div className="flex items-center gap-2">
+          <Link to="/manutencao" className="text-sm text-secondary hover:underline">
+            Ver toda a manutenção →
+          </Link>
+          <Button size="sm" onClick={() => openMaintenanceForm({ initialPropertyId: propertyId, lockProperty: true })}>
+            <Plus size={14} /> Novo pedido
+          </Button>
         </div>
-        <Button size="sm" variant={showForm ? "ghost" : "primary"} onClick={() => setShowForm(!showForm)}>
-          {showForm ? "Cancelar" : <><Plus size={14} /> Novo pedido</>}
-        </Button>
       </div>
 
-      {showForm && (
-        <Card>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium text-muted">Título</span>
-                <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Esquentador a falhar" className="h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary" />
-              </label>
-              <label className="block sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium text-muted">Descrição</span>
-                <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm outline-none focus:border-secondary" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted">Prioridade</span>
-                <select value={prioridade} onChange={(e) => setPrioridade(e.target.value as Prioridade)} className="h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary">
-                  {(Object.keys(PRIORIDADE_LABEL) as Prioridade[]).map((p) => <option key={p} value={p}>{PRIORIDADE_LABEL[p]}</option>)}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted">Custo estimado</span>
-                <div className="flex items-center rounded-lg border border-line bg-card">
-                  <input type="number" value={custoEst || ""} onChange={(e) => setCustoEst(Number(e.target.value) || 0)} className="h-10 w-full bg-transparent px-3 text-sm outline-none" />
-                  <span className="px-3 text-sm text-muted">€</span>
-                </div>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted">Técnico</span>
-                <input value={tecnico} onChange={(e) => setTecnico(e.target.value)} placeholder="Nome" className="h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted">Contacto</span>
-                <input value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Telefone" className="h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary" />
-              </label>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <Button size="sm" onClick={onAdd}><Plus size={14} /> Criar pedido</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <KpisManutencao propertyId={propertyId} />
+      <PedidosBoard propertyId={propertyId} />
 
-      {filtrados.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted">
-            <Wrench size={28} className="mx-auto mb-2" />
-            <p className="text-sm">Sem pedidos de manutenção para estes filtros.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {filtrados.map((r) => (
-            <Card key={r.id}>
-              <CardContent className="p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", PRIORIDADE_TONE[r.prioridade])}>{PRIORIDADE_LABEL[r.prioridade]}</span>
-                      <Badge tone={r.estado === "concluido" ? "success" : r.estado === "cancelado" ? "neutral" : r.estado === "em_curso" ? "warning" : "info"}>{ESTADO_PEDIDO_LABEL[r.estado]}</Badge>
-                    </div>
-                    <p className="mt-1.5 font-medium text-ink">{r.titulo}</p>
-                    {r.descricao && <p className="text-xs text-muted">{r.descricao}</p>}
-                  </div>
-                  <button onClick={() => { if (confirm(`Eliminar "${r.titulo}"?`)) remove(r.id); }} className="rounded p-1 text-muted hover:text-danger"><Trash2 size={14} /></button>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {r.tecnicoNome && <MiniKpi label="Técnico" value={r.tecnicoNome} />}
-                  {r.tecnicoContacto && <MiniKpi label="Contacto" value={r.tecnicoContacto} />}
-                  {r.custoEstimado ? <MiniKpi label="Custo estimado" value={eur(r.custoEstimado)} /> : null}
-                  {r.custoFinal ? <MiniKpi label="Custo final" value={eur(r.custoFinal)} tone="neg" /> : null}
-                </div>
-                {r.estado !== "concluido" && r.estado !== "cancelado" && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {r.estado === "aberto" && (
-                      <Button size="sm" variant="outline" onClick={() => update(r.id, { estado: "em_curso" })}>
-                        <PauseCircle size={13} /> Marcar em curso
-                      </Button>
-                    )}
-                    <Button size="sm" variant="gold" onClick={() => update(r.id, { estado: "concluido", resolvedAt: new Date().toISOString().slice(0, 10) })}>
-                      <CheckCircle2 size={13} /> Marcar concluído
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <div>
+        <h3 className="mb-3 mt-2 text-[11px] font-semibold uppercase tracking-widest text-secondary">
+          Prevenção deste imóvel
+        </h3>
+        <PrevencaoSection propertyId={propertyId} />
+      </div>
     </div>
   );
 }

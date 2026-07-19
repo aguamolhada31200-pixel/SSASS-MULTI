@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, Plus, Search, MapPin, KeyRound } from "lucide-react";
+import { Building2, Plus, Search, MapPin, KeyRound, Wrench } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +9,7 @@ import { useExampleData } from "@/store/useExampleData";
 import { useModalStore } from "@/store/useModalStore";
 import { usePropertiesStore, PROP_TYPE_LABEL, STATUS_LABEL, type PropStatus, type PropType } from "@/store/usePropertiesStore";
 import { useArrendamentosStore, ocupaImovel } from "@/store/useArrendamentosStore";
+import { useMaintenanceStore, pedidoAberto } from "@/store/useMaintenanceStore";
 import { situacaoImovel } from "@/lib/property";
 import { eur, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,12 @@ export default function ImoveisList() {
   const [q, setQ] = useState("");
 
   const idsArrendados = new Set(arrendamentos.filter(ocupaImovel).map((a) => a.propertyId));
+
+  // Sinal de manutenção urgente aberta por imóvel
+  const maintenanceRequests = useMaintenanceStore((s) => s.requests);
+  const urgentesPorImovel = new Set(
+    maintenanceRequests.filter((r) => pedidoAberto(r) && r.prioridade === "urgente").map((r) => r.propertyId)
+  );
 
   const list = enabled ? properties : [];
   const filtered = list.filter(
@@ -123,7 +130,12 @@ export default function ImoveisList() {
                     {photo && (
                       <img src={photo} alt={p.name} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
                     )}
-                    <div className="absolute right-3 top-3">
+                    <div className="absolute right-3 top-3 flex items-center gap-1.5">
+                      {urgentesPorImovel.has(p.id) && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                          <Wrench size={10} /> Urgente
+                        </span>
+                      )}
                       <Badge tone={statusTone[p.status]}>{STATUS_LABEL[p.status]}</Badge>
                     </div>
                     {!photo && <Building2 className="absolute bottom-3 left-3 h-7 w-7 text-white/40" />}

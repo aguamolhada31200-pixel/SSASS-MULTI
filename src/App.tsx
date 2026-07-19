@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Wrench } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import ImoveisList from "@/pages/imoveis/ImoveisList";
@@ -29,10 +28,11 @@ import BalancoIRS from "@/pages/financas/BalancoIRS";
 import PastaDigital from "@/pages/documentos/PastaDigital";
 import ContratoDetalhe from "@/pages/contratos/ContratoDetalhe";
 import AssistenteIA from "@/pages/ia/AssistenteIA";
+import Manutencao from "@/pages/manutencao/Manutencao";
+import ManutencaoDetalhe from "@/pages/manutencao/ManutencaoDetalhe";
 import Perfil from "@/pages/conta/Perfil";
 import Definicoes from "@/pages/conta/Definicoes";
 import Faturacao from "@/pages/conta/Faturacao";
-import Placeholder from "@/pages/Placeholder";
 
 export default function App() {
   return (
@@ -84,22 +84,9 @@ export default function App() {
         {/* Contratos (documento carregado pelo senhorio) */}
         <Route path="contratos/:id" element={<ContratoDetalhe />} />
 
-        {/* Manutenção */}
-        <Route
-          path="manutencao"
-          element={
-            <Placeholder
-              title="Manutenção"
-              subtitle="Pedidos e reparações"
-              icon={Wrench}
-              fase="Fase 1 — MVP operacional"
-              bullets={[
-                "KPIs, filtros e lista (prioridade, status, imóvel, custo)",
-                "Detalhe: descrição, fotos, técnico, orçamento vs custo, notas",
-              ]}
-            />
-          }
-        />
+        {/* Manutenção — centro de comando + detalhe do pedido */}
+        <Route path="manutencao" element={<Manutencao />} />
+        <Route path="manutencao/:id" element={<ManutencaoDetalhe />} />
         {/* IA */}
         <Route path="ia" element={<AssistenteIA />} />
 

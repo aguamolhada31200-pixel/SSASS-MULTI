@@ -22,6 +22,7 @@ import {
   type FrequenciaPagamento,
 } from "@/store/usePropertiesStore";
 import { useObrasStore, CATEGORIA_LABEL, type ObraCategoria, type ObraEstado } from "@/store/useObrasStore";
+import { useMaintenancePlanStore } from "@/store/useMaintenancePlanStore";
 import { pmt } from "@/lib/calc/imt";
 import { eur } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -296,6 +297,21 @@ export function PropertyFormModal() {
         });
       }
       toast.success("Imóvel adicionado", { description: values.name });
+      // Plano preventivo recomendado (caldeira, gás, extintor AL…) em 1 toque
+      const criado = usePropertiesStore.getState().properties.find((p) => p.id === id);
+      if (criado) {
+        toast("Quer criar o plano de manutenção recomendado?", {
+          description: "Caldeira, inspeção de gás, certificado energético… ajustado ao tipo do imóvel.",
+          duration: 10000,
+          action: {
+            label: "Criar plano",
+            onClick: () => {
+              const n = useMaintenancePlanStore.getState().criarPlanoRecomendado(criado);
+              toast.success(n > 0 ? `Plano criado · ${n} tarefas` : "O plano já estava completo");
+            },
+          },
+        });
+      }
       closePropertyForm();
       navigate(`/imoveis/${id}`);
     }

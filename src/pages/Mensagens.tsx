@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Send, ArrowLeft, MessageSquare, Search } from "lucide-react";
+import { Send, ArrowLeft, MessageSquare, Search, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   useConversationsStore,
@@ -8,9 +8,16 @@ import {
 } from "@/store/useConversationsStore";
 import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { useListingsStore } from "@/store/useListingsStore";
+import { useTenantsStore } from "@/store/useTenantsStore";
+import { useMaintenanceStore } from "@/store/useMaintenanceStore";
+import { useModalStore } from "@/store/useModalStore";
 import { cn } from "@/lib/utils";
 
-type Filtro = "todas" | "investidores";
+type Filtro = "todas" | "investidores" | "inquilinos";
+
+/** Palavras que indicam avaria numa mensagem do inquilino → banner de manutenção. */
+const PALAVRAS_AVARIA =
+  /avaria|fuga|não funciona|nao funciona|partid[ao]|sem água|sem agua|sem luz|sem aquecimento|não aquece|nao aquece|entupid|infiltra|estragad|avariad|pingar|a pingar|curto-circuito/i;
 
 function horaCurta(iso: string): string {
   const d = new Date(iso);
@@ -31,10 +38,12 @@ export default function Mensagens() {
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const [busca, setBusca] = useState("");
 
+  const tenants = useTenantsStore((s) => s.tenants);
   const activeId = params.get("c");
   const active = conversations.find((c) => c.id === activeId);
 
-  const nomeDe = (id: string) => profiles.find((p) => p.id === id)?.fullName ?? "Utilizador";
+  const nomeDe = (id: string) =>
+    profiles.find((p) => p.id === id)?.fullName ?? tenants.find((t) => t.id === id)?.nomeCompleto ?? "Utilizador";
   const avatarDe = (id: string) => profiles.find((p) => p.id === id)?.avatarUrl;
   const otherOf = (c: Conversation) => c.participantIds.find((id) => id !== CURRENT_USER_ID) ?? "";
 
@@ -43,11 +52,16 @@ export default function Mensagens() {
       const l = listings.find((x) => x.id === c.contextId);
       return { label: l ? l.title : "Anúncio", to: l ? `/comunidade/rede/anuncio/${l.id}` : undefined };
     }
+    if (c.contextType === "tenant") {
+      const t = tenants.find((x) => x.id === (c.contextId ?? otherOf(c)));
+      return { label: t ? `Inquilino${t.propertyId ? "" : ""}` : "Inquilino", to: t ? `/pessoas/inquilinos/${t.id}` : undefined };
+    }
     return { label: "Conversa direta" };
   };
 
   const matchesFiltro = (c: Conversation) => {
-    if (filtro === "todas") return c.contextType !== "tenant";
+    if (filtro === "todas") return true;
+    if (filtro === "inquilinos") return c.contextType === "tenant";
     return c.contextType === "listing" || c.contextType === "direct";
   };
 
@@ -87,7 +101,7 @@ export default function Mensagens() {
               <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Pesquisar…" className="h-8 w-full bg-transparent text-sm outline-none" />
             </div>
             <div className="flex gap-1">
-              {(["todas", "investidores"] as Filtro[]).map((f) => (
+              {(["todas", "investidores", "inquilinos"] as Filtro[]).map((f) => (
                 <button key={f} onClick={() => setFiltro(f)} className={cn("flex-1 rounded-lg px-2 py-1.5 text-xs font-medium capitalize transition-colors", filtro === f ? "bg-primary text-white" : "text-muted hover:bg-accent")}>
                   {f}
                 </button>
@@ -139,6 +153,7 @@ export default function Mensagens() {
               contexto={contextoLabel(active)}
               onBack={() => setParams({})}
               onSend={(txt) => sendMessage(active.id, txt)}
+              manutencao={<BannerManutencao conversation={active} outroId={otherOf(active)} />}
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center text-center text-muted">
@@ -152,6 +167,58 @@ export default function Mensagens() {
   );
 }
 
+/** Banner "Parece um pedido de manutenção" — só em conversas de inquilino com palavras-chave. */
+function BannerManutencao({ conversation, outroId }: { conversation: Conversation; outroId: string }) {
+  const tenants = useTenantsStore((s) => s.tenants);
+  const requests = useMaintenanceStore((s) => s.requests);
+  const openMaintenanceForm = useModalStore((s) => s.openMaintenanceForm);
+
+  if (conversation.contextType !== "tenant") return null;
+  const msgAvaria = [...conversation.messages].reverse().find(
+    (m) => m.senderId !== CURRENT_USER_ID && PALAVRAS_AVARIA.test(m.content)
+  );
+  if (!msgAvaria) return null;
+
+  const tenant = tenants.find((t) => t.id === (conversation.contextId ?? outroId));
+  const pedidoExistente = requests.find((r) => r.conversationId === conversation.id);
+
+  if (pedidoExistente) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-success/8 px-4 py-2.5 text-[13px] text-success">
+        <Wrench size={14} className="shrink-0" />
+        Pedido de manutenção criado a partir desta conversa.
+        <Link to={`/manutencao/${pedidoExistente.id}`} className="font-medium underline hover:no-underline">
+          Ver pedido →
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-line bg-warning/8 px-4 py-2.5 text-[13px] text-warning">
+      <Wrench size={14} className="shrink-0" />
+      Parece um pedido de manutenção.
+      <button
+        onClick={() =>
+          openMaintenanceForm({
+            initialPropertyId: tenant?.propertyId ?? null,
+            lockProperty: !!tenant?.propertyId,
+            prefill: {
+              titulo: msgAvaria.content.split(/[.!?\n]/)[0].slice(0, 70),
+              descricao: msgAvaria.content,
+              tenantId: tenant?.id,
+              conversationId: conversation.id,
+            },
+          })
+        }
+        className="rounded-full border border-warning/50 px-2.5 py-1 font-medium transition-colors hover:bg-warning/10"
+      >
+        Criar pedido a partir desta conversa
+      </button>
+    </div>
+  );
+}
+
 function Thread({
   conversation,
   nome,
@@ -159,6 +226,7 @@ function Thread({
   contexto,
   onBack,
   onSend,
+  manutencao,
 }: {
   conversation: Conversation;
   other: string;
@@ -167,6 +235,7 @@ function Thread({
   contexto: { label: string; to?: string };
   onBack: () => void;
   onSend: (txt: string) => void;
+  manutencao?: React.ReactNode;
 }) {
   const [txt, setTxt] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -197,6 +266,9 @@ function Thread({
           )}
         </div>
       </div>
+
+      {/* Banner de manutenção (conversa de inquilino com avaria detetada) */}
+      {manutencao}
 
       {/* Mensagens */}
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-bg/40 p-4">

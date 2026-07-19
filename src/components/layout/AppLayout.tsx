@@ -16,6 +16,8 @@ import { MarcoPayModal } from "@/components/modals/MarcoPayModal";
 import { InterestModal } from "@/components/modals/InterestModal";
 import { CollabFormModal } from "@/components/modals/CollabFormModal";
 import { GaleriaFormModal } from "@/components/modals/GaleriaFormModal";
+import { MaintenanceFormModal } from "@/components/modals/MaintenanceFormModal";
+import { MaintenanceExpenseModal } from "@/components/modals/MaintenanceExpenseModal";
 import { cn } from "@/lib/utils";
 
 export function AppLayout() {
@@ -86,6 +88,8 @@ export function AppLayout() {
       <InterestModal />
       <CollabFormModal />
       <GaleriaFormModal />
+      <MaintenanceFormModal />
+      <MaintenanceExpenseModal />
       <Toaster richColors position="top-center" toastOptions={{ style: { fontFamily: "DM Sans" } }} />
     </div>
   );

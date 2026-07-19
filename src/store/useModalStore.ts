@@ -1,6 +1,29 @@
 import { create } from "zustand";
 import type { TipoMov } from "./useTransactionsStore";
 
+/** Prefill do modal de nova obra (ex.: conversão de um pedido de manutenção). */
+export interface ObraPrefill {
+  titulo?: string;
+  categoria?: string;
+  orcamento?: number;
+  descricao?: string;
+  fotos?: string[];
+  /** Pedido de manutenção a marcar como convertido quando a obra for criada. */
+  maintenanceId?: string;
+}
+
+/** Prefill do modal de novo pedido de manutenção (ex.: criado a partir de uma conversa). */
+export interface MaintenancePrefill {
+  titulo?: string;
+  descricao?: string;
+  tenantId?: string;
+  conversationId?: string;
+  /** Tarefa do plano preventivo que origina o pedido. */
+  planTaskId?: string;
+  categoria?: string;
+  dataAgendada?: string;
+}
+
 /** Estado dos modais globais (abertos via store, nunca duplicados por página). */
 interface ModalState {
   propertyForm: { open: boolean; editingId: string | null };
@@ -33,13 +56,35 @@ interface ModalState {
     editingId: string | null;
     initialProjectId: string | null;
     initialPropertyId: string | null;
+    prefill: ObraPrefill | null;
   };
   openObraForm: (params?: {
     editingId?: string | null;
     initialProjectId?: string | null;
     initialPropertyId?: string | null;
+    prefill?: ObraPrefill | null;
   }) => void;
   closeObraForm: () => void;
+
+  maintenanceForm: {
+    open: boolean;
+    editingId: string | null;
+    initialPropertyId: string | null;
+    /** true = imóvel pré-selecionado e bloqueado (aberto a partir do tab do imóvel). */
+    lockProperty: boolean;
+    prefill: MaintenancePrefill | null;
+  };
+  openMaintenanceForm: (params?: {
+    editingId?: string | null;
+    initialPropertyId?: string | null;
+    lockProperty?: boolean;
+    prefill?: MaintenancePrefill | null;
+  }) => void;
+  closeMaintenanceForm: () => void;
+
+  maintenanceExpenseForm: { open: boolean; requestId: string | null };
+  openMaintenanceExpense: (requestId: string) => void;
+  closeMaintenanceExpense: () => void;
 
   tenantForm: { open: boolean; editingId: string | null; initialPropertyId: string | null };
   openTenantForm: (editingId?: string | null, initialPropertyId?: string | null) => void;
@@ -108,6 +153,7 @@ export const useModalStore = create<ModalState>((set) => ({
     editingId: null,
     initialProjectId: null,
     initialPropertyId: null,
+    prefill: null,
   },
   openObraForm: (params = {}) =>
     set({
@@ -116,6 +162,7 @@ export const useModalStore = create<ModalState>((set) => ({
         editingId: params.editingId ?? null,
         initialProjectId: params.initialProjectId ?? null,
         initialPropertyId: params.initialPropertyId ?? null,
+        prefill: params.prefill ?? null,
       },
     }),
   closeObraForm: () =>
@@ -125,8 +172,27 @@ export const useModalStore = create<ModalState>((set) => ({
         editingId: null,
         initialProjectId: null,
         initialPropertyId: null,
+        prefill: null,
       },
     }),
+
+  maintenanceForm: { open: false, editingId: null, initialPropertyId: null, lockProperty: false, prefill: null },
+  openMaintenanceForm: (params = {}) =>
+    set({
+      maintenanceForm: {
+        open: true,
+        editingId: params.editingId ?? null,
+        initialPropertyId: params.initialPropertyId ?? null,
+        lockProperty: params.lockProperty ?? false,
+        prefill: params.prefill ?? null,
+      },
+    }),
+  closeMaintenanceForm: () =>
+    set({ maintenanceForm: { open: false, editingId: null, initialPropertyId: null, lockProperty: false, prefill: null } }),
+
+  maintenanceExpenseForm: { open: false, requestId: null },
+  openMaintenanceExpense: (requestId) => set({ maintenanceExpenseForm: { open: true, requestId } }),
+  closeMaintenanceExpense: () => set({ maintenanceExpenseForm: { open: false, requestId: null } }),
 
   tenantForm: { open: false, editingId: null, initialPropertyId: null },
   openTenantForm: (editingId = null, initialPropertyId = null) =>

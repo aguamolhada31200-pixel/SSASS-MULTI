@@ -40,6 +40,8 @@ import { useContractsStore, statusEfetivo, diasAteFim } from "@/store/useContrac
 import { useTransactionsStore } from "@/store/useTransactionsStore";
 import { useObrasStore } from "@/store/useObrasStore";
 import { useAccountStore } from "@/store/useAccountStore";
+import { useMaintenanceStore } from "@/store/useMaintenanceStore";
+import { useMaintenancePlanStore, estadoPlano } from "@/store/useMaintenancePlanStore";
 import { useCollabStore } from "@/store/useCollabStore";
 import { CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { usePendentes } from "@/components/collab/PendingDecisions";
@@ -96,6 +98,8 @@ export default function Dashboard() {
   const contracts = useContractsStore((s) => s.contracts);
   const transactions = useTransactionsStore((s) => s.transactions);
   const obras = useObrasStore((s) => s.obras);
+  const maintenanceRequests = useMaintenanceStore((s) => s.requests);
+  const planTasks = useMaintenancePlanStore((s) => s.tasks);
   const nomeConta = useAccountStore((s) => s.privado.nomeCompleto);
   const openPropertyForm = useModalStore((s) => s.openPropertyForm);
   const openExpenseForm = useModalStore((s) => s.openExpenseForm);
@@ -228,9 +232,34 @@ export default function Dashboard() {
       });
     }
 
+    // Manutenção: pedidos urgentes abertos + prevenção obrigatória vencida
+    for (const r of maintenanceRequests) {
+      if (r.prioridade !== "urgente" || !["aberto", "agendado", "em_curso", "aguarda_pecas"].includes(r.estado)) continue;
+      const prop = properties.find((p) => p.id === r.propertyId);
+      out.push({
+        id: `mnt-${r.id}`,
+        severity: "danger",
+        title: `Avaria urgente · ${r.titulo}`,
+        context: prop?.name ?? "Imóvel",
+        when: "abrir a Manutenção",
+      });
+    }
+    for (const t of planTasks) {
+      if (estadoPlano(t) !== "vencida") continue;
+      const prop = properties.find((p) => p.id === t.propertyId);
+      const dias = Math.abs(Math.floor((hoje.getTime() - new Date(`${t.proximaExecucao}T00:00:00`).getTime()) / 86400000));
+      out.push({
+        id: `prev-${t.id}`,
+        severity: "danger",
+        title: `Prevenção vencida · ${t.titulo}`,
+        context: prop?.name ?? "Imóvel",
+        when: `há ${dias}d${t.obrigatoriaLegal ? " · obrigatória" : ""}`,
+      });
+    }
+
     const ordem = { danger: 0, warning: 1, info: 2, success: 3 } as const;
     return out.sort((a, b) => ordem[a.severity] - ordem[b.severity]).slice(0, 5);
-  }, [properties, transactions, contracts, tenants, obras, mesCorrente, rotuloContrato]);
+  }, [properties, transactions, contracts, tenants, obras, maintenanceRequests, planTasks, mesCorrente, rotuloContrato]);
 
   // ── Próximos vencimentos (30 dias) — derivados ──
   const vencimentos = useMemo<EventoDash[]>(() => {

@@ -27,6 +27,19 @@ function uid(prefix = "c"): string {
 }
 
 const SEED: Conversation[] = [
+  // Conversa com INQUILINA (tenant) — dispara o banner "Parece um pedido de manutenção"
+  {
+    id: "conv-tenant-ana",
+    participantIds: [CURRENT_USER_ID, "tenant-ana-martins"],
+    contextType: "tenant",
+    contextId: "tenant-ana-martins",
+    createdAt: "2026-07-16",
+    messages: [
+      { id: "mt1", senderId: "tenant-ana-martins", content: "Bom dia! O esquentador não aquece a água de manhã — já é o terceiro dia seguido. Consegue mandar alguém ver a avaria?", createdAt: "2026-07-16T08:30:00", read: true },
+      { id: "mt2", senderId: CURRENT_USER_ID, content: "Bom dia Ana, obrigado pelo aviso. Vou abrir já um pedido e mando o técnico João Silva ainda esta semana.", createdAt: "2026-07-16T08:44:00", read: true },
+      { id: "mt3", senderId: "tenant-ana-martins", content: "Perfeito, obrigada! De manhã estou em casa até às 10h.", createdAt: "2026-07-16T08:50:00", read: false },
+    ],
+  },
   {
     id: "conv-arroios",
     participantIds: [CURRENT_USER_ID, "carlos-mendes"],
@@ -119,6 +132,18 @@ export const useConversationsStore = create<ConversationsState>()(
       },
       resetSeed: () => set({ conversations: SEED }),
     }),
-    { name: "redegest-conversations", version: 1 }
+    {
+      name: "redegest-conversations",
+      version: 2,
+      // v2: conversa seed com a inquilina Ana Martins (fluxo mensagem → pedido de manutenção).
+      migrate: (persisted: unknown, version: number) => {
+        const s = (persisted ?? {}) as { conversations?: Conversation[] };
+        if (version < 2) {
+          const presentes = new Set((s.conversations ?? []).map((c) => c.id));
+          s.conversations = [...SEED.filter((c) => !presentes.has(c.id)), ...(s.conversations ?? [])];
+        }
+        return s as ConversationsState;
+      },
+    }
   )
 );

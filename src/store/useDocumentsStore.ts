@@ -17,6 +17,7 @@ export type DocCategoria =
   | "Plantas"
   | "Certificados"
   | "Fiscal"
+  | "Manutenção"
   | "Outros";
 
 export const DOC_CATEGORIAS: DocCategoria[] = [
@@ -31,6 +32,7 @@ export const DOC_CATEGORIAS: DocCategoria[] = [
   "Plantas",
   "Certificados",
   "Fiscal",
+  "Manutenção",
   "Outros",
 ];
 
@@ -67,6 +69,8 @@ export interface PropertyDocument {
   arrendamentoId?: string;
   projectId?: string;
   obraId?: string;
+  /** Pedido de manutenção associado (orçamentos, faturas, garantias). */
+  maintenanceId?: string;
   // Organização / metadados
   pasta?: string; // pasta personalizada (nome)
   tamanho?: number; // bytes

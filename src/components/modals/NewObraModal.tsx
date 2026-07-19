@@ -15,6 +15,7 @@ import {
   type Divisao,
 } from "@/store/useObrasStore";
 import { DIVISAO_ICON } from "@/components/obras/Divisoes";
+import { useMaintenanceStore } from "@/store/useMaintenanceStore";
 import { MoneyBox } from "@/components/ui/MoneyField";
 import { useTechniciansStore, ESPECIALIDADE_LABEL } from "@/store/useTechniciansStore";
 import { eur } from "@/lib/format";
@@ -71,7 +72,8 @@ const CATEGORIAS = Object.entries(CATEGORIA_LABEL) as [ObraCategoria, string][];
 
 export function NewObraModal() {
   const { obraForm, closeObraForm } = useModalStore();
-  const { open, editingId, initialProjectId, initialPropertyId } = obraForm;
+  const { open, editingId, initialProjectId, initialPropertyId, prefill } = obraForm;
+  const converterEmObra = useMaintenanceStore((s) => s.converterEmObra);
   const addObra = useObrasStore((s) => s.addObra);
   const updateObra = useObrasStore((s) => s.updateObra);
   const editingObra = useObrasStore((s) => (editingId ? s.obras.find((o) => o.id === editingId) : undefined));
@@ -111,10 +113,25 @@ export function NewObraModal() {
           addTranches: false,
         });
       } else {
-        setForm(emptyForm({ projectId: initialProjectId, propertyId: initialPropertyId }));
+        const base = emptyForm({ projectId: initialProjectId, propertyId: initialPropertyId });
+        // Prefill (ex.: conversão de um pedido de manutenção em obra)
+        if (prefill) {
+          const categoriasValidas = Object.keys(CATEGORIA_LABEL);
+          setForm({
+            ...base,
+            titulo: prefill.titulo ?? base.titulo,
+            categoria: (prefill.categoria && categoriasValidas.includes(prefill.categoria)
+              ? prefill.categoria
+              : base.categoria) as ObraCategoria,
+            orcamento: prefill.orcamento ?? base.orcamento,
+            descricao: prefill.descricao ?? base.descricao,
+          });
+        } else {
+          setForm(base);
+        }
       }
     }
-  }, [open, editingId, editingObra, initialProjectId, initialPropertyId]);
+  }, [open, editingId, editingObra, initialProjectId, initialPropertyId, prefill]);
 
   if (!open) return null;
 
@@ -181,7 +198,13 @@ export function NewObraModal() {
       empreiteiroId: form.empreiteiroId || undefined,
       contactoEmpreiteiro: form.contactoEmpreiteiro.trim() || undefined,
       notas: form.descricao.trim(),
+      fotos: prefill?.fotos,
     });
+
+    // Ponte manutenção → obra: fecha o pedido e deixa o link cruzado
+    if (prefill?.maintenanceId) {
+      converterEmObra(prefill.maintenanceId, obraId, form.titulo.trim());
+    }
 
     // Plano de pagamentos sugerido: 30% adjudicação · 40% a meio · 30% no fim
     if (form.addTranches && form.orcamento > 0) {
