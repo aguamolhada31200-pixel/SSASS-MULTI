@@ -168,6 +168,233 @@ export interface ConfirmacaoDespesa {
   ts: string; // ISO
 }
 
+// ───────────────────── Orçamento detalhado (custos à portuguesa) ─────────────────────
+// Dado rico, interface burra: tudo opcional exceto título/divisão/orçamento.
+// Quando os blocos detalhados existem, o orçamento da obra é recalculado a partir deles.
+
+export type EspecialidadeMO =
+  | "demolicao" | "pichelaria" | "eletricidade" | "alvenaria" | "carpintaria"
+  | "pintura" | "estuque" | "serralharia" | "acabamentos" | "outros";
+
+export const ESPECIALIDADE_MO_LABEL: Record<EspecialidadeMO, string> = {
+  demolicao: "Demolição",
+  pichelaria: "Pichelaria",
+  eletricidade: "Eletricidade",
+  alvenaria: "Alvenaria",
+  carpintaria: "Carpintaria",
+  pintura: "Pintura",
+  estuque: "Estuque",
+  serralharia: "Serralharia",
+  acabamentos: "Acabamentos",
+  outros: "Outros",
+};
+
+export type ModalidadeMO = "empreitada_fechada" | "por_hora" | "por_dia";
+
+export const MODALIDADE_MO_LABEL: Record<ModalidadeMO, string> = {
+  empreitada_fechada: "Empreitada fechada",
+  por_hora: "Por hora",
+  por_dia: "Por dia",
+};
+
+export interface MaoDeObraItem {
+  id: string;
+  especialidade: EspecialidadeMO;
+  modalidade: ModalidadeMO;
+  valorFechado?: number;
+  /** €/hora ou €/dia, conforme a modalidade. */
+  valorHora?: number;
+  horasPrevistas?: number;
+  horasReais?: number;
+  empreiteiroId?: string;
+}
+
+export function subtotalMaoDeObra(i: MaoDeObraItem): number {
+  if (i.modalidade === "empreitada_fechada") return i.valorFechado ?? 0;
+  return (i.valorHora ?? 0) * (i.horasReais ?? i.horasPrevistas ?? 0);
+}
+
+export type UnidadeMaterial = "un" | "m2" | "m" | "m3" | "kg" | "saco" | "l";
+
+export const UNIDADE_LABEL: Record<UnidadeMaterial, string> = {
+  un: "un", m2: "m²", m: "m", m3: "m³", kg: "kg", saco: "saco", l: "L",
+};
+
+export interface MaterialItem {
+  id: string;
+  descricao: string;
+  quantidade: number;
+  unidade: UnidadeMaterial;
+  precoUnitario: number;
+  fornecedor?: string;
+  dataPrecoAtualizado?: string; // YYYY-MM-DD
+}
+
+export function subtotalMaterial(m: MaterialItem): number {
+  return (m.quantidade || 0) * (m.precoUnitario || 0);
+}
+
+/** Preço com mais de 60 dias — "preços de materiais podem ter mudado". */
+export function precoDesatualizado(m: MaterialItem): boolean {
+  if (!m.dataPrecoAtualizado) return false;
+  const dias = Math.round((Date.now() - new Date(`${m.dataPrecoAtualizado}T00:00:00`).getTime()) / 86400000);
+  return dias > 60;
+}
+
+export type TipoEquipamento = "andaimes" | "betoneira" | "elevacao" | "contentor_rcd" | "taxa_vazadouro" | "outros";
+
+export const EQUIPAMENTO_LABEL: Record<TipoEquipamento, string> = {
+  andaimes: "Andaimes",
+  betoneira: "Betoneira",
+  elevacao: "Elevação",
+  contentor_rcd: "Contentor RCD",
+  taxa_vazadouro: "Taxa de vazadouro",
+  outros: "Outros",
+};
+
+export interface EquipamentoItem {
+  id: string;
+  tipo: TipoEquipamento;
+  descricao?: string;
+  custo: number;
+  dias?: number;
+}
+
+export type TipoLicenciamento = "nao_aplicavel" | "comunicacao_previa" | "licenciamento" | "isento";
+
+export const LICENCIAMENTO_LABEL: Record<TipoLicenciamento, string> = {
+  nao_aplicavel: "Não aplicável",
+  comunicacao_previa: "Comunicação prévia",
+  licenciamento: "Licenciamento",
+  isento: "Isento",
+};
+
+export type EstadoProcesso = "nao_iniciado" | "submetido" | "aprovado" | "indeferido";
+
+export const ESTADO_PROCESSO_LABEL: Record<EstadoProcesso, string> = {
+  nao_iniciado: "Não iniciado",
+  submetido: "Submetido",
+  aprovado: "Aprovado",
+  indeferido: "Indeferido",
+};
+
+export interface Licenciamento {
+  tipo: TipoLicenciamento;
+  taxaCamararia?: number;
+  custoAlvara?: number;
+  /** OVP — ocupação de via pública (andaimes/contentores). */
+  ovpNecessaria?: boolean;
+  ovpCusto?: number;
+  ovpDias?: number;
+  numeroProcesso?: string;
+  dataSubmissao?: string;
+  dataAprovacao?: string;
+  estadoProcesso?: EstadoProcesso;
+}
+
+export type TipoProjetoEsp =
+  | "arquitetura" | "estabilidade" | "termica" | "acustica"
+  | "aguas_esgotos" | "eletricidade_ited" | "gas" | "outros";
+
+export const PROJETO_ESP_LABEL: Record<TipoProjetoEsp, string> = {
+  arquitetura: "Arquitetura",
+  estabilidade: "Estabilidade",
+  termica: "Térmica",
+  acustica: "Acústica",
+  aguas_esgotos: "Águas e esgotos",
+  eletricidade_ited: "Eletricidade / ITED",
+  gas: "Gás",
+  outros: "Outros",
+};
+
+export interface ProjetoHonorario {
+  id: string;
+  tipo: TipoProjetoEsp;
+  gabinete?: string;
+  custo: number;
+  estado: "por_contratar" | "em_curso" | "entregue";
+}
+
+export interface SegurosObra {
+  rcContratado?: boolean;
+  rcSeguradora?: string;
+  rcApolice?: string;
+  rcCapital?: number;
+  rcCusto?: number;
+  rcValidade?: string;
+  rcDocumentId?: string;
+  /** Seguro de acidentes de trabalho do empreiteiro — obrigação dele; aqui verifica-se. */
+  atVerificado?: boolean;
+  atValidade?: string;
+  atDocumentId?: string;
+}
+
+export interface FiscalObraInfo {
+  contratado?: boolean;
+  nome?: string;
+  contacto?: string;
+  custo?: number;
+  periodicidadeVisitas?: string;
+}
+
+export interface CoordenacaoSegurancaInfo {
+  necessaria?: boolean;
+  coordenador?: string;
+  custo?: number;
+  documentId?: string;
+}
+
+export type IvaJustificacao = "aru" | "reabilitacao_habitacao" | "normal";
+
+export interface IvaObra {
+  /** Resposta do assistente: ARU / reabilitação de habitação / normal. */
+  justificacao?: IvaJustificacao;
+  /** "Tenho contrato com trabalhos e materiais discriminados" (requisito legal fora de ARU). */
+  contratoDiscriminado?: boolean;
+}
+
+export interface ContingenciaObra {
+  /** 10–20%, default 15. */
+  percentagem?: number;
+}
+
+export interface ContratoObra {
+  assinado?: boolean;
+  documentId?: string;
+  alvaraEmpreiteiro?: string;
+  alvaraVerificadoIMPIC?: boolean;
+  prazoExecucaoDias?: number;
+  penalizacaoAtrasoDia?: number;
+}
+
+export interface Tarefa {
+  id: string;
+  titulo: string;
+  feito: boolean;
+  dataFeito?: string;
+  feitoPor?: string; // userId
+  responsavel?: string;
+  criadoEm: string;
+}
+
+export type DiarioTipo = "antes" | "durante" | "depois" | "nota";
+
+export const DIARIO_TIPO_LABEL: Record<DiarioTipo, string> = {
+  antes: "Antes",
+  durante: "Durante",
+  depois: "Depois",
+  nota: "Nota",
+};
+
+export interface DiarioEntry {
+  id: string;
+  data: string; // ISO datetime
+  texto?: string;
+  fotos: string[];
+  autorId: string;
+  tipo: DiarioTipo;
+}
+
 export interface Obra {
   id: string;
   projectId?: string;
@@ -201,6 +428,25 @@ export interface Obra {
   regraVotacao?: RegraVotacao;
   /** Avaliação ao técnico após conclusão (1–5). */
   avaliacaoTecnico?: number;
+  // ── Orçamento detalhado (opcional — quando existe, recalcula o orçamento) ──
+  maoDeObra?: MaoDeObraItem[];
+  materiais?: MaterialItem[];
+  equipamentos?: EquipamentoItem[];
+  licenciamento?: Licenciamento;
+  projetosHonorarios?: ProjetoHonorario[];
+  seguros?: SegurosObra;
+  fiscalObra?: FiscalObraInfo;
+  cso?: CoordenacaoSegurancaInfo;
+  iva?: IvaObra;
+  contingencia?: ContingenciaObra;
+  contrato?: ContratoObra;
+  // ── Operação simples ──
+  tarefas?: Tarefa[];
+  diario?: DiarioEntry[];
+  /** IDs de avisos legais que o gestor marcou como "Já tratei". */
+  avisosDispensados?: string[];
+  /** Contactos desta obra (IDs do diretório de técnicos), além do empreiteiro. */
+  contactosIds?: string[];
 }
 
 export interface Fase {
@@ -296,6 +542,192 @@ export const FASES_SUGERIDAS: Record<ObraCategoria, string[]> = {
   geral: ["Planeamento", "Execução", "Acabamentos"],
 };
 
+// ── Assistentes por categoria (poupam escrita) ──
+
+export const ESPECIALIDADES_SUGERIDAS: Record<ObraCategoria, EspecialidadeMO[]> = {
+  cozinha: ["demolicao", "pichelaria", "eletricidade", "alvenaria", "carpintaria", "pintura"],
+  wc: ["demolicao", "pichelaria", "alvenaria", "acabamentos"],
+  pintura: ["estuque", "pintura"],
+  eletricidade: ["eletricidade"],
+  canalizacao: ["demolicao", "pichelaria"],
+  estrutural: ["demolicao", "alvenaria", "serralharia", "acabamentos"],
+  mobiliario: ["carpintaria"],
+  arquitetura: ["outros"],
+  geral: ["demolicao", "alvenaria", "pintura", "acabamentos"],
+};
+
+export const MATERIAIS_SUGERIDOS: Record<ObraCategoria, string[]> = {
+  cozinha: ["Azulejo", "Tinta", "Loiça sanitária", "Torneira", "Bancada", "Eletrodomésticos"],
+  wc: ["Azulejo", "Loiça sanitária", "Torneiras", "Base de duche", "Móvel WC"],
+  pintura: ["Tinta", "Massa de reparação", "Rolos e fitas", "Lonas de proteção"],
+  eletricidade: ["Quadro elétrico", "Cabo", "Tomadas e interruptores", "Iluminação"],
+  canalizacao: ["Tubagem PEX", "Válvulas", "Sifões", "Autoclismo"],
+  estrutural: ["Cimento", "Varão de aço", "Vigas", "Tijolo"],
+  mobiliario: ["Painéis", "Ferragens", "Puxadores"],
+  arquitetura: [],
+  geral: ["Cimento", "Tinta", "Pavimento", "Rodapés"],
+};
+
+export const TAREFAS_SUGERIDAS: Record<ObraCategoria, string[]> = {
+  cozinha: ["Escolher azulejos", "Marcar entrega dos móveis", "Ligar ao picheleiro", "Escolher eletrodomésticos"],
+  wc: ["Escolher loiças", "Escolher azulejos", "Confirmar medidas do duche"],
+  pintura: ["Escolher cores", "Comprar tinta", "Proteger móveis"],
+  eletricidade: ["Marcar certificação", "Escolher iluminação"],
+  canalizacao: ["Fechar a água geral", "Testar pressão"],
+  estrutural: ["Pedir parecer do engenheiro", "Confirmar licença"],
+  mobiliario: ["Confirmar medidas", "Marcar montagem"],
+  arquitetura: ["Reunir com o arquiteto", "Levantamento do existente"],
+  geral: ["Pedir 3 orçamentos", "Marcar visita do empreiteiro"],
+};
+
+// ───────────────────── Totais do orçamento detalhado ─────────────────────
+
+export interface TotaisObra {
+  /** Há blocos detalhados preenchidos? Sem eles, vale o orçamento simples. */
+  temDetalhe: boolean;
+  custosDiretos: number;
+  totalMateriais: number;
+  custosLegais: number;
+  custosTecnicos: number;
+  subtotalSemIva: number;
+  /** % dos materiais no subtotal — regra dos 20% do IVA a 6%. */
+  pctMateriais: number;
+  ivaElegivel6: boolean;
+  ivaTaxa: 6 | 23;
+  valorIva: number;
+  /** Quanto poupa com 6% face a 23% (0 se não elegível). */
+  poupancaIva: number;
+  contingenciaPct: number;
+  contingenciaValor: number;
+  contingenciaUsado: number;
+  orcamentoTotal: number;
+}
+
+/** Aviso do assistente de IVA — texto humano gerado dos dados. */
+export function avisoElegibilidadeIva(t: TotaisObra, iva?: IvaObra): string {
+  if (!iva?.justificacao) return "Responda às perguntas para estimar o IVA.";
+  if (iva.justificacao === "aru") return "Imóvel em ARU → IVA a 6%. Confirme na sua câmara municipal.";
+  if (iva.justificacao === "normal") return "Obra sem enquadramento de reabilitação → IVA a 23%.";
+  if (t.pctMateriais > 20)
+    return `Os materiais representam ${Math.round(t.pctMateriais)}% da obra. Para IVA a 6% fora de ARU, os materiais não podem passar de 20% do valor total. Neste momento a obra é taxada a 23%.`;
+  if (!iva.contratoDiscriminado)
+    return "Materiais dentro do limite dos 20% — falta o contrato com trabalhos e materiais discriminados para os 6%.";
+  return "Elegível para IVA a 6% (reabilitação de habitação, materiais ≤ 20% e contrato discriminado).";
+}
+
+/**
+ * Totais auto-calculados da obra. Se os blocos detalhados estiverem vazios,
+ * o subtotal é o orçamento simples da camada rápida (IVA/contingência não somam).
+ */
+export function totaisObra(obra: Obra, despesas: Despesa[]): TotaisObra {
+  const mo = (obra.maoDeObra ?? []).reduce((s, i) => s + subtotalMaoDeObra(i), 0);
+  const totalMateriais = (obra.materiais ?? []).reduce((s, m) => s + subtotalMaterial(m), 0);
+  const equip = (obra.equipamentos ?? []).reduce((s, e) => s + (e.custo || 0), 0);
+  const custosDiretos = mo + totalMateriais + equip;
+
+  const lic = obra.licenciamento;
+  const custosLicenca = (lic?.taxaCamararia ?? 0) + (lic?.custoAlvara ?? 0) + (lic?.ovpNecessaria ? lic?.ovpCusto ?? 0 : 0);
+  const honorarios = (obra.projetosHonorarios ?? []).reduce((s, p) => s + (p.custo || 0), 0);
+  const seguros = obra.seguros?.rcContratado ? obra.seguros?.rcCusto ?? 0 : 0;
+  const custosLegais = custosLicenca + honorarios + seguros;
+
+  const custosTecnicos = (obra.fiscalObra?.contratado ? obra.fiscalObra?.custo ?? 0 : 0) + (obra.cso?.necessaria ? obra.cso?.custo ?? 0 : 0);
+
+  const temDetalhe = custosDiretos > 0 || custosLegais > 0 || custosTecnicos > 0;
+  const subtotalSemIva = temDetalhe ? custosDiretos + custosLegais + custosTecnicos : obra.orcamento;
+
+  const pctMateriais = subtotalSemIva > 0 ? (totalMateriais / subtotalSemIva) * 100 : 0;
+  const j = obra.iva?.justificacao;
+  const ivaElegivel6 =
+    j === "aru" || (j === "reabilitacao_habitacao" && pctMateriais <= 20 && !!obra.iva?.contratoDiscriminado);
+  const ivaTaxa: 6 | 23 = ivaElegivel6 ? 6 : 23;
+  const valorIva = Math.round(subtotalSemIva * (ivaTaxa / 100));
+  const poupancaIva = ivaElegivel6 ? Math.round(subtotalSemIva * 0.17) : 0;
+
+  const contingenciaPct = Math.min(20, Math.max(10, obra.contingencia?.percentagem ?? 15));
+  const contingenciaValor = temDetalhe ? Math.round(subtotalSemIva * (contingenciaPct / 100)) : 0;
+
+  const orcamentoTotal = temDetalhe ? subtotalSemIva + valorIva + contingenciaValor : obra.orcamento;
+
+  const gasto = gastoReal(obra, despesas);
+  const contingenciaUsado = temDetalhe
+    ? Math.min(contingenciaValor, Math.max(0, gasto - (subtotalSemIva + valorIva)))
+    : 0;
+
+  return {
+    temDetalhe,
+    custosDiretos,
+    totalMateriais,
+    custosLegais,
+    custosTecnicos,
+    subtotalSemIva,
+    pctMateriais,
+    ivaElegivel6,
+    ivaTaxa,
+    valorIva,
+    poupancaIva,
+    contingenciaPct,
+    contingenciaValor,
+    contingenciaUsado,
+    orcamentoTotal,
+  };
+}
+
+// ───────────────────── Avisos legais automáticos (PT) ─────────────────────
+// Informativos, não aconselhamento jurídico. Dispensáveis com "Já tratei".
+
+export interface AvisoLegal {
+  id: string;
+  texto: string;
+  acao: string;
+}
+
+export function avisosLegais(obra: Obra, totais: TotaisObra): AvisoLegal[] {
+  const avisos: AvisoLegal[] = [];
+  const dispensados = new Set(obra.avisosDispensados ?? []);
+  const temEmpreiteiro = !!(obra.empreiteiroId || obra.empreiteiro);
+
+  if (totais.orcamentoTotal > 20000 && !obra.contrato?.assinado)
+    avisos.push({
+      id: "contrato",
+      texto: "Obras acima de 20.000 € exigem contrato escrito com partes, alvarás, trabalhos, materiais, valor, prazo e penalizações por atraso.",
+      acao: "Anexar contrato",
+    });
+  if (temEmpreiteiro && !obra.contrato?.alvaraVerificadoIMPIC)
+    avisos.push({
+      id: "impic",
+      texto: "Confirme o alvará do empreiteiro no portal do IMPIC antes de começar.",
+      acao: "Marcar como verificado",
+    });
+  const estrutural = obra.categoria === "estrutural";
+  const processoParado = !obra.licenciamento || obra.licenciamento.tipo === "nao_aplicavel" || (obra.licenciamento.estadoProcesso ?? "nao_iniciado") === "nao_iniciado";
+  if (estrutural && processoParado && obra.estado !== "concluida")
+    avisos.push({
+      id: "licenca",
+      texto: "Obras na estrutura ou fachada exigem licença camarária. Coimas de 500 € a 200.000 €.",
+      acao: "Registar processo",
+    });
+  if (obra.licenciamento?.ovpNecessaria && !obra.licenciamento.ovpCusto)
+    avisos.push({
+      id: "ovp",
+      texto: "Andaimes ou contentores na via pública exigem licença de ocupação de via pública.",
+      acao: "Adicionar taxa",
+    });
+  if (temEmpreiteiro && !obra.seguros?.rcContratado)
+    avisos.push({
+      id: "seguro-rc",
+      texto: "Recomendado: seguro de responsabilidade civil do empreiteiro.",
+      acao: "Registar seguro",
+    });
+  if (temEmpreiteiro && !obra.seguros?.atVerificado)
+    avisos.push({
+      id: "seguro-at",
+      texto: "O empreiteiro é obrigado a ter seguro de acidentes de trabalho.",
+      acao: "Confirmar",
+    });
+  return avisos.filter((a) => !dispensados.has(a.id));
+}
+
 // ───────────────────── Seeds ─────────────────────
 
 // Membros de co-gestão. "Você" (utilizador atual) é gestor no #001 e investidor no #003.
@@ -316,6 +748,15 @@ function withMembers(o: Obra): Obra {
   if (o.projectId === "principe-real") return { ...o, members: MEMBROS_PRINCIPE, regraVotacao: "maioria_simples" };
   return o;
 }
+
+/** Data ISO a N dias de hoje — para seeds com datas relativas. */
+function seedEmDias(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+const IMG_OBRA = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=900&q=70`;
 
 const SEED_OBRAS: Obra[] = ([
   // PORTO FLIP — projeto colaborativo #001
@@ -392,6 +833,72 @@ const SEED_OBRAS: Obra[] = ([
     createdAt: "2026-04-20",
   },
 
+  // ── Obra grande de demonstração dos AVISOS LEGAIS (Parte 7): contrato >20k,
+  // IVA 23% (materiais ≈ 34% > 20%), alvará IMPIC por verificar, OVP, CSO. ──
+  // Subtotal 41.850 € · IVA 23% 9.626 € · contingência 20% 8.370 € → ≈ 59.846 €.
+  {
+    id: "o-porto-reab",
+    divisao: "casa_toda",
+    projectId: "porto-flip",
+    titulo: "Reabilitação total",
+    categoria: "estrutural",
+    orcamento: 59846,
+    gasto: 0,
+    dataInicio: "2026-07-01",
+    dataFimPrevista: "2026-11-30",
+    estado: "em_curso",
+    progresso: 10,
+    empreiteiro: "Reabilita Norte Lda.",
+    fotos: [],
+    notas: "Reabilitação integral do edifício — fase de preparação e licenciamento.",
+    createdAt: "2026-06-20",
+    maoDeObra: [
+      { id: "mo-r1", especialidade: "outros", modalidade: "empreitada_fechada", valorFechado: 14000 },
+    ],
+    materiais: [
+      { id: "mat-r1", descricao: "Caixilharia (vidro duplo)", quantidade: 1, unidade: "un", precoUnitario: 6900, dataPrecoAtualizado: seedEmDias(-20) },
+      { id: "mat-r2", descricao: "Pavimentos", quantidade: 95, unidade: "m2", precoUnitario: 43.16, dataPrecoAtualizado: seedEmDias(-75) },
+      { id: "mat-r3", descricao: "Cerâmicos WC e cozinha", quantidade: 1, unidade: "un", precoUnitario: 2200, dataPrecoAtualizado: seedEmDias(-20) },
+      { id: "mat-r4", descricao: "Tintas e primários", quantidade: 1, unidade: "un", precoUnitario: 800, dataPrecoAtualizado: seedEmDias(-20) },
+    ],
+    equipamentos: [
+      { id: "eq-r1", tipo: "andaimes", custo: 1400, dias: 30 },
+      { id: "eq-r2", tipo: "contentor_rcd", custo: 600, dias: 15 },
+      { id: "eq-r3", tipo: "taxa_vazadouro", custo: 250 },
+    ],
+    licenciamento: {
+      tipo: "comunicacao_previa",
+      taxaCamararia: 480,
+      ovpNecessaria: true,
+      ovpCusto: 620,
+      ovpDias: 30,
+      numeroProcesso: "CP-2026/1184",
+      dataSubmissao: "2026-06-25",
+      estadoProcesso: "submetido",
+    },
+    projetosHonorarios: [
+      { id: "ph-r1", tipo: "arquitetura", gabinete: "Atelier Soares", custo: 3200, estado: "em_curso" },
+      { id: "ph-r2", tipo: "estabilidade", custo: 1800, estado: "em_curso" },
+      { id: "ph-r3", tipo: "termica", custo: 900, estado: "por_contratar" },
+      { id: "ph-r4", tipo: "eletricidade_ited", custo: 700, estado: "por_contratar" },
+    ],
+    fiscalObra: { contratado: true, nome: "Eng. Marta Silva", contacto: "91 555 20 20", custo: 2400, periodicidadeVisitas: "Semanal" },
+    cso: { necessaria: true, coordenador: "SafeWork Porto", custo: 1500 },
+    iva: { justificacao: "reabilitacao_habitacao", contratoDiscriminado: false },
+    contingencia: { percentagem: 20 },
+    contrato: { assinado: false, alvaraVerificadoIMPIC: false },
+    tarefas: [
+      { id: "t-r1", titulo: "Submeter comunicação prévia", feito: true, dataFeito: "2026-06-25", feitoPor: CURRENT_USER_ID, criadoEm: "2026-06-20" },
+      { id: "t-r2", titulo: "Assinar contrato de empreitada", feito: false, criadoEm: "2026-06-20" },
+      { id: "t-r3", titulo: "Verificar alvará no IMPIC", feito: false, criadoEm: "2026-06-20" },
+      { id: "t-r4", titulo: "Pedir licença de ocupação de via pública", feito: false, criadoEm: "2026-06-26" },
+    ],
+    diario: [
+      { id: "di-r1", data: "2026-06-28T10:00:00.000Z", tipo: "antes", autorId: CURRENT_USER_ID, texto: "Estado atual do edifício antes da reabilitação.", fotos: [IMG_OBRA("1487958449943-2429e8be8625")] },
+      { id: "di-r2", data: "2026-07-10T16:00:00.000Z", tipo: "durante", autorId: CURRENT_USER_ID, texto: "Montagem de andaimes e proteções na fachada.", fotos: [IMG_OBRA("1541888946425-d81bb19240f5")] },
+    ],
+  },
+
   // PRÍNCIPE REAL — projeto colaborativo #003 (novo)
   {
     id: "o-principe-1",
@@ -412,23 +919,64 @@ const SEED_OBRAS: Obra[] = ([
     notas: "",
     createdAt: "2026-05-10",
   },
+  // ── Obra de demonstração COMPLETA (Parte 7): orçamento profundo à portuguesa ──
+  // Subtotal 12.512 € (diretos 12.332 + seguro RC 180) · IVA 6% ARU 751 € ·
+  // contingência 15% 1.877 € → orçamento total ≈ 15.140 € (recalculado dos blocos).
   {
     id: "o-principe-2",
     divisao: "cozinha",
     projectId: "principe-real",
     titulo: "Cozinha nova",
     categoria: "cozinha",
-    orcamento: 12000,
+    orcamento: 15140,
     gasto: 0,
     dataInicio: "2026-06-15",
     dataFimPrevista: "2026-08-15",
-    estado: "por_iniciar",
-    progresso: 0,
+    estado: "em_curso",
+    progresso: 25,
     empreiteiro: "Cozinhas Modernas Lx",
     empreiteiroId: "tec-cozinhas-lx",
     fotos: [],
-    notas: "Adjudicação assinada — espera de início.",
+    notas: "Adjudicação assinada — demolição concluída, canalização a começar.",
     createdAt: "2026-06-01",
+    maoDeObra: [
+      { id: "mo-c1", especialidade: "demolicao", modalidade: "empreitada_fechada", valorFechado: 800, empreiteiroId: "tec-cozinhas-lx" },
+      { id: "mo-c2", especialidade: "pichelaria", modalidade: "empreitada_fechada", valorFechado: 1800, empreiteiroId: "tec-cozinhas-lx" },
+      { id: "mo-c3", especialidade: "eletricidade", modalidade: "empreitada_fechada", valorFechado: 1500, empreiteiroId: "tec-cozinhas-lx" },
+      { id: "mo-c4", especialidade: "alvenaria", modalidade: "empreitada_fechada", valorFechado: 1200, empreiteiroId: "tec-cozinhas-lx" },
+      { id: "mo-c5", especialidade: "carpintaria", modalidade: "empreitada_fechada", valorFechado: 3400, empreiteiroId: "tec-cozinhas-lx" },
+      { id: "mo-c6", especialidade: "pintura", modalidade: "empreitada_fechada", valorFechado: 700, empreiteiroId: "tec-cozinhas-lx" },
+    ],
+    materiais: [
+      { id: "mat-c1", descricao: "Azulejo", quantidade: 25, unidade: "m2", precoUnitario: 28, fornecedor: "Love Tiles", dataPrecoAtualizado: seedEmDias(-12) },
+      { id: "mat-c2", descricao: "Tinta", quantidade: 6, unidade: "l", precoUnitario: 42, fornecedor: "Robbialac", dataPrecoAtualizado: seedEmDias(-12) },
+      { id: "mat-c3", descricao: "Loiça sanitária", quantidade: 1, unidade: "un", precoUnitario: 480, fornecedor: "Roca", dataPrecoAtualizado: seedEmDias(-12) },
+      { id: "mat-c4", descricao: "Torneira", quantidade: 1, unidade: "un", precoUnitario: 180, fornecedor: "Roca", dataPrecoAtualizado: seedEmDias(-12) },
+      { id: "mat-c5", descricao: "Bancada", quantidade: 1, unidade: "un", precoUnitario: 950, fornecedor: "Cozinhas Modernas Lx", dataPrecoAtualizado: seedEmDias(-12) },
+    ],
+    equipamentos: [
+      { id: "eq-c1", tipo: "contentor_rcd", descricao: "Contentor de entulho", custo: 280, dias: 5 },
+      { id: "eq-c2", tipo: "taxa_vazadouro", custo: 90 },
+    ],
+    licenciamento: { tipo: "nao_aplicavel" },
+    seguros: { rcContratado: true, rcSeguradora: "Fidelidade", rcCusto: 180, atVerificado: true },
+    iva: { justificacao: "aru" },
+    contingencia: { percentagem: 15 },
+    contrato: { assinado: true, alvaraVerificadoIMPIC: true },
+    tarefas: [
+      { id: "t-c1", titulo: "Escolher azulejos", feito: true, dataFeito: "2026-06-18", feitoPor: "pedro-alves", criadoEm: "2026-06-10" },
+      { id: "t-c2", titulo: "Confirmar medidas da bancada", feito: true, dataFeito: "2026-06-20", feitoPor: "pedro-alves", criadoEm: "2026-06-10" },
+      { id: "t-c3", titulo: "Marcar entrega dos móveis", feito: true, dataFeito: "2026-07-02", feitoPor: "pedro-alves", criadoEm: "2026-06-10" },
+      { id: "t-c4", titulo: "Escolher eletrodomésticos", feito: false, criadoEm: "2026-06-10" },
+      { id: "t-c5", titulo: "Ligar ao picheleiro para agendar", feito: false, criadoEm: "2026-06-25" },
+      { id: "t-c6", titulo: "Escolher iluminação do teto", feito: false, criadoEm: "2026-07-01" },
+    ],
+    diario: [
+      { id: "di-c1", data: "2026-06-14T18:30:00.000Z", tipo: "antes", autorId: "pedro-alves", texto: "Cozinha antiga antes da demolição.", fotos: [IMG_OBRA("1556909212-d5b604d0c90d")] },
+      { id: "di-c2", data: "2026-06-18T17:00:00.000Z", tipo: "durante", autorId: "pedro-alves", texto: "Demolição concluída em 3 dias. Entulho no contentor.", fotos: [IMG_OBRA("1581858726788-75bc0f6a952d")] },
+      { id: "di-c3", data: "2026-06-26T16:20:00.000Z", tipo: "durante", autorId: CURRENT_USER_ID, texto: "Passei na obra — tubagem nova a entrar. Bom ritmo.", fotos: [IMG_OBRA("1504307651254-35680f356dfd")] },
+      { id: "di-c4", data: "2026-07-08T15:45:00.000Z", tipo: "durante", autorId: "pedro-alves", texto: "Paredes fechadas e eletricidade pronta para os móveis.", fotos: [IMG_OBRA("1503387762-592deb58ef4e")] },
+    ],
   },
   {
     id: "o-principe-3",
@@ -527,7 +1075,7 @@ const SEED_OBRAS: Obra[] = ([
 
 const SEED_FASES: Fase[] = [
   // Cozinha nova do Príncipe Real — 4 fases sugeridas
-  { id: "f1", obraId: "o-principe-2", titulo: "Demolição cozinha existente", dataInicio: "2026-06-15", dataFim: "2026-06-22", progresso: 0, custoEstimado: 800, ordem: 1 },
+  { id: "f1", obraId: "o-principe-2", titulo: "Demolição cozinha existente", dataInicio: "2026-06-15", dataFim: "2026-06-22", progresso: 100, custoEstimado: 800, ordem: 1 },
   { id: "f2", obraId: "o-principe-2", titulo: "Canalização nova", dataInicio: "2026-06-22", dataFim: "2026-07-05", progresso: 0, custoEstimado: 1800, ordem: 2 },
   { id: "f3", obraId: "o-principe-2", titulo: "Eletricidade & iluminação", dataInicio: "2026-07-05", dataFim: "2026-07-15", progresso: 0, custoEstimado: 1500, ordem: 3 },
   { id: "f4", obraId: "o-principe-2", titulo: "Mobiliário & bancada", dataInicio: "2026-07-15", dataFim: "2026-08-15", progresso: 0, custoEstimado: 7900, ordem: 4 },
@@ -765,6 +1313,68 @@ const SEED_DESPESAS: Despesa[] = [
     ],
   },
 
+  // COZINHA NOVA (#003) — despesas com fatura + 1 por comprovar (Parte 7)
+  {
+    id: "d-coz-demolicao",
+    obraId: "o-principe-2",
+    faseId: "f1",
+    descricao: "Demolição da cozinha existente",
+    valor: 800,
+    data: "2026-06-18",
+    fornecedor: "Cozinhas Modernas Lx",
+    nif: "509888777",
+    registadoPor: "pedro-alves",
+    registadoEm: "2026-06-18T17:30:00.000Z",
+    comprovativos: [
+      {
+        id: "cp-coz-1",
+        documentId: "seed-doc-fatura-demolicao",
+        tipo: "fatura",
+        nomeFicheiro: "Fatura Cozinhas Modernas 18-06.pdf",
+        valorNoComprovativo: 800,
+        addedBy: "pedro-alves",
+        addedAt: "2026-06-18T17:35:00.000Z",
+      },
+    ],
+    confirmacoes: [{ userId: CURRENT_USER_ID, valor: "confirma", ts: "2026-06-19T09:00:00.000Z" }],
+  },
+  {
+    id: "d-coz-tubagem",
+    obraId: "o-principe-2",
+    faseId: "f2",
+    descricao: "Materiais de canalização (adiantamento)",
+    valor: 350,
+    data: "2026-06-26",
+    fornecedor: "Cozinhas Modernas Lx",
+    registadoPor: "pedro-alves",
+    registadoEm: "2026-06-26T18:00:00.000Z",
+    // sem comprovativos → por_comprovar
+  },
+
+  // REABILITAÇÃO TOTAL (Porto) — honorários com fatura
+  {
+    id: "d-reab-arq",
+    obraId: "o-porto-reab",
+    descricao: "Honorários arquitetura — adjudicação",
+    valor: 1600,
+    data: "2026-07-02",
+    fornecedor: "Atelier Soares",
+    nif: "507333222",
+    registadoPor: CURRENT_USER_ID,
+    registadoEm: "2026-07-02T11:00:00.000Z",
+    comprovativos: [
+      {
+        id: "cp-reab-1",
+        documentId: "seed-doc-fatura-arq",
+        tipo: "fatura",
+        nomeFicheiro: "Fatura Atelier Soares 02-07.pdf",
+        valorNoComprovativo: 1600,
+        addedBy: CURRENT_USER_ID,
+        addedAt: "2026-07-02T11:05:00.000Z",
+      },
+    ],
+  },
+
   { id: "d7", obraId: "o-porto-2", descricao: "Substituição prumadas (extra)", valor: 1500, data: "2026-05-10", fornecedor: "Hidroplan Porto", registadoPor: CURRENT_USER_ID },
   { id: "d8", obraId: "o-porto-2", descricao: "Tubagem PEX kit", valor: 4200, data: "2026-04-22", fornecedor: "Hidroplan Porto", registadoPor: CURRENT_USER_ID },
   { id: "d9", obraId: "o-porto-2", descricao: "Mão-de-obra fase 1", valor: 3800, data: "2026-05-25", fornecedor: "Hidroplan Porto", registadoPor: CURRENT_USER_ID },
@@ -815,7 +1425,27 @@ const SEED_DESPESAS: Despesa[] = [
 ];
 
 const SEED_MARCOS: Marco[] = [
-  { id: "m1", obraId: "o-principe-2", titulo: "Adjudicação cozinha (30%)", valor: 3600, dataPrevista: "2026-06-01", dataPago: "2026-06-01", estado: "pago", empreiteiro: "Cozinhas Modernas Lx", registadoPor: "pedro-alves", pagoPor: "pedro-alves" },
+  {
+    id: "m1",
+    obraId: "o-principe-2",
+    titulo: "Adjudicação cozinha (30%)",
+    valor: 3600,
+    dataPrevista: "2026-06-01",
+    dataPago: "2026-06-01",
+    estado: "pago",
+    empreiteiro: "Cozinhas Modernas Lx",
+    registadoPor: "pedro-alves",
+    pagoPor: "pedro-alves",
+    comprovativoPagamento: {
+      id: "cp-m1",
+      documentId: "seed-doc-transf-cozinha",
+      tipo: "comprovativo_pagamento",
+      nomeFicheiro: "Transferência CGD 01-06.pdf",
+      valorNoComprovativo: 3600,
+      addedBy: "pedro-alves",
+      addedAt: "2026-06-01T18:00:00.000Z",
+    },
+  },
   // Acima do threshold → precisa do voto dos sócios antes de poder ser pago (falta o Daniel e a Rita).
   {
     id: "m2",
@@ -903,8 +1533,11 @@ export function gastoReal(obra: Obra, despesas: Despesa[]): number {
 
 export function progressoReal(obra: Obra, fases: Fase[]): number {
   const fs = fases.filter((f) => f.obraId === obra.id);
-  if (fs.length === 0) return obra.progresso;
-  return Math.round(fs.reduce((s, f) => s + f.progresso, 0) / fs.length);
+  if (fs.length > 0) return Math.round(fs.reduce((s, f) => s + f.progresso, 0) / fs.length);
+  // Sem fases: % de tarefas feitas (checklist), se existirem.
+  const ts = obra.tarefas ?? [];
+  if (ts.length > 0) return Math.round((ts.filter((t) => t.feito).length / ts.length) * 100);
+  return obra.progresso;
 }
 
 export function custoRealFase(faseId: string, despesas: Despesa[]): number {
@@ -1142,20 +1775,20 @@ export function custoObrasProjeto(projectId: string, obras: Obra[], despesas: De
 
 export type EstadoHumano = "tudo_em_dia" | "atraso" | "atencao" | "concluidas" | "nao_comecou";
 
-/** Rótulos para a capa da CASA (nível 1). */
+/** Rótulos para a capa da CASA (nível 1) — semáforo de 3 cores, frase humana. */
 export const ESTADO_HUMANO_CASA: Record<EstadoHumano, string> = {
-  tudo_em_dia: "Tudo em dia",
-  atraso: "Vai com atraso",
-  atencao: "Precisa de atenção",
+  tudo_em_dia: "Tudo a correr bem",
+  atraso: "Precisa de atenção",
+  atencao: "Há problemas",
   concluidas: "Obras concluídas",
   nao_comecou: "Ainda não começou",
 };
 
 /** Rótulos curtos para o cartão da DIVISÃO (nível 2). */
 export const ESTADO_HUMANO_DIVISAO: Record<EstadoHumano, string> = {
-  tudo_em_dia: "A decorrer",
-  atraso: "Atrasada",
-  atencao: "Precisa de atenção",
+  tudo_em_dia: "A correr bem",
+  atraso: "Precisa de atenção",
+  atencao: "Há problemas",
   concluidas: "Pronta",
   nao_comecou: "Por começar",
 };
@@ -1322,6 +1955,23 @@ interface ObrasState {
   setNotas: (obraId: string, notas: string) => void;
   addFoto: (obraId: string, url: string) => void;
   removeFoto: (obraId: string, idx: number) => void;
+
+  // Orçamento detalhado — merges e recalcula obra.orcamento quando há blocos
+  updateDetalhe: (obraId: string, patch: Partial<Obra>) => void;
+
+  // Tarefas (checklist simples)
+  addTarefa: (obraId: string, titulo: string) => void;
+  toggleTarefa: (obraId: string, tarefaId: string, userId: string) => void;
+  removeTarefa: (obraId: string, tarefaId: string) => void;
+
+  // Diário (fotos + notas com etiqueta)
+  addDiario: (obraId: string, entry: Omit<DiarioEntry, "id">) => void;
+  removeDiario: (obraId: string, entryId: string) => void;
+
+  // Avisos legais + contactos da obra
+  dispensarAviso: (obraId: string, avisoId: string) => void;
+  addContactoObra: (obraId: string, technicianId: string) => void;
+  removeContactoObra: (obraId: string, technicianId: string) => void;
 
   resetSeed: () => void;
 }
@@ -1692,6 +2342,93 @@ export const useObrasStore = create<ObrasState>()(
           ),
         })),
 
+      updateDetalhe: (obraId, patch) =>
+        set((s) => ({
+          obras: s.obras.map((o) => {
+            if (o.id !== obraId) return o;
+            const next = { ...o, ...patch };
+            // Se há blocos detalhados, o orçamento simples passa a ser o total calculado.
+            const t = totaisObra(next, s.despesas);
+            return t.temDetalhe ? { ...next, orcamento: Math.round(t.orcamentoTotal) } : next;
+          }),
+        })),
+
+      addTarefa: (obraId, titulo) =>
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId
+              ? { ...o, tarefas: [...(o.tarefas ?? []), { id: uid("t"), titulo: titulo.trim(), feito: false, criadoEm: todayISO() }] }
+              : o
+          ),
+        })),
+      toggleTarefa: (obraId, tarefaId, userId) =>
+        set((s) => {
+          const obra = s.obras.find((o) => o.id === obraId);
+          const tarefa = obra?.tarefas?.find((t) => t.id === tarefaId);
+          return {
+            obras: s.obras.map((o) =>
+              o.id === obraId
+                ? {
+                    ...o,
+                    tarefas: (o.tarefas ?? []).map((t) =>
+                      t.id === tarefaId
+                        ? t.feito
+                          ? { ...t, feito: false, dataFeito: undefined, feitoPor: undefined }
+                          : { ...t, feito: true, dataFeito: todayISO(), feitoPor: userId }
+                        : t
+                    ),
+                  }
+                : o
+            ),
+            logs: tarefa && !tarefa.feito ? appendLog(s, obraId, `Tarefa concluída: ${tarefa.titulo}.`) : s.logs,
+          };
+        }),
+      removeTarefa: (obraId, tarefaId) =>
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId ? { ...o, tarefas: (o.tarefas ?? []).filter((t) => t.id !== tarefaId) } : o
+          ),
+        })),
+
+      addDiario: (obraId, entry) =>
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId ? { ...o, diario: [{ ...entry, id: uid("di") }, ...(o.diario ?? [])] } : o
+          ),
+          logs: appendLog(s, obraId, `Registo no diário da obra (${DIARIO_TIPO_LABEL[entry.tipo]}).`),
+        })),
+      removeDiario: (obraId, entryId) =>
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId ? { ...o, diario: (o.diario ?? []).filter((e) => e.id !== entryId) } : o
+          ),
+        })),
+
+      dispensarAviso: (obraId, avisoId) =>
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId
+              ? { ...o, avisosDispensados: [...new Set([...(o.avisosDispensados ?? []), avisoId])] }
+              : o
+          ),
+        })),
+      addContactoObra: (obraId, technicianId) =>
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId
+              ? { ...o, contactosIds: [...new Set([...(o.contactosIds ?? []), technicianId])] }
+              : o
+          ),
+        })),
+      removeContactoObra: (obraId, technicianId) =>
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId
+              ? { ...o, contactosIds: (o.contactosIds ?? []).filter((id) => id !== technicianId) }
+              : o
+          ),
+        })),
+
       resetSeed: () =>
         set({
           obras: SEED_OBRAS,
@@ -1704,10 +2441,12 @@ export const useObrasStore = create<ObrasState>()(
     }),
     {
       name: "redegest-obras",
-      version: 10,
+      version: 11,
       // v4: co-gestão. v5/v6: obra parada + marcos espalhados. v7: comprovativos + confirmações.
       // v8: divisão da casa. v9: empreiteiroId + notaCausa + sugestões + saúde 50/50.
       // v10: camada de papéis — d-tinta aguarda o voto do Daniel, m2 em votação, gasto contestado, proposta do Daniel no Porto.
+      // v11: orçamento detalhado à portuguesa (mão de obra/materiais/licenças/IVA/contingência/contrato),
+      //      tarefas + diário, Cozinha nova completa e Reabilitação total (avisos legais).
       // Re-semeia os exemplos mantendo obras/itens criados pelo utilizador.
       migrate: (persisted: unknown, version: number) => {
         const s = (persisted ?? {}) as {
@@ -1719,7 +2458,7 @@ export const useObrasStore = create<ObrasState>()(
           sugestoes?: SugestaoFase[];
         };
         s.sugestoes = s.sugestoes ?? [];
-        if (version < 10) {
+        if (version < 11) {
           const seedObraIds = new Set(SEED_OBRAS.map((o) => o.id));
           const seedFaseIds = new Set(SEED_FASES.map((f) => f.id));
           const seedDespIds = new Set(SEED_DESPESAS.map((d) => d.id));

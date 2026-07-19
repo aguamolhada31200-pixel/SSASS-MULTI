@@ -31,6 +31,7 @@ interface MoneyBoxProps {
   value: number | undefined;
   onChange: (n: number | undefined) => void;
   onBlur?: () => void;
+  disabled?: boolean;
   suffix?: string;
   placeholder?: string;
   comDecimais?: boolean;
@@ -38,7 +39,7 @@ interface MoneyBoxProps {
 }
 
 /** Caixa de valor controlada (value/onChange numéricos) — reutilizável fora do RHF. */
-export function MoneyBox({ value, onChange, onBlur, suffix = "€", placeholder, comDecimais = false, className }: MoneyBoxProps) {
+export function MoneyBox({ value, onChange, onBlur, disabled, suffix = "€", placeholder, comDecimais = false, className }: MoneyBoxProps) {
   const [focused, setFocused] = useState(false);
   const [text, setText] = useState<string>(() => paraTexto(value, comDecimais));
 
@@ -69,11 +70,12 @@ export function MoneyBox({ value, onChange, onBlur, suffix = "€", placeholder,
   };
 
   return (
-    <div className={cn("flex items-center rounded-lg border border-line bg-card focus-within:border-secondary", className)}>
+    <div className={cn("flex items-center rounded-lg border border-line bg-card focus-within:border-secondary", disabled && "opacity-60", className)}>
       <input
         inputMode={comDecimais ? "decimal" : "numeric"}
         value={text}
         placeholder={placeholder}
+        disabled={disabled}
         onFocus={() => setFocused(true)}
         onBlur={() => { setFocused(false); onBlur?.(); }}
         onChange={(e) => handleChange(e.target.value)}
