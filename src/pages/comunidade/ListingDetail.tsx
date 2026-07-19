@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Maximize2,
   Handshake,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -124,6 +125,11 @@ export default function ListingDetail() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-gold px-2.5 py-1 text-xs font-semibold text-sidebar">{TYPE_LABEL_SHORT[listing.type]}</span>
               <span className="rounded-full bg-card/80 px-2 py-1 text-[11px] font-medium text-ink">{ESTADO_ANUNCIO_LABEL[listing.estadoAnuncio]}</span>
+              {listing.anoConstrucao ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gold/90 px-2 py-1 text-[11px] font-semibold text-sidebar backdrop-blur-sm">
+                  <CalendarClock size={11} /> {listing.anoConstrucao}
+                </span>
+              ) : null}
             </div>
             <h1 className="mt-3 font-display text-3xl font-bold text-white sm:text-4xl lg:text-5xl">{listing.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/80">
@@ -238,6 +244,30 @@ function MetricCard({ label, value, tone, highlighted, hint }: { label: string; 
       </p>
       <p className={cn("mt-1 num text-base font-bold", color)}>{value}</p>
       {hint && <p className="mt-0.5 text-[11px] font-medium text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * Grelha "Dados do imóvel" partilhada pelos 3 tipos de anúncio. O ano de
+ * construção é um dado de destaque — vem à frente, a dourado e com a idade.
+ */
+function DadosImovelGrid({ listing }: { listing: L }) {
+  const itens: { label: string; value: string; tone?: "gold"; hint?: string }[] = [];
+  if (listing.anoConstrucao) {
+    const idade = Math.max(0, new Date().getFullYear() - listing.anoConstrucao);
+    itens.push({ label: "Ano de construção", value: String(listing.anoConstrucao), tone: "gold", hint: `${idade} ${idade === 1 ? "ano" : "anos"}` });
+  }
+  if (listing.tipoImovel) itens.push({ label: "Tipo de imóvel", value: TIPO_IMOVEL_LABEL[listing.tipoImovel], tone: "gold" });
+  itens.push({ label: "Tipologia", value: listing.tipologia });
+  itens.push({ label: "Área útil", value: `${listing.areaUtil} m²` });
+  itens.push({ label: "Estado", value: listing.estado });
+  const cols = itens.length >= 5 ? "sm:grid-cols-5" : itens.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3";
+  return (
+    <div className={cn("grid grid-cols-2 gap-3", cols)}>
+      {itens.map((it) => (
+        <MetricCard key={it.label} label={it.label} value={it.value} tone={it.tone} hint={it.hint} />
+      ))}
     </div>
   );
 }
@@ -449,14 +479,7 @@ function CorpoReab({ listing }: { listing: L }) {
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
-          {listing.tipoImovel && (
-            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
-          )}
-          <MetricCard label="Tipologia" value={listing.tipologia} />
-          <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
-          <MetricCard label="Estado" value={listing.estado} />
-        </div>
+        <DadosImovelGrid listing={listing} />
       </Secao>
 
       {/* ─────── BLOCO 1 — Composição do investimento (rentabilidade do PROJETO) ─────── */}
@@ -615,14 +638,7 @@ function CorpoCedencia({ listing, author }: { listing: L; author?: { isVerified:
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
-          {listing.tipoImovel && (
-            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
-          )}
-          <MetricCard label="Tipologia" value={listing.tipologia} />
-          <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
-          <MetricCard label="Estado" value={listing.estado} />
-        </div>
+        <DadosImovelGrid listing={listing} />
         {listing.tipoCedencia && (
           <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-gold/15 px-3 py-1.5 text-sm font-semibold text-gold-dark">
             {TIPO_CEDENCIA_LABEL[listing.tipoCedencia]}
@@ -783,14 +799,7 @@ function CorpoArrendamento({ listing }: { listing: L }) {
   return (
     <>
       <Secao title="Dados do imóvel">
-        <div className={cn("grid gap-3", listing.tipoImovel ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
-          {listing.tipoImovel && (
-            <MetricCard label="Tipo de imóvel" value={TIPO_IMOVEL_LABEL[listing.tipoImovel]} tone="gold" />
-          )}
-          <MetricCard label="Tipologia" value={listing.tipologia} />
-          <MetricCard label="Área útil" value={`${listing.areaUtil} m²`} />
-          <MetricCard label="Estado" value={listing.estado} />
-        </div>
+        <DadosImovelGrid listing={listing} />
       </Secao>
 
       <Card>

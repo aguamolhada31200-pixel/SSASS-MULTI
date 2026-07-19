@@ -40,6 +40,7 @@ export interface Listing {
   exactAddress: string;
   tipologia: Tipologia;
   tipoImovel?: TipoImovel;
+  anoConstrucao?: number;
   areaUtil: number;
   estado: EstadoImovel;
   coverImageUrl: string;
@@ -170,6 +171,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua de Cedofeita 212, 2.º",
     tipoImovel: "apartamento",
     tipologia: "T3",
+    anoConstrucao: 1955,
     areaUtil: 95,
     estado: "a recuperar",
     coverImageUrl: IMG("1502672260266-1c1ef2d93688"),
@@ -213,6 +215,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua Pascoal de Melo 44, 3.º Esq.",
     tipoImovel: "apartamento",
     tipologia: "T2",
+    anoConstrucao: 1968,
     areaUtil: 70,
     estado: "bom",
     coverImageUrl: IMG("1522708323590-d24dbb6b0267"),
@@ -253,6 +256,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua do Açúcar 28, 1.º",
     tipoImovel: "apartamento",
     tipologia: "T1",
+    anoConstrucao: 1978,
     areaUtil: 52,
     estado: "bom",
     coverImageUrl: IMG("1484154218962-a197022b5858"),
@@ -294,6 +298,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua de Cedofeita 198, 1.º",
     tipoImovel: "apartamento",
     tipologia: "T3",
+    anoConstrucao: 1948,
     areaUtil: 110,
     estado: "a recuperar",
     coverImageUrl: IMG("1502672260266-1c1ef2d93688"),
@@ -334,6 +339,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua Cândido dos Reis 56, R/C",
     tipoImovel: "loja",
     tipologia: "T1",
+    anoConstrucao: 1985,
     areaUtil: 80,
     estado: "a recuperar",
     coverImageUrl: IMG("1505691938895-1758d7feb511"),
@@ -375,6 +381,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua de Belém 142, 2.º",
     tipoImovel: "apartamento",
     tipologia: "T2",
+    anoConstrucao: 1960,
     areaUtil: 88,
     estado: "a recuperar",
     coverImageUrl: IMG("1493809842364-78817add7ffb"),
@@ -415,6 +422,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Av. da Boavista 1284, 5.º",
     tipoImovel: "apartamento",
     tipologia: "T4",
+    anoConstrucao: 1992,
     areaUtil: 165,
     estado: "a recuperar",
     coverImageUrl: IMG("1556909114-f6e7ad7d3136"),
@@ -456,6 +464,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua do Areeiro 38, 3.º",
     tipoImovel: "apartamento",
     tipologia: "T3",
+    anoConstrucao: 1965,
     areaUtil: 105,
     estado: "a recuperar",
     coverImageUrl: IMG("1556909211-36987daf7b4d"),
@@ -498,6 +507,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua Direita 88, 2.º",
     tipoImovel: "apartamento",
     tipologia: "T1",
+    anoConstrucao: 1950,
     areaUtil: 48,
     estado: "a recuperar",
     coverImageUrl: IMG("1512917774080-9991f1c4c750"),
@@ -539,6 +549,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     city: "Lisboa",
     exactAddress: "Av. Almirante Reis 120, 4.º Dto.",
     tipologia: "T2",
+    anoConstrucao: 1967,
     areaUtil: 78,
     estado: "renovado",
     coverImageUrl: IMG("1493809842364-78817add7ffb"),
@@ -572,6 +583,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua de Coimbra 18",
     tipoImovel: "predio",
     tipologia: "T4",
+    anoConstrucao: 1938,
     areaUtil: 140,
     estado: "a recuperar",
     coverImageUrl: IMG("1564013799919-ab600027ffc6"),
@@ -613,6 +625,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     city: "Porto",
     exactAddress: "Rua de Camões 60, 1.º",
     tipologia: "T0",
+    anoConstrucao: 1954,
     areaUtil: 38,
     estado: "renovado",
     coverImageUrl: IMG("1502005229762-cf1b2da7c5d6"),
@@ -646,6 +659,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     exactAddress: "Rua do Souto 91, 2.º",
     tipoImovel: "apartamento",
     tipologia: "T2",
+    anoConstrucao: 1975,
     areaUtil: 65,
     estado: "a recuperar",
     coverImageUrl: IMG("1512917774080-9991f1c4c750"),
@@ -688,6 +702,7 @@ const RAW_SEED: Array<Omit<Listing, "galleryUrls"> & { galleryUrls: string[] }> 
     city: "Lisboa",
     exactAddress: "Rua Ferreira Borges 55, 2.º Esq.",
     tipologia: "T2",
+    anoConstrucao: 1946,
     areaUtil: 72,
     estado: "renovado",
     coverImageUrl: IMG("1484154218962-a197022b5858"),
@@ -768,7 +783,7 @@ export const useListingsStore = create<ListingsState>()(
     }),
     {
       name: "redegest-listings",
-      version: 11,
+      version: 12,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { listings?: Listing[] } | undefined;
         if (state?.listings && version < 5) {
@@ -778,12 +793,13 @@ export const useListingsStore = create<ListingsState>()(
             galleryUrls: normalizeListingPhotos(l.galleryUrls as unknown),
           }));
         }
-        if (state?.listings && version < 11) {
+        if (state?.listings && version < 12) {
           // v6: cedência com/sem obras. v7: anúncio do utilizador (vista autor).
           // v8: reabilitação — valorMercadoAtual/PosObras, impostos consolidados, prazoObras.
           // v9: tipo de imóvel nas cedências que faltavam (Belém, Boavista, Areeiro, Aveiro).
           // v10: términos de CPCV dinâmicos (4/9/12 dias) — faixa "Fecham em breve".
           // v11: 6 anúncios com createdAt recente — linha "novas esta semana".
+          // v12: ano de construção em todos os seeds.
           // Refresca os seeds mantendo anúncios criados pelo utilizador.
           const seedIds = new Set(SEED.map((l) => l.id));
           const userListings = state.listings.filter((l) => !seedIds.has(l.id));

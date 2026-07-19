@@ -61,6 +61,7 @@ const schema = z
     // `.or(z.literal(""))`: a opção "— Selecionar —" do <select> envia "" e
     // z.enum().optional() só aceita undefined — sem isto o form bloqueava sem erro visível.
     tipoImovel: z.enum(["apartamento", "moradia", "predio", "quinta", "loja", "casa", "casa_ferias"]).or(z.literal("")).optional(),
+    anoConstrucao: z.coerce.number().min(0).max(new Date().getFullYear() + 5).optional(),
     areaUtil: z.coerce.number().optional(),
     estado: z.enum(["a recuperar", "bom", "renovado", "novo"]),
     galleryUrls: z.array(z.object({ url: z.string(), legenda: z.string().optional() })).default([]),
@@ -207,6 +208,7 @@ export function PublishListingModal() {
   const gallery = watch("galleryUrls") ?? [];
   const floorPlan = watch("floorPlanUrl");
   const distrito = watch("district");
+  const anoConstrucao = watch("anoConstrucao");
 
   // watch() sem argumentos subscreve todas as mudanças — valores sempre live no resumo.
   const valoresLive = watch();
@@ -225,6 +227,7 @@ export function PublishListingModal() {
       exactAddress: values.exactAddress,
       tipologia: values.tipologia as Tipologia,
       tipoImovel: values.tipoImovel || undefined,
+      anoConstrucao: values.anoConstrucao || undefined,
       areaUtil: values.areaUtil,
       estado: values.estado as EstadoImovel,
       coverImageUrl,
@@ -436,6 +439,20 @@ export function PublishListingModal() {
                         <option key={k} value={k}>{TIPO_IMOVEL_LABEL[k]}</option>
                       ))}
                     </select>
+                  </Field>
+                  <Field label="Ano de construção" error={errors.anoConstrucao?.message}>
+                    <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Ex.: 1998"
+                        {...register("anoConstrucao")}
+                        className="h-10 w-full bg-transparent px-3 text-sm outline-none"
+                      />
+                      <span className="whitespace-nowrap px-3 text-xs text-muted">
+                        {Number(anoConstrucao) > 1500 ? `${Math.max(0, new Date().getFullYear() - Number(anoConstrucao))} anos` : "opcional"}
+                      </span>
+                    </div>
                   </Field>
                   <Field label="Tipologia">
                     <select {...register("tipologia")} className={inputCls}>
@@ -1120,7 +1137,7 @@ function PreviewCard({ v }: { v: FormValues }) {
       </div>
       <div className="p-4">
         <h3 className="font-display text-base font-semibold text-ink">{v.title || "Título do anúncio"}</h3>
-        <p className="text-xs text-muted">{v.city || "Cidade"} · {v.tipoImovel ? TIPO_IMOVEL_LABEL[v.tipoImovel as TipoImovel] + " · " : ""}{v.tipologia} · {Number(v.areaUtil) || 0} m² · {v.estado}</p>
+        <p className="text-xs text-muted">{v.city || "Cidade"} · {v.tipoImovel ? TIPO_IMOVEL_LABEL[v.tipoImovel as TipoImovel] + " · " : ""}{v.tipologia} · {Number(v.areaUtil) || 0} m² · {v.estado}{Number(v.anoConstrucao) > 1500 ? ` · ${v.anoConstrucao}` : ""}</p>
       </div>
     </div>
   );
@@ -1160,6 +1177,7 @@ function SummaryStep({ v }: { v: FormValues }) {
         <SummaryRow k="Concelho" v={v.city || "—"} />
         {v.exactAddress && <SummaryRow k="Morada exata (privada)" v={v.exactAddress} />}
         {v.tipoImovel && <SummaryRow k="Tipo de imóvel" v={TIPO_IMOVEL_LABEL[v.tipoImovel as TipoImovel]} />}
+        {Number(v.anoConstrucao) > 1500 && <SummaryRow k="Ano de construção" v={String(v.anoConstrucao)} />}
         <SummaryRow k="Tipologia" v={v.tipologia} />
         {(Number(v.areaUtil) || 0) > 0 && <SummaryRow k="Área útil" v={`${Number(v.areaUtil)} m²`} />}
         <SummaryRow k="Estado" v={v.estado} />

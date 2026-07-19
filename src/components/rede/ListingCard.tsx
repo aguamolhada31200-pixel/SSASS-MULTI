@@ -109,7 +109,7 @@ export function ListingCard({ listing }: { listing: Listing }) {
 
         <div className="absolute inset-x-0 bottom-0 px-4 pb-3">
           <p className="flex items-center gap-1 text-[12px] font-medium text-white/90 drop-shadow">
-            <MapPin size={12} /> {listing.city} · {listing.tipologia} · {listing.areaUtil} m²
+            <MapPin size={12} /> {listing.city} · {listing.tipologia} · {listing.areaUtil} m²{listing.anoConstrucao ? ` · ${listing.anoConstrucao}` : ""}
           </p>
         </div>
       </div>
