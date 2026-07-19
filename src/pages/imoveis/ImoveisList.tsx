@@ -140,7 +140,7 @@ export default function ImoveisList() {
                     </div>
                     {!photo && <Building2 className="absolute bottom-3 left-3 h-7 w-7 text-white/40" />}
                     <span className="absolute bottom-3 right-3 rounded-md bg-black/30 px-2 py-0.5 text-[11px] text-white/90">
-                      {PROP_TYPE_LABEL[p.type]}
+                      {PROP_TYPE_LABEL[p.type]}{p.anoConstrucao ? ` · ${p.anoConstrucao}` : ""}
                     </span>
                   </div>
                   <div className="p-4">

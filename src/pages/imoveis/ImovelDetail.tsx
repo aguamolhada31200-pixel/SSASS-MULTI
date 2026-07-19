@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Building2, Pencil, Trash2, ArrowLeft, TriangleAlert, Clock, Plus, Hammer, KeyRound } from "lucide-react";
+import { Building2, Pencil, Trash2, ArrowLeft, TriangleAlert, Clock, Plus, Hammer, KeyRound, CalendarClock } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -116,6 +116,11 @@ export default function ImovelDetail() {
             <Badge tone={property.status === "ocupado" ? "success" : property.status === "em_obras" ? "info" : "warning"}>
               {STATUS_LABEL[property.status]}
             </Badge>
+            {property.anoConstrucao ? (
+              <Badge tone="gold">
+                <CalendarClock size={11} /> {property.anoConstrucao}
+              </Badge>
+            ) : null}
             {property.areaUtil ? <Badge tone="neutral">{property.areaUtil} m²</Badge> : null}
             {property.numQuartos ? <Badge tone="neutral">{property.numQuartos} quartos</Badge> : null}
             {property.classeEnergetica ? (
@@ -259,15 +264,24 @@ function VisaoGeral({
       </div>
 
       {/* Descrição + caracterização física + nota privada */}
-      {(property.descricao || property.notaPrivada || property.areaUtil || property.numDivisoes || property.numQuartos || property.numCasasBanho || property.classeEnergetica) && (
+      {(property.descricao || property.notaPrivada || property.anoConstrucao || property.areaUtil || property.numDivisoes || property.numQuartos || property.numCasasBanho || property.classeEnergetica) && (
         <Card>
           <CardContent>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-display text-base font-semibold text-ink">Descrição do imóvel</h3>
               <button onClick={onEdit} className="text-sm text-secondary hover:underline">Editar →</button>
             </div>
-            {(property.areaUtil || property.numDivisoes || property.numQuartos || property.numCasasBanho || property.classeEnergetica) && (
-              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {(property.anoConstrucao || property.areaUtil || property.numDivisoes || property.numQuartos || property.numCasasBanho || property.classeEnergetica) && (
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-6">
+                {/* Ano de construção primeiro — dado de maior importância */}
+                {property.anoConstrucao ? (
+                  <MiniStat
+                    label="Ano de construção"
+                    value={String(property.anoConstrucao)}
+                    hint={`${Math.max(0, new Date().getFullYear() - property.anoConstrucao)} anos`}
+                    tone="pos"
+                  />
+                ) : null}
                 {property.areaUtil ? <MiniStat label="Área útil" value={`${property.areaUtil} m²`} /> : null}
                 {property.numDivisoes ? <MiniStat label="Divisões" value={String(property.numDivisoes)} /> : null}
                 {property.numQuartos ? <MiniStat label="Quartos" value={String(property.numQuartos)} /> : null}
@@ -395,12 +409,13 @@ function Kpi({ label, value, tone }: { label: string; value: string; tone?: "pos
 }
 
 /** Célula compacta para caracterização física (área, quartos, WCs…). */
-function MiniStat({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) {
+function MiniStat({ label, value, tone, hint }: { label: string; value: string; tone?: "pos" | "neg"; hint?: string }) {
   const color = tone === "pos" ? "text-success" : tone === "neg" ? "text-danger" : "text-ink";
   return (
     <div className="rounded-lg border border-line bg-card p-2.5 text-center">
       <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
       <p className={cn("num mt-0.5 text-sm font-bold", color)}>{value}</p>
+      {hint && <p className="num text-[10px] text-muted">{hint}</p>}
     </div>
   );
 }

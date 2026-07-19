@@ -104,6 +104,7 @@ export interface Property {
   pais?: string;
   // A.3 Descrição física (todos opcionais)
   tipoImovel?: TipoImovel;
+  anoConstrucao?: number; // ano em que o imóvel foi construído
   areaUtil?: number; // m²
   numDivisoes?: number;
   numQuartos?: number;
@@ -174,6 +175,7 @@ const SEED: Property[] = [
     address: "Rua de Arroios 112",
     city: "Lisboa",
     type: "tradicional",
+    anoConstrucao: 1998,
     dataCompra: "2022-04-12",
     valorCompra: 245000,
     entrada: 73500,
@@ -207,6 +209,7 @@ const SEED: Property[] = [
     address: "Rua das Flores 58",
     city: "Porto",
     type: "al",
+    anoConstrucao: 1948,
     dataCompra: "2023-02-20",
     valorCompra: 130000,
     entrada: 40000,
@@ -234,6 +237,7 @@ const SEED: Property[] = [
     address: "Rua Lourenço de Almeida 33",
     city: "Coimbra",
     type: "tradicional",
+    anoConstrucao: 1985,
     dataCompra: "2026-04-15",
     valorCompra: 210000,
     entrada: 60000,
@@ -261,6 +265,7 @@ const SEED: Property[] = [
     address: "Rua da Escola Politécnica 20, 2.º Esq.",
     city: "Lisboa",
     type: "tradicional",
+    anoConstrucao: 1935,
     dataCompra: "2026-03-05",
     valorCompra: 380000,
     entrada: 114000,
@@ -334,7 +339,7 @@ export const usePropertiesStore = create<PropertiesState>()(
     }),
     {
       name: "redegest-properties",
-      version: 4,
+      version: 5,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as { properties?: Property[] } | undefined;
         if (state?.properties && version < 2) {
@@ -354,6 +359,13 @@ export const usePropertiesStore = create<PropertiesState>()(
           const seedIds = new Set(SEED.map((s) => s.id));
           state.properties = state.properties.map((p) =>
             seedIds.has(p.id) && p.irsPct === 28 ? { ...p, irsPct: 25 } : p
+          );
+        }
+        if (state?.properties && version < 5) {
+          // v5: ano de construção — preencher os seeds a partir do SEED atualizado.
+          const anos = new Map(SEED.map((s) => [s.id, s.anoConstrucao] as const));
+          state.properties = state.properties.map((p) =>
+            p.anoConstrucao == null && anos.get(p.id) != null ? { ...p, anoConstrucao: anos.get(p.id) } : p
           );
         }
         return state as PropertiesState;

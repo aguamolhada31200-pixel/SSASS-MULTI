@@ -60,7 +60,9 @@ const schema = z.object({
   distrito: z.string().optional().default(""),
   pais: z.string().optional().default("Portugal"),
   // A.3 Descrição física — todos opcionais
-  tipoImovel: z.enum(["apartamento", "moradia", "predio", "quinta", "loja", "casa", "casa_ferias"]).optional(),
+  // O <select> usa value="" para "— Selecionar —"; tratamos "" como não-preenchido.
+  tipoImovel: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["apartamento", "moradia", "predio", "quinta", "loja", "casa", "casa_ferias"]).optional()),
+  anoConstrucao: z.coerce.number().min(0).max(new Date().getFullYear() + 5).optional(),
   areaUtil: z.coerce.number().min(0).optional(),
   numDivisoes: z.coerce.number().min(0).optional(),
   numQuartos: z.coerce.number().min(0).optional(),
@@ -72,7 +74,7 @@ const schema = z.object({
   rendaMensal: z.coerce.number().min(0),
   dataInicioArrendamento: z.string().optional(),
   caucao: z.coerce.number().min(0).optional(),
-  tipoRendaProposto: z.enum(["arrendamento", "al", "estudantes", "curta_duracao"]).optional(),
+  tipoRendaProposto: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["arrendamento", "al", "estudantes", "curta_duracao"]).optional()),
   frequenciaPagamento: z.enum(["mensal", "trimestral", "semestral", "anual"]).optional(),
   estadiaMinimaMeses: z.coerce.number().min(0).optional(),
   estadiaMaximaMeses: z.coerce.number().min(0).optional(),
@@ -108,6 +110,7 @@ const EMPTY: FormValues = {
   distrito: "",
   pais: "Portugal",
   tipoImovel: undefined,
+  anoConstrucao: undefined,
   areaUtil: undefined,
   numDivisoes: undefined,
   numQuartos: undefined,
@@ -235,6 +238,7 @@ export function PropertyFormModal() {
   const photos = watch("photos") ?? [];
   const irsPct = watch("irsPct");
   const classeEnergetica = watch("classeEnergetica");
+  const anoConstrucao = watch("anoConstrucao");
   const tipoRendaProposto = watch("tipoRendaProposto");
 
   const next = async () => {
@@ -467,6 +471,21 @@ export function PropertyFormModal() {
                       <option key={k} value={k}>{TIPO_IMOVEL_LABEL[k]}</option>
                     ))}
                   </select>
+                </Field>
+                {/* Ano de construção — dado importante, em destaque no topo da caracterização */}
+                <Field label="Ano de construção" error={errors.anoConstrucao?.message} className="sm:col-span-2">
+                  <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="Ex.: 1998"
+                      {...register("anoConstrucao")}
+                      className="h-10 w-full bg-transparent px-3 text-sm outline-none"
+                    />
+                    <span className="px-3 text-xs text-muted">
+                      {anoConstrucao && Number(anoConstrucao) > 1500 ? `${Math.max(0, new Date().getFullYear() - Number(anoConstrucao))} anos` : "opcional"}
+                    </span>
+                  </div>
                 </Field>
                 <Num label="Área útil (m² · opcional)" reg={register("areaUtil")} suffix="m²" />
                 <Num label="Nº de divisões (opcional)" reg={register("numDivisoes")} suffix="" />
