@@ -42,6 +42,7 @@ import {
 import { useProfilesStore, CURRENT_USER_ID, type Profile } from "@/store/useProfilesStore";
 import { useSavedStore } from "@/store/useSavedStore";
 import { useInterestsStore } from "@/store/useInterestsStore";
+import { useConversationsStore } from "@/store/useConversationsStore";
 import { useAlertsStore, alertaMatch, ALERT_CAPITAL_LABEL, type Alerta, type AlertCriterios, type AlertCapital } from "@/store/useAlertsStore";
 import { capitalDoAnuncio, roiDoAnuncio, yieldDoAnuncio, retornoEntradaCedencia } from "@/lib/calc/rede";
 import { eur, pct } from "@/lib/format";
@@ -110,6 +111,7 @@ export default function RedeInvestidores() {
   const interests = useInterestsStore((s) => s.interests);
   const alertas = useAlertsStore((s) => s.alertas);
   const openListingForm = useModalStore((s) => s.openListingForm);
+  const mensagensNaoLidas = useConversationsStore((s) => s.unreadCount());
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
 
@@ -355,9 +357,19 @@ export default function RedeInvestidores() {
               { name: "O meu perfil", icon: CircleUserRound, onClick: () => navigate("/comunidade/rede/meu-perfil") },
             ]}
           />
-          <Button onClick={() => openListingForm()}>
-            <Plus size={15} /> Publicar anúncio
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="relative" onClick={() => navigate("/mensagens")}>
+              <MessageCircle size={15} /> Mensagens
+              {mensagensNaoLidas > 0 && (
+                <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-bold text-white">
+                  {mensagensNaoLidas}
+                </span>
+              )}
+            </Button>
+            <Button onClick={() => openListingForm()}>
+              <Plus size={15} /> Publicar anúncio
+            </Button>
+          </div>
         </div>
 
         {tab === "anuncios" && (
