@@ -14,8 +14,6 @@ import {
   Hourglass,
   MessageCircle,
   Handshake,
-  ChevronLeft,
-  ChevronRight,
   Bell,
   BellPlus,
   Pause,
@@ -293,38 +291,7 @@ export default function RedeInvestidores() {
     ...(retEntradaMin > 0 ? [{ label: `Ret. entrada ≥ ${retEntradaMin}%`, clear: () => setRetEntradaMin(0) }] : []),
   ];
 
-  // "Para o seu capital" — banda inferida do filtro ou dos guardados/interesses.
-  const bandaCapital = useMemo<CapitalFiltro | null>(() => {
-    if (capital !== "todos") return capital;
-    const sinais = baseListings.filter(
-      (l) => savedIds.includes(l.id) || interests.some((i) => i.userId === CURRENT_USER_ID && i.listingId === l.id)
-    );
-    if (sinais.length === 0) return null;
-    const media = sinais.reduce((s, l) => s + capitalDoAnuncio(l), 0) / sinais.length;
-    return bandFromValue(media);
-  }, [capital, baseListings, savedIds, interests]);
-
-  const paraOSeuCapital = useMemo(() => {
-    if (!bandaCapital || bandaCapital === "todos") return [];
-    const test = CAPITAL_PILLS.find((c) => c.key === bandaCapital)!.test;
-    return ativos.filter((l) => test(capitalDoAnuncio(l))).slice(0, 8);
-  }, [ativos, bandaCapital]);
-
   const directoryProfiles = profiles.filter((p) => p.id !== CURRENT_USER_ID);
-  const anunciosPorAutor = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const l of ativos) m.set(l.authorId, (m.get(l.authorId) ?? 0) + 1);
-    return m;
-  }, [ativos]);
-  const investidoresAtivos = useMemo(
-    () =>
-      directoryProfiles
-        .filter((p) => p.isVerified && (anunciosPorAutor.get(p.id) ?? 0) > 0)
-        .sort((a, b) => (anunciosPorAutor.get(b.id) ?? 0) - (anunciosPorAutor.get(a.id) ?? 0) || b.rating - a.rating)
-        .slice(0, 8),
-    [directoryProfiles, anunciosPorAutor]
-  );
-
   const meusAlertas = alertas.filter((a) => a.userId === CURRENT_USER_ID);
   const utilizadorNovo = savedIds.length === 0 && !interests.some((i) => i.userId === CURRENT_USER_ID);
 
@@ -338,24 +305,24 @@ export default function RedeInvestidores() {
 
   return (
     <div className="-mx-4 -my-6 sm:-mx-6 lg:-mx-8">
-      {/* ───────── HERO comprimido ───────── */}
-      <div className="relative overflow-hidden bg-[#2E1A0E] px-4 py-8 text-sidebar-text sm:px-6">
+      {/* ───────── HERO compacto (design antigo — gradiente madeira + glass) ───────── */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#2E1A0E] via-[#5C3D2E] to-[#3a2417] px-4 pb-14 pt-8 text-sidebar-text sm:px-10">
         <div className="azulejo absolute inset-0 opacity-[0.06]" />
         <div className="relative mx-auto max-w-[1280px]">
-          <h1 className="text-[28px] font-semibold leading-tight text-[#F5ECD7]">Capital encontra negócio.</h1>
-          <p className="mt-1.5 text-[13px] text-[#E8D5A4]">
-            <span className="num">{ativos.length}</span> oportunidades ativas · <span className="num">{capitalCurto(capitalAtivo)}</span> em capital procurado
+          <h1 className="text-[26px] font-semibold leading-tight text-[#F5ECD7]">Capital encontra negócio.</h1>
+          <p className="mt-1 text-[13px] font-normal text-gold-soft">
+            <span className="num">{ativos.length}</span> {ativos.length === 1 ? "oportunidade ativa" : "oportunidades ativas"} · <span className="num">{capitalCurto(capitalAtivo)}</span> em capital procurado
             {novasSemana > 0 && <> · <span className="num">{novasSemana}</span> novas esta semana</>}
           </p>
 
-          <div className="mt-4 flex max-w-xl gap-2">
-            <div className="flex flex-1 items-center gap-2 rounded-md border border-white/15 bg-white/95 px-3">
+          <div className="glass mt-4 flex max-w-2xl flex-col gap-2 rounded-xl border border-white/15 p-1.5 sm:flex-row sm:items-center">
+            <div className="flex flex-1 items-center gap-2 px-3">
               <Search size={16} className="text-muted" />
               <input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 placeholder="Cidade, distrito ou tipo de negócio"
-                className="h-10 w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+                className="h-9 w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted"
               />
               {busca && (
                 <button onClick={() => setBusca("")} className="text-muted hover:text-ink">
@@ -363,7 +330,7 @@ export default function RedeInvestidores() {
                 </button>
               )}
             </div>
-            <Button variant="gold" onClick={() => { setTab("anuncios"); irParaGrelha(); }}>
+            <Button variant="gold" size="sm" className="sm:w-auto" onClick={() => { setTab("anuncios"); irParaGrelha(); }}>
               Procurar
             </Button>
           </div>
@@ -424,6 +391,16 @@ export default function RedeInvestidores() {
                   <option key={o} value={o}>{ORDENAR_LABEL[o]}</option>
                 ))}
               </select>
+              <button
+                onClick={() => setAlertaModal(meusAlertas.length > 0 ? "lista" : "criar")}
+                className={cn(
+                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-sm",
+                  meusAlertas.length > 0 ? "border-gold/40 bg-gold/10 text-gold-dark" : "border-line bg-card text-muted hover:bg-accent"
+                )}
+                title="Alertas de oportunidade"
+              >
+                <Bell size={14} /> Alertas{meusAlertas.length > 0 ? ` · ${meusAlertas.length}` : ""}
+              </button>
             </div>
 
             {/* Contexto de resultados + chips */}
@@ -453,17 +430,22 @@ export default function RedeInvestidores() {
                 Ative o toggle «Dados de exemplo» (no topo da app) para explorar a Rede, ou publique o primeiro anúncio.
               </p>
             ) : (
-              <div className="mt-14 space-y-14">
-                {/* Fecham em breve */}
+              <div className="mt-6 space-y-10">
+                {/* Fecham em breve — grelha (design antigo) */}
                 {descoberta && fechamEmBreve.length > 0 && (
                   <section>
-                    <SectionHeader title="Fecham em breve" acao={{ label: "ver todos →", onClick: () => { setOrdenar("fechar"); irParaGrelha(); } }} />
-                    <Faixa>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">Fecham em breve</h2>
+                      <button onClick={() => { setOrdenar("fechar"); irParaGrelha(); }} className="text-xs font-medium text-secondary hover:underline">
+                        ver todos →
+                      </button>
+                    </div>
+                    <div className="flex gap-5 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3">
                       {fechamEmBreve.map(({ l, dias, nInt }) => (
-                        <div key={l.id} className="relative w-[300px] shrink-0 snap-start">
-                          <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning">
+                        <div key={l.id} className="relative w-[280px] shrink-0 sm:w-auto">
+                          <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning shadow-sm">
                             {dias !== null && dias >= 0 && dias < 30 ? (
-                              <>{dias} {dias === 1 ? "dia" : "dias"}</>
+                              <><Hourglass size={11} /> {dias} {dias === 1 ? "dia" : "dias"}</>
                             ) : (
                               `${nInt} interessados`
                             )}
@@ -471,37 +453,22 @@ export default function RedeInvestidores() {
                           <ListingCard listing={l} />
                         </div>
                       ))}
-                    </Faixa>
+                    </div>
                   </section>
                 )}
 
-                {/* Para o seu capital */}
-                {descoberta && paraOSeuCapital.length > 0 && bandaCapital && (
-                  <section>
-                    <SectionHeader
-                      title={`Para o seu capital · ${ALERT_CAPITAL_LABEL[bandaCapital]}`}
-                      acao={{ label: "ajustar →", onClick: () => setDrawerOpen(true) }}
-                    />
-                    <Faixa>
-                      {paraOSeuCapital.map((l) => (
-                        <div key={l.id} className="w-[300px] shrink-0 snap-start">
-                          <ListingCard listing={l} />
-                        </div>
-                      ))}
-                    </Faixa>
-                  </section>
-                )}
-
-                {/* Todas as oportunidades */}
+                {/* Todas as oportunidades — grelha simples */}
                 <section ref={gridRef}>
-                  {descoberta && <SectionHeader title="Todas as oportunidades" />}
+                  {descoberta && fechamEmBreve.length > 0 && (
+                    <h2 className="mb-4 text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">Todas as oportunidades</h2>
+                  )}
                   {filtered.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-line bg-card/50 px-6 py-16 text-center">
+                    <div className="rounded-2xl border border-dashed border-line bg-card/50 px-6 py-16 text-center">
                       <Search size={20} className="mx-auto text-muted" />
                       <p className="mt-3 text-sm text-ink">Nenhuma oportunidade com estes critérios.</p>
                       <div className="mt-4 flex items-center justify-center gap-2">
                         <Button variant="outline" size="sm" onClick={resetFiltros}>Limpar filtros</Button>
-                        <Button size="sm" onClick={() => setAlertaModal("criar")}>Criar alerta para estes critérios</Button>
+                        <Button size="sm" onClick={() => setAlertaModal("criar")}><BellPlus size={15} /> Criar alerta para estes critérios</Button>
                       </div>
                     </div>
                   ) : (
@@ -512,7 +479,7 @@ export default function RedeInvestidores() {
                         ))}
                       </div>
                       {filtered.length > visiveis && (
-                        <div className="mt-12 flex justify-center">
+                        <div className="mt-6 flex justify-center">
                           <Button variant="outline" onClick={() => setVisiveis((v) => v + 9)}>
                             Carregar mais ({filtered.length - visiveis})
                           </Button>
@@ -521,36 +488,6 @@ export default function RedeInvestidores() {
                     </>
                   )}
                 </section>
-
-                {/* Investidores ativos */}
-                {descoberta && investidoresAtivos.length > 0 && (
-                  <section>
-                    <SectionHeader title="Investidores ativos" acao={{ label: "ver todos →", onClick: () => setTab("investidores") }} />
-                    <Faixa>
-                      {investidoresAtivos.map((p) => (
-                        <InvestidorMini key={p.id} profile={p} anuncios={anunciosPorAutor.get(p.id) ?? 0} />
-                      ))}
-                    </Faixa>
-                  </section>
-                )}
-
-                {/* Alertas de oportunidade */}
-                {descoberta && (
-                  <section>
-                    <div className="rounded-lg bg-accent px-6 py-8 text-center">
-                      <p className="text-lg font-semibold text-ink">Ainda não encontrou o negócio certo?</p>
-                      <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-                        Guarde os seus critérios e avisamos quando aparecer uma oportunidade que encaixa.
-                      </p>
-                      <div className="mt-4 flex items-center justify-center gap-4">
-                        <Button onClick={() => setAlertaModal("criar")}><BellPlus size={16} /> Criar alerta</Button>
-                        <button onClick={() => setAlertaModal("lista")} className="text-sm font-medium text-primary hover:text-secondary">
-                          Os meus alertas ({meusAlertas.length})
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-                )}
 
                 {/* Como funciona — só utilizador novo */}
                 {descoberta && utilizadorNovo && (
@@ -704,52 +641,6 @@ export default function RedeInvestidores() {
 
 // ───────────────────────── Peças de layout ─────────────────────────
 
-function SectionHeader({ title, acao }: { title: string; acao?: { label: string; onClick: () => void } }) {
-  return (
-    <div className="mb-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-muted">{title}</h2>
-        {acao && (
-          <button onClick={acao.onClick} className="shrink-0 text-[13px] text-primary transition-colors hover:text-secondary">
-            {acao.label}
-          </button>
-        )}
-      </div>
-      <div className="mt-2 border-b border-line" />
-    </div>
-  );
-}
-
-/** Faixa horizontal com scroll suave, snap e setas discretas (só desktop, no hover). */
-function Faixa({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const scroll = (dir: number) => ref.current?.scrollBy({ left: dir * 320, behavior: "smooth" });
-  return (
-    <div className="group relative">
-      <div
-        ref={ref}
-        className="flex snap-x gap-5 overflow-x-auto scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {children}
-      </div>
-      <button
-        onClick={() => scroll(-1)}
-        className="absolute -left-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-line bg-card text-muted opacity-0 shadow-sm transition-opacity hover:text-ink group-hover:opacity-100 lg:flex"
-        aria-label="Anterior"
-      >
-        <ChevronLeft size={18} />
-      </button>
-      <button
-        onClick={() => scroll(1)}
-        className="absolute -right-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-line bg-card text-muted opacity-0 shadow-sm transition-opacity hover:text-ink group-hover:opacity-100 lg:flex"
-        aria-label="Seguinte"
-      >
-        <ChevronRight size={18} />
-      </button>
-    </div>
-  );
-}
-
 function CatPill({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
@@ -761,32 +652,6 @@ function CatPill({ ativo, onClick, children }: { ativo: boolean; onClick: () => 
     >
       {children}
     </button>
-  );
-}
-
-function InvestidorMini({ profile, anuncios }: { profile: Profile; anuncios: number }) {
-  const initials = profile.fullName.split(" ").map((p) => p[0]).join("").slice(0, 2);
-  return (
-    <div className="flex w-[200px] shrink-0 snap-start flex-col items-center rounded-lg border border-line bg-card p-4 text-center">
-      <div className={cn("h-12 w-12 overflow-hidden rounded-full", profile.isVerified && "ring-2 ring-gold ring-offset-1 ring-offset-card")}>
-        {profile.avatarUrl ? (
-          <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-secondary text-sm font-semibold text-white">{initials}</div>
-        )}
-      </div>
-      <p className="mt-2 flex items-center gap-1 text-sm font-semibold text-ink">
-        {profile.fullName}
-        {profile.isVerified && <BadgeCheck size={13} className="text-gold-dark" />}
-      </p>
-      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
-        {profile.projetosConcluidos} projetos{profile.numAvaliacoes > 0 && <> · <Star size={10} className="fill-gold text-gold" /> {profile.rating.toFixed(1)}</>}
-      </p>
-      <p className="text-xs text-muted">{anuncios} {anuncios === 1 ? "anúncio ativo" : "anúncios ativos"}</p>
-      <Link to={`/comunidade/rede/${profile.id}`} className="mt-3 w-full rounded-md border border-line bg-card py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-accent">
-        Ver perfil
-      </Link>
-    </div>
   );
 }
 
