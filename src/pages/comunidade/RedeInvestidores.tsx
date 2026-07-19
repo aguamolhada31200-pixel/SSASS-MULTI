@@ -431,32 +431,6 @@ export default function RedeInvestidores() {
               </p>
             ) : (
               <div className="mt-6 space-y-10">
-                {/* Fecham em breve — grelha (design antigo) */}
-                {descoberta && fechamEmBreve.length > 0 && (
-                  <section>
-                    <div className="mb-4 flex items-center justify-between">
-                      <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">Fecham em breve</h2>
-                      <button onClick={() => { setOrdenar("fechar"); irParaGrelha(); }} className="text-xs font-medium text-secondary hover:underline">
-                        ver todos →
-                      </button>
-                    </div>
-                    <div className="flex gap-5 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3">
-                      {fechamEmBreve.map(({ l, dias, nInt }) => (
-                        <div key={l.id} className="relative w-[280px] shrink-0 sm:w-auto">
-                          <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning shadow-sm">
-                            {dias !== null && dias >= 0 && dias < 30 ? (
-                              <><Hourglass size={11} /> {dias} {dias === 1 ? "dia" : "dias"}</>
-                            ) : (
-                              `${nInt} interessados`
-                            )}
-                          </span>
-                          <ListingCard listing={l} />
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
                 {/* Todas as oportunidades — grelha simples */}
                 <section ref={gridRef}>
                   {descoberta && fechamEmBreve.length > 0 && (
@@ -488,6 +462,32 @@ export default function RedeInvestidores() {
                     </>
                   )}
                 </section>
+
+                {/* Fecham em breve — grelha (design antigo) */}
+                {descoberta && fechamEmBreve.length > 0 && (
+                  <section>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h2 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted">Fecham em breve</h2>
+                      <button onClick={() => { setOrdenar("fechar"); irParaGrelha(); }} className="text-xs font-medium text-secondary hover:underline">
+                        ver todos →
+                      </button>
+                    </div>
+                    <div className="flex gap-5 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3">
+                      {fechamEmBreve.map(({ l, dias, nInt }) => (
+                        <div key={l.id} className="relative w-[280px] shrink-0 sm:w-auto">
+                          <span className="absolute -top-2.5 left-3 z-10 inline-flex items-center gap-1 rounded bg-[#F6E8D3] px-2 py-[3px] text-[11px] font-medium uppercase tracking-[0.04em] text-warning shadow-sm">
+                            {dias !== null && dias >= 0 && dias < 30 ? (
+                              <><Hourglass size={11} /> {dias} {dias === 1 ? "dia" : "dias"}</>
+                            ) : (
+                              `${nInt} interessados`
+                            )}
+                          </span>
+                          <ListingCard listing={l} />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 {/* Como funciona — só utilizador novo */}
                 {descoberta && utilizadorNovo && (
