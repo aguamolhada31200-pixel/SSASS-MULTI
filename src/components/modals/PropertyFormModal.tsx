@@ -8,6 +8,7 @@ import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Trash2, Plus, Hammer } 
 import { Button } from "@/components/ui/Button";
 import { MoneyInput, MoneyBox } from "@/components/ui/MoneyField";
 import { useModalStore } from "@/store/useModalStore";
+import { retomarObraPendente } from "@/components/modals/NewObraModal";
 import {
   usePropertiesStore,
   CLASSE_ENERGETICA,
@@ -195,7 +196,7 @@ const STEP_FIELDS: (keyof FormValues)[][] = [
 const CATEGORIAS = Object.entries(CATEGORIA_LABEL) as [ObraCategoria, string][];
 
 export function PropertyFormModal() {
-  const { propertyForm, closePropertyForm } = useModalStore();
+  const { propertyForm, closePropertyForm, openObraForm } = useModalStore();
   const { open, editingId } = propertyForm;
   const add = usePropertiesStore((s) => s.add);
   const update = usePropertiesStore((s) => s.update);
@@ -317,6 +318,9 @@ export function PropertyFormModal() {
         });
       }
       closePropertyForm();
+      // Retorno ao fluxo: se o utilizador veio da "Nova obra" sem imóveis,
+      // reabre o modal da obra com este imóvel já selecionado.
+      if (retomarObraPendente({ propertyId: id }, () => openObraForm())) return;
       navigate(`/imoveis/${id}`);
     }
   };

@@ -164,8 +164,56 @@ export const ESTADO_PROVA_LABEL: Record<EstadoProva, string> = {
 export interface ConfirmacaoDespesa {
   userId: string;
   valor: "confirma" | "contesta";
+  /** Motivo rápido da contestação (chave de MOTIVOS_CONTESTACAO). */
+  motivo?: string;
   comentario?: string;
   ts: string; // ISO
+}
+
+/** Motivos rápidos de contestação — escolha sem escrever. */
+export const MOTIVOS_CONTESTACAO: Record<string, string> = {
+  valor_nao_corresponde: "O valor não corresponde ao trabalho",
+  fatura_ilegivel: "A fatura está ilegível ou incompleta",
+  fornecedor_desconhecido: "Não reconheço este fornecedor",
+  trabalho_nao_executado: "Este trabalho ainda não foi executado",
+  outro: "Outro",
+};
+
+/** Resposta do gestor a uma contestação. */
+export interface RespostaDespesa {
+  userId: string;
+  texto: string;
+  ts: string; // ISO
+}
+
+// ── Verificação pelos sócios (a prova deixa de ser unilateral) ──
+// Duas dimensões independentes: estadoProva (tem ficheiro) × verificação (aval dos sócios).
+
+export type VerificacaoEstado = "por_verificar" | "confirmada" | "contestada";
+
+export interface Verificacao {
+  estado: VerificacaoEstado;
+  confirmadaPor: ConfirmacaoDespesa[];
+  contestadaPor: ConfirmacaoDespesa[];
+  totalInvestidores: number;
+}
+
+/**
+ * Estado de verificação de uma despesa/pagamento comprovado, derivado das
+ * confirmações dos sócios investidores: contestada > confirmada (todos) > por verificar.
+ */
+export function verificacaoDe(obra: Obra, item: { confirmacoes?: ConfirmacaoDespesa[] }): Verificacao {
+  const inv = membrosDe(obra).filter((m) => m.role === "investidor").map((m) => m.userId);
+  const cs = (item.confirmacoes ?? []).filter((c) => inv.includes(c.userId));
+  const confirmadaPor = cs.filter((c) => c.valor === "confirma");
+  const contestadaPor = cs.filter((c) => c.valor === "contesta");
+  const estado: VerificacaoEstado =
+    contestadaPor.length > 0
+      ? "contestada"
+      : inv.length > 0 && confirmadaPor.length === inv.length
+        ? "confirmada"
+        : "por_verificar";
+  return { estado, confirmadaPor, contestadaPor, totalInvestidores: inv.length };
 }
 
 // ───────────────────── Orçamento detalhado (custos à portuguesa) ─────────────────────
@@ -482,6 +530,8 @@ export interface Despesa {
   /** Sobrescreve o estado derivado dos comprovativos (caso o utilizador queira flagar manualmente). */
   estadoProva?: EstadoProva;
   confirmacoes?: ConfirmacaoDespesa[];
+  /** Respostas do gestor às contestações. */
+  respostas?: RespostaDespesa[];
 }
 
 export interface Marco {
@@ -498,6 +548,8 @@ export interface Marco {
   aprovacao?: Aprovacao;
   /** Obrigatório para passar o marco a "pago". */
   comprovativoPagamento?: Comprovativo;
+  /** Verificação do comprovativo de pagamento pelos sócios (mesmo fluxo das despesas). */
+  confirmacoes?: ConfirmacaoDespesa[];
 }
 
 export interface LogEntry {
@@ -1336,7 +1388,68 @@ const SEED_DESPESAS: Despesa[] = [
         addedAt: "2026-06-18T17:35:00.000Z",
       },
     ],
-    confirmacoes: [{ userId: CURRENT_USER_ID, valor: "confirma", ts: "2026-06-19T09:00:00.000Z" }],
+    // Verificação COMPLETA: confirmada pelos 2 sócios investidores (Daniel + Rita) → verde
+    confirmacoes: [
+      { userId: CURRENT_USER_ID, valor: "confirma", ts: "2026-06-19T09:00:00.000Z" },
+      { userId: "rita-santos", valor: "confirma", ts: "2026-06-19T14:20:00.000Z" },
+    ],
+  },
+  // Comprovada mas AINDA POR VERIFICAR pelos sócios (âmbar)
+  {
+    id: "d-coz-bancada",
+    obraId: "o-principe-2",
+    faseId: "f4",
+    descricao: "Bancada em pedra — sinal de encomenda",
+    valor: 475,
+    data: "2026-07-10",
+    fornecedor: "Cozinhas Modernas Lx",
+    nif: "509888777",
+    registadoPor: "pedro-alves",
+    registadoEm: "2026-07-10T12:00:00.000Z",
+    comprovativos: [
+      {
+        id: "cp-coz-bancada",
+        documentId: "seed-doc-fatura-bancada",
+        tipo: "fatura",
+        nomeFicheiro: "Fatura Bancada 10-07.pdf",
+        valorNoComprovativo: 475,
+        addedBy: "pedro-alves",
+        addedAt: "2026-07-10T12:05:00.000Z",
+      },
+    ],
+  },
+  // Comprovada mas CONTESTADA pela Rita com motivo (vermelho)
+  {
+    id: "d-coz-alvenaria",
+    obraId: "o-principe-2",
+    faseId: "f2",
+    descricao: "Alvenaria — fecho de roços (1.ª fase)",
+    valor: 600,
+    data: "2026-07-05",
+    fornecedor: "Cozinhas Modernas Lx",
+    nif: "509888777",
+    registadoPor: "pedro-alves",
+    registadoEm: "2026-07-05T18:00:00.000Z",
+    comprovativos: [
+      {
+        id: "cp-coz-alvenaria",
+        documentId: "seed-doc-fatura-alvenaria",
+        tipo: "fatura",
+        nomeFicheiro: "Fatura Alvenaria 05-07.pdf",
+        valorNoComprovativo: 600,
+        addedBy: "pedro-alves",
+        addedAt: "2026-07-05T18:05:00.000Z",
+      },
+    ],
+    confirmacoes: [
+      {
+        userId: "rita-santos",
+        valor: "contesta",
+        motivo: "trabalho_nao_executado",
+        comentario: "Passei lá sábado e os roços da parede norte ainda estavam abertos.",
+        ts: "2026-07-14T10:00:00.000Z",
+      },
+    ],
   },
   {
     id: "d-coz-tubagem",
@@ -1844,6 +1957,44 @@ export function gastoNaoComprovado(obra: Obra, despesas: Despesa[]): number {
   return Math.max(0, total - gastoComprovado(obra, despesas));
 }
 
+/**
+ * 2.ª métrica de transparência: % (em valor) do gasto aplicado CONFIRMADO por
+ * TODOS os sócios investidores. null quando a obra não tem investidores
+ * (obra solo — a métrica não se aplica).
+ */
+export function pctVerificadoSocios(obra: Obra, despesas: Despesa[]): number | null {
+  const inv = membrosDe(obra).filter((m) => m.role === "investidor");
+  if (inv.length === 0) return null;
+  const aplicadas = despesas.filter((d) => d.obraId === obra.id && despesaAplicada(d));
+  const total = aplicadas.reduce((s, d) => s + d.valor, 0);
+  if (total <= 0) return 100;
+  const confirmado = aplicadas
+    .filter((d) => estadoProvaDe(d) === "comprovada" && verificacaoDe(obra, d).estado === "confirmada")
+    .reduce((s, d) => s + d.valor, 0);
+  return Math.round((confirmado / total) * 100);
+}
+
+/** Despesas comprovadas de obras COM investidores, à espera do aval dos sócios. */
+export function listaPorVerificar(obras: Obra[], despesas: Despesa[]): Despesa[] {
+  return despesas.filter((d) => {
+    if (!despesaAplicada(d) || estadoProvaDe(d) !== "comprovada") return false;
+    const obra = obras.find((o) => o.id === d.obraId);
+    if (!obra) return false;
+    const v = verificacaoDe(obra, d);
+    return v.totalInvestidores > 0 && v.estado === "por_verificar";
+  });
+}
+
+/** Despesas contestadas por algum sócio. */
+export function listaContestadas(obras: Obra[], despesas: Despesa[]): Despesa[] {
+  return despesas.filter((d) => {
+    if (!despesaAplicada(d)) return false;
+    const obra = obras.find((o) => o.id === d.obraId);
+    if (!obra) return false;
+    return verificacaoDe(obra, d).estado === "contestada";
+  });
+}
+
 export function pctTransparencia(obra: Obra, despesas: Despesa[]): number {
   const totalDoObra = despesas.filter((d) => d.obraId === obra.id && despesaAplicada(d)).reduce((s, d) => s + d.valor, 0);
   if (totalDoObra <= 0) return 100;
@@ -1946,9 +2097,13 @@ interface ObrasState {
   /** Anexa um comprovativo (fatura/recibo) a uma despesa já existente. */
   adicionarComprovativo: (despesaId: string, c: Omit<Comprovativo, "id" | "addedAt">) => void;
   removerComprovativo: (despesaId: string, comprovativoId: string) => void;
-  /** Sócio investidor confirma ou contesta uma despesa. */
-  confirmarDespesa: (despesaId: string, userId: string, valor: "confirma" | "contesta", comentario?: string) => void;
+  /** Sócio investidor confirma ou contesta uma despesa (motivo = chave de MOTIVOS_CONTESTACAO). */
+  confirmarDespesa: (despesaId: string, userId: string, valor: "confirma" | "contesta", comentario?: string, motivo?: string) => void;
   removerConfirmacaoDespesa: (despesaId: string, userId: string) => void;
+  /** Gestor responde a uma contestação (fica no rasto da despesa). */
+  responderContestacao: (despesaId: string, userId: string, texto: string) => void;
+  /** Sócio investidor confirma ou contesta o comprovativo de um pagamento. */
+  confirmarMarco: (marcoId: string, userId: string, valor: "confirma" | "contesta", comentario?: string, motivo?: string) => void;
 
   // CRUD marcos
   addMarco: (input: Omit<Marco, "id">) => string;
@@ -2175,11 +2330,12 @@ export const useObrasStore = create<ObrasState>()(
           if (!d) return s;
           const comprovativo: Comprovativo = { ...c, id: uid("cp"), addedAt: new Date().toISOString() };
           const lista = [...(d.comprovativos ?? []), comprovativo];
+          // Ficheiro novo ⇒ a verificação recomeça: os sócios têm de rever a fatura nova.
           return {
             despesas: s.despesas.map((x) =>
-              x.id === despesaId ? { ...x, comprovativos: lista, estadoProva: undefined } : x
+              x.id === despesaId ? { ...x, comprovativos: lista, estadoProva: undefined, confirmacoes: [] } : x
             ),
-            logs: appendLog(s, d.obraId, `Comprovativo (${PROVA_TIPO_LABEL[c.tipo]}) anexado a "${d.descricao}".`),
+            logs: appendLog(s, d.obraId, `Comprovativo (${PROVA_TIPO_LABEL[c.tipo]}) anexado a "${d.descricao}" — verificação dos sócios reiniciada.`),
           };
         }),
       removerComprovativo: (despesaId, comprovativoId) =>
@@ -2190,18 +2346,45 @@ export const useObrasStore = create<ObrasState>()(
               : d
           ),
         })),
-      confirmarDespesa: (despesaId, userId, valor, comentario) =>
+      confirmarDespesa: (despesaId, userId, valor, comentario, motivo) =>
         set((s) => {
           const d = s.despesas.find((x) => x.id === despesaId);
           if (!d) return s;
           const semMeu = (d.confirmacoes ?? []).filter((c) => c.userId !== userId);
           const lista: ConfirmacaoDespesa[] = [
             ...semMeu,
-            { userId, valor, comentario, ts: new Date().toISOString() },
+            { userId, valor, comentario, motivo, ts: new Date().toISOString() },
           ];
           return {
             despesas: s.despesas.map((x) => (x.id === despesaId ? { ...x, confirmacoes: lista } : x)),
-            logs: appendLog(s, d.obraId, valor === "confirma" ? `Despesa confirmada por sócio: "${d.descricao}".` : `Despesa contestada por sócio: "${d.descricao}".`),
+            logs: appendLog(s, d.obraId, valor === "confirma" ? `Despesa confirmada por sócio: "${d.descricao}".` : `Despesa contestada por sócio: "${d.descricao}"${motivo && MOTIVOS_CONTESTACAO[motivo] ? ` — ${MOTIVOS_CONTESTACAO[motivo]}.` : "."}`),
+          };
+        }),
+      responderContestacao: (despesaId, userId, texto) =>
+        set((s) => {
+          const d = s.despesas.find((x) => x.id === despesaId);
+          if (!d) return s;
+          return {
+            despesas: s.despesas.map((x) =>
+              x.id === despesaId
+                ? { ...x, respostas: [...(x.respostas ?? []), { userId, texto, ts: new Date().toISOString() }] }
+                : x
+            ),
+            logs: appendLog(s, d.obraId, `Gestor respondeu à contestação de "${d.descricao}".`),
+          };
+        }),
+      confirmarMarco: (marcoId, userId, valor, comentario, motivo) =>
+        set((s) => {
+          const m = s.marcos.find((x) => x.id === marcoId);
+          if (!m) return s;
+          const semMeu = (m.confirmacoes ?? []).filter((c) => c.userId !== userId);
+          const lista: ConfirmacaoDespesa[] = [
+            ...semMeu,
+            { userId, valor, comentario, motivo, ts: new Date().toISOString() },
+          ];
+          return {
+            marcos: s.marcos.map((x) => (x.id === marcoId ? { ...x, confirmacoes: lista } : x)),
+            logs: appendLog(s, m.obraId, valor === "confirma" ? `Pagamento confirmado por sócio: "${m.titulo}".` : `Pagamento contestado por sócio: "${m.titulo}".`),
           };
         }),
       removerConfirmacaoDespesa: (despesaId, userId) =>
@@ -2467,12 +2650,13 @@ export const useObrasStore = create<ObrasState>()(
     }),
     {
       name: "redegest-obras",
-      version: 11,
+      version: 13,
       // v4: co-gestão. v5/v6: obra parada + marcos espalhados. v7: comprovativos + confirmações.
       // v8: divisão da casa. v9: empreiteiroId + notaCausa + sugestões + saúde 50/50.
       // v10: camada de papéis — d-tinta aguarda o voto do Daniel, m2 em votação, gasto contestado, proposta do Daniel no Porto.
       // v11: orçamento detalhado à portuguesa (mão de obra/materiais/licenças/IVA/contingência/contrato),
       //      tarefas + diário, Cozinha nova completa e Reabilitação total (avisos legais).
+      // v12: verificação da fatura pelos sócios — seeds com confirmada 2/2, por verificar e contestada c/ motivo.
       // Re-semeia os exemplos mantendo obras/itens criados pelo utilizador.
       migrate: (persisted: unknown, version: number) => {
         const s = (persisted ?? {}) as {
@@ -2484,7 +2668,7 @@ export const useObrasStore = create<ObrasState>()(
           sugestoes?: SugestaoFase[];
         };
         s.sugestoes = s.sugestoes ?? [];
-        if (version < 11) {
+        if (version < 13) {
           const seedObraIds = new Set(SEED_OBRAS.map((o) => o.id));
           const seedFaseIds = new Set(SEED_FASES.map((f) => f.id));
           const seedDespIds = new Set(SEED_DESPESAS.map((d) => d.id));

@@ -42,12 +42,28 @@ export interface DecisaoComentario {
   ts: string; // ISO
 }
 
+/** Contexto da decisão — fonte única: decisões criadas nas obras são as mesmas da tab. */
+export type DecisaoContexto = "geral" | "obra" | "financas" | "contrato";
+
+export const DECISAO_CONTEXTO_LABEL: Record<DecisaoContexto, string> = {
+  geral: "Geral",
+  obra: "Obra",
+  financas: "Finanças",
+  contrato: "Contrato",
+};
+
 export interface Decisao {
   id: string;
   projectId: string;
   titulo: string;
   descricao: string;
   tipo: DecisaoTipo;
+  /** Onde a decisão nasceu (default "geral"). */
+  contexto?: DecisaoContexto;
+  /** Id da entidade do contexto (ex.: obraId quando contexto === "obra"). */
+  contextoId?: string;
+  /** Rótulo visível do contexto (ex.: "Obra: Cozinha nova"). */
+  contextoLabel?: string;
   valor?: number;
   prazo?: string; // YYYY-MM-DD
   maioria: MaioriaRegra;
@@ -133,6 +149,26 @@ export function estadoDerivado(d: Decisao, partners: Partner[]): DecisaoEstado |
 // ───────────────────────── Seed ─────────────────────────
 
 const SEED: Decisao[] = [
+  // Criada A PARTIR DA OBRA "Cozinha nova" — aparece no bloco da obra e na tab com o chip "Obra: …"
+  {
+    id: "dec-eletro-encastre",
+    projectId: "principe-real",
+    titulo: "Upgrade dos eletrodomésticos para encastre (Cozinha nova)",
+    descricao:
+      "A bancada nova permite encastrar placa, forno e exaustor. Diferença face aos livres: +1.200 €. Valoriza o arrendamento e a revenda. Proponho aprovar o upgrade.",
+    tipo: "despesa",
+    contexto: "obra",
+    contextoId: "o-principe-2",
+    contextoLabel: "Obra: Cozinha nova",
+    valor: 1200,
+    prazo: "2026-07-28",
+    maioria: "simples",
+    proposedBy: "pedro-alves",
+    createdAt: "2026-07-15T09:00:00.000Z",
+    estado: "pendente",
+    votos: [{ userId: "rita-santos", valor: "a_favor", ts: "2026-07-16T10:00:00.000Z" }],
+    comentarios: [],
+  },
   // Aberta — Príncipe Real (Pedro propôs 40% a favor... não: Rita 25% a favor, falta o voto do Daniel)
   {
     id: "dec-renovacao-contrato",
@@ -285,12 +321,13 @@ export const useDecisionsStore = create<DecisionsState>()(
     }),
     {
       name: "redegest-decisions",
-      version: 2,
+      version: 3,
       // v2: sócios do Príncipe Real passaram a Pedro (gestor) / Daniel / Rita — re-semeia mantendo decisões do utilizador.
+      // v3: contexto das decisões (obra/finanças/contrato) + decisão criada a partir da obra "Cozinha nova".
       migrate: (persisted: unknown, version: number) => {
         const state = (persisted ?? {}) as { decisoes?: Decisao[] };
-        if (version < 2) {
-          const antigas = new Set(["dec-tinta-premium", "dec-bomba-calor", ...SEED.map((d) => d.id)]);
+        if (version < 3) {
+          const antigas = new Set(["dec-tinta-premium", ...SEED.map((d) => d.id)]);
           state.decisoes = [...SEED, ...(state.decisoes ?? []).filter((d) => !antigas.has(d.id))];
         }
         return state as DecisionsState;

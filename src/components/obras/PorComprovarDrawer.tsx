@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { X, AlertTriangle, ShieldCheck, Trash2, ChevronRight, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -7,10 +7,14 @@ import { useModalStore } from "@/store/useModalStore";
 import {
   useObrasStore,
   listaPorComprovar,
+  listaPorVerificar,
+  listaContestadas,
+  verificacaoDe,
   diasDesdeRegisto,
   divisaoDe,
   podeGerir,
   DIVISAO_LABEL,
+  MOTIVOS_CONTESTACAO,
   type Despesa,
   type Obra,
 } from "@/store/useObrasStore";
@@ -22,6 +26,13 @@ import { eur, dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Ordenar = "valor" | "antiguidade";
+type TabProva = "sem_fatura" | "por_verificar" | "contestados";
+
+const TAB_PROVA_LABEL: Record<TabProva, string> = {
+  sem_fatura: "Sem fatura",
+  por_verificar: "Por verificar",
+  contestados: "Contestados",
+};
 
 interface Linha {
   despesa: Despesa;
@@ -33,6 +44,7 @@ interface Linha {
 }
 
 export function PorComprovarDrawer() {
+  const navigate = useNavigate();
   const { porComprovarDrawer, closePorComprovar, openAnexarProva } = useModalStore();
   const { open, obraId } = porComprovarDrawer;
 
@@ -46,9 +58,22 @@ export function PorComprovarDrawer() {
   const [filtroObra, setFiltroObra] = useState<string>("todas");
   const [filtroImovel, setFiltroImovel] = useState<string>("todos");
   const [ordenar, setOrdenar] = useState<Ordenar>("antiguidade");
+  const [tab, setTab] = useState<TabProva>("sem_fatura");
+
+  // Contagens por separador (respeitam o filtro da obra do deep-link)
+  const noEscopo = (d: Despesa) => (obraId ? d.obraId === obraId : true);
+  const nSemFatura = listaPorComprovar(despesas).filter(noEscopo).length;
+  const nPorVerificar = listaPorVerificar(obras, despesas).filter(noEscopo).length;
+  const nContestados = listaContestadas(obras, despesas).filter(noEscopo).length;
 
   const linhas = useMemo<Linha[]>(() => {
-    const base = listaPorComprovar(despesas).filter((d) => (obraId ? d.obraId === obraId : true));
+    const fonte =
+      tab === "sem_fatura"
+        ? listaPorComprovar(despesas)
+        : tab === "por_verificar"
+          ? listaPorVerificar(obras, despesas)
+          : listaContestadas(obras, despesas);
+    const base = fonte.filter((d) => (obraId ? d.obraId === obraId : true));
     return base
       .map((d) => {
         const obra = obras.find((o) => o.id === d.obraId);
@@ -65,7 +90,7 @@ export function PorComprovarDrawer() {
         } as Linha;
       })
       .filter((x): x is Linha => x !== null);
-  }, [despesas, obras, projects, properties, obraId]);
+  }, [despesas, obras, projects, properties, obraId, tab]);
 
   // Filtros dependem da lista base (só oferecemos opções que existem)
   const obrasDisponiveis = useMemo(() => {
@@ -125,6 +150,30 @@ export function PorComprovarDrawer() {
           </button>
         </div>
 
+        {/* Separadores: Sem fatura · Por verificar · Contestados */}
+        <div className="flex gap-1.5 border-b border-line bg-card px-5 pb-3">
+          {(Object.keys(TAB_PROVA_LABEL) as TabProva[]).map((t) => {
+            const n = t === "sem_fatura" ? nSemFatura : t === "por_verificar" ? nPorVerificar : nContestados;
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={cn(
+                  "flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors",
+                  tab === t
+                    ? t === "contestados"
+                      ? "border-danger bg-danger text-white"
+                      : "border-gold bg-gold text-sidebar"
+                    : "border-line bg-card text-muted hover:text-ink"
+                )}
+              >
+                {TAB_PROVA_LABEL[t]}
+                {n > 0 && <span className="num">({n})</span>}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Filtros */}
         {linhas.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-b border-line bg-card/60 px-5 py-3">
@@ -160,8 +209,16 @@ export function PorComprovarDrawer() {
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-success/12 text-success">
                 <ShieldCheck size={30} />
               </span>
-              <p className="text-lg font-semibold text-success">Está tudo comprovado.</p>
-              <p className="text-sm text-muted">Nenhuma despesa à espera de fatura.</p>
+              <p className="text-lg font-semibold text-success">
+                {tab === "sem_fatura" ? "Está tudo comprovado." : tab === "por_verificar" ? "Nada por verificar." : "Sem contestações."}
+              </p>
+              <p className="text-sm text-muted">
+                {tab === "sem_fatura"
+                  ? "Nenhuma despesa à espera de fatura."
+                  : tab === "por_verificar"
+                    ? "Todas as faturas foram vistas e confirmadas pelos sócios."
+                    : "Nenhum sócio contestou gastos."}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -191,20 +248,62 @@ export function PorComprovarDrawer() {
                       <span className="num text-lg font-bold text-ink">{eur(l.despesa.valor)}</span>
                     </div>
 
-                    {l.souGestor ? (
+                    {/* Motivo da contestação (separador Contestados) */}
+                    {tab === "contestados" && (() => {
+                      const v = verificacaoDe(l.obra, l.despesa);
+                      const c = v.contestadaPor[0];
+                      if (!c) return null;
+                      return (
+                        <p className="mt-2 rounded-lg bg-danger/8 px-3 py-2 text-sm text-danger">
+                          {c.motivo && MOTIVOS_CONTESTACAO[c.motivo] ? MOTIVOS_CONTESTACAO[c.motivo] : "Contestada"}
+                          {c.comentario ? ` — "${c.comentario}"` : ""}
+                        </p>
+                      );
+                    })()}
+
+                    {tab === "sem_fatura" ? (
+                      l.souGestor ? (
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Button variant="gold" size="lg" className="w-full sm:flex-1" onClick={() => openAnexarProva(l.despesa.id)}>
+                            <ShieldCheck size={16} /> Anexar fatura
+                          </Button>
+                          <button
+                            onClick={() => eliminar(l)}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted hover:text-danger"
+                          >
+                            <Trash2 size={14} /> Eliminar
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-sm text-muted">Só o gestor pode anexar o comprovativo.</p>
+                      )
+                    ) : tab === "contestados" && l.souGestor ? (
                       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                         <Button variant="gold" size="lg" className="w-full sm:flex-1" onClick={() => openAnexarProva(l.despesa.id)}>
-                          <ShieldCheck size={16} /> Anexar fatura
+                          <ShieldCheck size={16} /> Anexar novo comprovativo
                         </Button>
-                        <button
-                          onClick={() => eliminar(l)}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted hover:text-danger"
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            closePorComprovar();
+                            navigate(l.casaId ? `/comunidade/colaborativa/obras/${l.casaId}/${l.obra.id}` : `/obra/${l.obra.id}`);
+                          }}
                         >
-                          <Trash2 size={14} /> Eliminar
-                        </button>
+                          Responder na obra
+                        </Button>
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-muted">Só o gestor pode anexar o comprovativo.</p>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="mt-3 w-full"
+                        onClick={() => {
+                          closePorComprovar();
+                          navigate(l.casaId ? `/comunidade/colaborativa/obras/${l.casaId}/${l.obra.id}` : `/obra/${l.obra.id}`);
+                        }}
+                      >
+                        {tab === "por_verificar" ? "Ver fatura na obra" : "Abrir na obra"}
+                      </Button>
                     )}
                   </div>
                 );

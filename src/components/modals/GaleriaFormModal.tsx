@@ -263,7 +263,17 @@ export function GaleriaFormModal() {
                 <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs font-medium text-danger">Selecione a obra de origem.</p>
               )}
               {obras.length === 0 && (
-                <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">Ainda não há obras registadas.</p>
+                <div className="flex flex-col items-center rounded-lg border border-dashed border-line bg-accent p-5 text-center">
+                  <p className="text-[15px] font-medium text-ink">Ainda não tem obras com fotos.</p>
+                  <p className="mt-0.5 text-[13px] text-muted">O antes/depois nasce das fotos do diário da obra.</p>
+                  <button
+                    type="button"
+                    onClick={() => { closeGaleriaForm(); navigate("/comunidade/colaborativa/obras"); }}
+                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg bg-gold px-4 text-sm font-semibold text-sidebar hover:opacity-90"
+                  >
+                    Ir para as obras →
+                  </button>
+                </div>
               )}
               {obras.map((o) => {
                 const nFotos = o.fotos.length + despesas.filter((d) => d.obraId === o.id).reduce((a, d) => a + (d.fotos?.length ?? 0), 0);

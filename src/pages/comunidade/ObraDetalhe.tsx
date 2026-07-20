@@ -44,6 +44,7 @@ import {
   gastoComprovado,
   gastoNaoComprovado,
   pctTransparencia,
+  pctVerificadoSocios,
   toneTransparencia,
   TRANSP_HEX,
   TRANSP_LABEL,
@@ -140,11 +141,13 @@ export default function ObraDetalhe() {
   const souGestor = podeGerir(obra, CURRENT_USER_ID);
   const meuRole = roleDe(obra, CURRENT_USER_ID);
 
-  // Transparência (prova das despesas)
+  // Transparência (prova das despesas) — DUAS métricas: com fatura × confirmado pelos sócios
   const pctComp = pctTransparencia(obra, despesas);
+  const pctVerif = pctVerificadoSocios(obra, despesas);
   const naoComp = gastoNaoComprovado(obra, despesas);
   const compVal = gastoComprovado(obra, despesas);
-  const transpTone = toneTransparencia(pctComp);
+  // Verde só quando ambas ≥90% (a 2.ª métrica só conta quando a obra tem investidores).
+  const transpTone = pctVerif != null && pctVerif < 90 && pctComp >= 90 ? "ambar" : toneTransparencia(pctComp);
 
   // ── Cartão TEMPO: texto humano por estado (nunca dias negativos) ──
   const temDatas = !!obra.dataInicio && !!obra.dataFimPrevista;
@@ -453,7 +456,7 @@ export default function ObraDetalhe() {
                 )}
                 {g > 0 && (
                   <span className="flex items-center gap-1" style={{ color: TRANSP_HEX[transpTone] }}>
-                    <ShieldCheck size={13} /> {pctComp}% dos gastos comprovados
+                    <ShieldCheck size={13} /> {pctComp}% com fatura{pctVerif != null ? ` · ${pctVerif}% confirmado pelos sócios` : ""}
                   </span>
                 )}
                 {temCoGestao && <span>· Threshold {eur(thresholdDe(obra))}</span>}
@@ -535,12 +538,23 @@ export default function ObraDetalhe() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">Transparência da obra</p>
                         <p className="num text-xs font-semibold" style={{ color: TRANSP_HEX[transpTone] }}>
-                          {pctComp}% comprovado · {TRANSP_LABEL[transpTone]}
+                          {TRANSP_LABEL[transpTone]}
                         </p>
                       </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-accent">
-                        <div className="h-full origin-left rounded-full animate-grow-x" style={{ width: `${pctComp}%`, background: TRANSP_HEX[transpTone] }} />
+                      {/* Barra 1 — tem fatura */}
+                      <p className="num mt-1.5 text-[11px] text-muted">{pctComp}% com fatura</p>
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-accent">
+                        <div className="h-full origin-left rounded-full animate-grow-x" style={{ width: `${pctComp}%`, background: pctComp >= 90 ? "#4A7C59" : "#C17E2A" }} />
                       </div>
+                      {/* Barra 2 — confirmado pelos sócios (só obras com investidores) */}
+                      {pctVerif != null && (
+                        <>
+                          <p className="num mt-1.5 text-[11px] text-muted">{pctVerif}% confirmado pelos sócios</p>
+                          <div className="mt-1 h-2 overflow-hidden rounded-full bg-accent">
+                            <div className="h-full origin-left rounded-full animate-grow-x" style={{ width: `${pctVerif}%`, background: pctVerif >= 90 ? "#4A7C59" : "#C17E2A" }} />
+                          </div>
+                        </>
+                      )}
                       <p className="num mt-1.5 text-[11px] text-muted">
                         {eur(compVal)} comprovado
                         {naoComp > 0 && <> · <span className="font-medium text-warning">{eur(naoComp)} por comprovar</span></>}

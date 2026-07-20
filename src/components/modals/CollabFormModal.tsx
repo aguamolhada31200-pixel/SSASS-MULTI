@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
+import { retomarObraPendente } from "@/components/modals/NewObraModal";
 import {
   useCollabStore,
   SOCIO_COLORS,
@@ -100,7 +101,7 @@ const num = (s: string) => {
 };
 
 export function CollabFormModal() {
-  const { collabForm, closeCollabForm } = useModalStore();
+  const { collabForm, closeCollabForm, openObraForm } = useModalStore();
   const { open, editingId } = collabForm;
   const navigate = useNavigate();
 
@@ -311,6 +312,9 @@ export function CollabFormModal() {
 
     toast.success("Projeto criado", { description: form.nome });
     closeCollabForm();
+    // Retorno ao fluxo: se o utilizador veio da "Nova obra" sem projetos,
+    // reabre o modal da obra com este projeto já selecionado.
+    if (retomarObraPendente({ projectId: id }, () => openObraForm())) return;
     navigate(`/comunidade/colaborativa/${id}`);
   };
 

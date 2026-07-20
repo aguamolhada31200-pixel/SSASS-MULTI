@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -311,6 +311,11 @@ function daysBetween(a: string, b: string): number {
 
 function ReabRoom({ project: p }: { project: CollabProject }) {
   const [tab, setTab] = useState<TabReab>("Visão geral");
+  // Deep-link ?tab=decisoes (vindo do ecrã Dinheiro da obra)
+  const [roomParams] = useSearchParams();
+  useEffect(() => {
+    if (roomParams.get("tab") === "decisoes") setTab("Decisões");
+  }, [roomParams]);
 
   const inv = (p.precoAquisicao ?? 0) + (p.custosAquisicao ?? 0) + (p.orcamentoObras ?? 0);
   const totalGasto = (p.precoAquisicao ?? 0) + (p.custosAquisicao ?? 0) + (p.gastoObras ?? 0);
@@ -793,6 +798,11 @@ function ObraEstadoBadgeMini({ estado }: { estado: ObraEstado }) {
 
 function ArrRoom({ project: p }: { project: CollabProject }) {
   const [tab, setTab] = useState<TabArr>("Visão geral");
+  // Deep-link ?tab=decisoes (vindo do ecrã Dinheiro da obra)
+  const [roomParams] = useSearchParams();
+  useEffect(() => {
+    if (roomParams.get("tab") === "decisoes") setTab("Decisões");
+  }, [roomParams]);
 
   const rendaAnual = (p.rendaMensal ?? 0) * 12;
   const despAnual = (p.despesasMensais ?? 0) * 12;

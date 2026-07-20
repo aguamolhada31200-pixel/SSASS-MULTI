@@ -38,6 +38,9 @@ import {
   SAUDE_HEX,
   gastoNaoComprovado,
   listaPorComprovar,
+  listaContestadas,
+  verificacaoDe,
+  MOTIVOS_CONTESTACAO,
   estadoHumanoObras,
   ESTADO_HUMANO_CASA,
   ESTADO_HUMANO_HEX,
@@ -590,35 +593,74 @@ function CartoesCriticos({
   );
 }
 
-/** Alerta agregado "por comprovar" — a seguir a "Precisa de atenção hoje". */
+/** Alertas de prova — "por comprovar" e "contestados" — a seguir a "Precisa de atenção hoje". */
 function AlertaPorComprovar({ obras, despesas, onAbrir }: { obras: Obra[]; despesas: Despesa[]; onAbrir: () => void }) {
+  const navigate = useNavigate();
+  const profiles = useProfilesStore((s) => s.profiles);
   const idsVisiveis = new Set(obras.map((o) => o.id));
   const lista = listaPorComprovar(despesas).filter((d) => idsVisiveis.has(d.obraId));
-  if (lista.length === 0) return null;
+  const contestadas = listaContestadas(obras, despesas).filter((d) => idsVisiveis.has(d.obraId));
+  if (lista.length === 0 && contestadas.length === 0) return null;
   const total = lista.reduce((s, d) => s + d.valor, 0);
   const nObras = new Set(lista.map((d) => d.obraId)).size;
+
   return (
-    <div className="mt-4">
-      <Card className="border-warning/40 bg-warning/5">
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/15 text-warning">
-              <TriangleAlert size={22} />
-            </span>
-            <div>
-              <p className="num font-display text-lg font-semibold text-ink">
-                {eur(total)} por comprovar
-              </p>
-              <p className="text-sm text-muted">
-                em {lista.length} {lista.length === 1 ? "despesa" : "despesas"} · {nObras} {nObras === 1 ? "obra" : "obras"}
-              </p>
+    <div className="mt-4 space-y-3">
+      {/* Contestados — o mais grave primeiro */}
+      {contestadas.map((d) => {
+        const obra = obras.find((o) => o.id === d.obraId)!;
+        const v = verificacaoDe(obra, d);
+        const quem = v.contestadaPor
+          .map((c) => (profiles.find((p) => p.id === c.userId)?.fullName ?? "Sócio").split(" ")[0])
+          .join(", ");
+        const motivo = v.contestadaPor[0]?.motivo;
+        return (
+          <Card key={d.id} className="border-danger/40 bg-danger/5">
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-danger/15 text-danger">
+                  <ShieldAlert size={22} />
+                </span>
+                <div>
+                  <p className="font-display text-lg font-semibold text-ink">
+                    Gasto contestado por {quem} · {obra.titulo}
+                  </p>
+                  <p className="num text-sm text-muted">
+                    {d.descricao} · {eur(d.valor)}
+                    {motivo && MOTIVOS_CONTESTACAO[motivo] ? ` — ${MOTIVOS_CONTESTACAO[motivo]}` : ""}
+                  </p>
+                </div>
+              </div>
+              <Button variant="danger" onClick={() => navigate(`/obra/${obra.id}`)}>
+                Ver →
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {lista.length > 0 && (
+        <Card className="border-warning/40 bg-warning/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/15 text-warning">
+                <TriangleAlert size={22} />
+              </span>
+              <div>
+                <p className="num font-display text-lg font-semibold text-ink">
+                  {eur(total)} por comprovar
+                </p>
+                <p className="text-sm text-muted">
+                  em {lista.length} {lista.length === 1 ? "despesa" : "despesas"} · {nObras} {nObras === 1 ? "obra" : "obras"}
+                </p>
+              </div>
             </div>
-          </div>
-          <Button variant="gold" onClick={onAbrir}>
-            Ver o que falta →
-          </Button>
-        </CardContent>
-      </Card>
+            <Button variant="gold" onClick={onAbrir}>
+              Ver o que falta →
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

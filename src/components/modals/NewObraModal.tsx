@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { X, Hammer, Pencil, Check, ChevronLeft, Sparkles } from "lucide-react";
+import { X, Hammer, Pencil, Check, ChevronLeft, Sparkles, Users2, Building2 } from "lucide-react";
+import { EmptyPicker } from "@/components/ui/EmptyPicker";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
 import {
@@ -20,6 +22,7 @@ import { useTechniciansStore, ESPECIALIDADE_LABEL } from "@/store/useTechnicians
 import { eur } from "@/lib/format";
 import { useCollabStore } from "@/store/useCollabStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
+import { useExampleData } from "@/store/useExampleData";
 import { cn } from "@/lib/utils";
 
 // CRIAR OBRA — simples por fora, completa por dentro (Parte 2 do blueprint):
@@ -69,16 +72,60 @@ function emptyForm(initial: { projectId?: string | null; propertyId?: string | n
 
 const CATEGORIAS = Object.entries(CATEGORIA_LABEL) as [ObraCategoria, string][];
 
+// ── Retorno ao fluxo: guarda a obra a meio enquanto o utilizador cria o
+// projeto/imóvel em falta; ao criar, o modal reabre com tudo como estava. ──
+const OBRA_PENDENTE_KEY = "obraPendente";
+
+export interface ObraPendente {
+  form: FormState;
+  passo: number;
+  /** Preenchido pelo modal que criou a entidade em falta. */
+  novoProjectId?: string;
+  novoPropertyId?: string;
+}
+
+export function guardarObraPendente(p: ObraPendente): void {
+  try { sessionStorage.setItem(OBRA_PENDENTE_KEY, JSON.stringify(p)); } catch { /* noop */ }
+}
+
+export function lerObraPendente(): ObraPendente | null {
+  try {
+    const raw = sessionStorage.getItem(OBRA_PENDENTE_KEY);
+    return raw ? (JSON.parse(raw) as ObraPendente) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function limparObraPendente(): void {
+  try { sessionStorage.removeItem(OBRA_PENDENTE_KEY); } catch { /* noop */ }
+}
+
+/** Chamado pelos modais de criação (imóvel/projeto): se havia uma obra a meio, retoma-a. */
+export function retomarObraPendente(novo: { propertyId?: string; projectId?: string }, openObraForm: () => void): boolean {
+  const p = lerObraPendente();
+  if (!p) return false;
+  guardarObraPendente({ ...p, novoPropertyId: novo.propertyId ?? p.novoPropertyId, novoProjectId: novo.projectId ?? p.novoProjectId });
+  openObraForm();
+  return true;
+}
+
 export function NewObraModal() {
-  const { obraForm, closeObraForm } = useModalStore();
+  const { obraForm, closeObraForm, openPropertyForm, openCollabForm } = useModalStore();
   const { open, editingId, initialProjectId, initialPropertyId, prefill } = obraForm;
+  const navigate = useNavigate();
+  void navigate;
   const converterEmObra = useMaintenanceStore((s) => s.converterEmObra);
   const addObra = useObrasStore((s) => s.addObra);
   const updateObra = useObrasStore((s) => s.updateObra);
   const editingObra = useObrasStore((s) => (editingId ? s.obras.find((o) => o.id === editingId) : undefined));
   const addMarco = useObrasStore((s) => s.addMarco);
-  const projects = useCollabStore((s) => s.projects);
-  const properties = usePropertiesStore((s) => s.properties);
+  const { enabled: exemplosOn } = useExampleData();
+  const projectsAll = useCollabStore((s) => s.projects);
+  const propertiesAll = usePropertiesStore((s) => s.properties);
+  // Com «Dados de exemplo» desligado, as listas ficam vazias → estados vazios testáveis.
+  const projects = exemplosOn ? projectsAll : [];
+  const properties = exemplosOn ? propertiesAll : [];
   const technicians = useTechniciansStore((s) => s.technicians);
 
   // Passos da camada rápida: 1 divisão · 2 o quê · 3 quanto/quando
@@ -109,6 +156,21 @@ export function NewObraModal() {
           contactoEmpreiteiro: editingObra.contactoEmpreiteiro ?? "",
           descricao: editingObra.notas ?? "",
           addTranches: false,
+        });
+      } else if (lerObraPendente()) {
+        // RETORNO AO FLUXO: o utilizador foi criar o projeto/imóvel em falta — retoma onde ia.
+        const p = lerObraPendente()!;
+        limparObraPendente();
+        const form: FormState = {
+          ...p.form,
+          projectId: p.novoProjectId ?? p.form.projectId,
+          propertyId: p.novoPropertyId ?? p.form.propertyId,
+          origin: p.novoProjectId ? "project" : p.novoPropertyId ? "property" : p.form.origin,
+        };
+        setForm(form);
+        setPasso(p.passo);
+        toast.success(p.novoProjectId ? "Projeto criado" : "Imóvel criado", {
+          description: "Continue a criar a obra — já está selecionado.",
         });
       } else {
         const base = emptyForm({ projectId: initialProjectId, propertyId: initialPropertyId });
@@ -320,24 +382,53 @@ export function NewObraModal() {
               )}
 
               {!preSelected && form.origin === "project" && (
-                <Field label="Projeto" error={erros.projectId}>
-                  <select value={form.projectId} onChange={(e) => patch({ projectId: e.target.value })} className={inputCls}>
-                    <option value="">Selecione…</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>#{p.number} · {p.title}</option>
-                    ))}
-                  </select>
-                </Field>
+                projects.length === 0 ? (
+                  <EmptyPicker
+                    icon={Users2}
+                    titulo="Ainda não tem projetos colaborativos."
+                    linha="Crie o projeto primeiro — a obra fica guardada e continua a seguir."
+                    ctaLabel="Criar projeto colaborativo →"
+                    onCta={() => {
+                      guardarObraPendente({ form, passo: 2 });
+                      closeObraForm();
+                      openCollabForm();
+                    }}
+                    secundario={{ label: "Ou criar esta obra num imóvel meu", onClick: () => patch({ origin: "property" }) }}
+                  />
+                ) : (
+                  <Field label="Projeto" error={erros.projectId}>
+                    <select value={form.projectId} onChange={(e) => patch({ projectId: e.target.value })} className={inputCls}>
+                      <option value="">Selecione…</option>
+                      {projects.map((p) => (
+                        <option key={p.id} value={p.id}>#{p.number} · {p.title}</option>
+                      ))}
+                    </select>
+                  </Field>
+                )
               )}
               {!preSelected && form.origin === "property" && (
-                <Field label="Imóvel" error={erros.propertyId}>
-                  <select value={form.propertyId} onChange={(e) => patch({ propertyId: e.target.value })} className={inputCls}>
-                    <option value="">Selecione…</option>
-                    {properties.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} — {p.city}</option>
-                    ))}
-                  </select>
-                </Field>
+                properties.length === 0 ? (
+                  <EmptyPicker
+                    icon={Building2}
+                    titulo="Ainda não tem imóveis registados."
+                    linha="Adicione o imóvel primeiro — a obra fica guardada e continua a seguir."
+                    ctaLabel="Adicionar imóvel →"
+                    onCta={() => {
+                      guardarObraPendente({ form, passo: 2 });
+                      closeObraForm();
+                      openPropertyForm();
+                    }}
+                  />
+                ) : (
+                  <Field label="Imóvel" error={erros.propertyId}>
+                    <select value={form.propertyId} onChange={(e) => patch({ propertyId: e.target.value })} className={inputCls}>
+                      <option value="">Selecione…</option>
+                      {properties.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} — {p.city}</option>
+                      ))}
+                    </select>
+                  </Field>
+                )
               )}
 
               <Field label="Nome da obra" error={erros.titulo}>

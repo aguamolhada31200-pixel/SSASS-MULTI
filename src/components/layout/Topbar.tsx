@@ -7,7 +7,7 @@ import { useConversationsStore } from "@/store/useConversationsStore";
 import { CURRENT_USER_ID, useCurrentUser, useProfilesStore } from "@/store/useProfilesStore";
 import { useAccountStore, PLANOS } from "@/store/useAccountStore";
 import { useNotificationsStore } from "@/store/useNotificationsStore";
-import { relativaTempo, useObrasStore, listaPorComprovar } from "@/store/useObrasStore";
+import { relativaTempo, useObrasStore, listaPorComprovar, listaContestadas } from "@/store/useObrasStore";
 import { useModalStore } from "@/store/useModalStore";
 import { useExampleData } from "@/store/useExampleData";
 import { eur } from "@/lib/format";
@@ -89,12 +89,14 @@ function NotificationsBell() {
   const markAllRead = useNotificationsStore((s) => s.markAllRead);
   const naoLidas = notificacoes.filter((n) => !n.lida).length;
 
-  // Entrada sintética "por comprovar" (não é uma notificação guardada — é live).
+  // Entradas sintéticas "por comprovar" / "contestados" (live, não guardadas).
   const { enabled } = useExampleData();
   const despesas = useObrasStore((s) => s.despesas);
+  const obras = useObrasStore((s) => s.obras);
   const openPorComprovar = useModalStore((s) => s.openPorComprovar);
   const porComprovar = enabled ? listaPorComprovar(despesas) : [];
   const totalPorComprovar = porComprovar.reduce((s, d) => s + d.valor, 0);
+  const contestadas = enabled ? listaContestadas(obras, despesas) : [];
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -124,6 +126,23 @@ function NotificationsBell() {
             )}
           </div>
           <div className="max-h-96 overflow-y-auto p-1.5">
+            {/* Entrada fixa: gastos contestados → vista dedicada (separador Contestados) */}
+            {contestadas.length > 0 && (
+              <button
+                onClick={() => { setOpen(false); openPorComprovar(); }}
+                className="mb-1 flex w-full items-start gap-2.5 rounded-lg border border-danger/30 bg-danger/8 px-2.5 py-2 text-left transition-colors hover:bg-danger/15"
+              >
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-danger/20 text-danger">
+                  <AlertTriangle size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium leading-snug text-ink">
+                    {contestadas.length === 1 ? "1 gasto contestado por um sócio" : `${contestadas.length} gastos contestados pelos sócios`}
+                  </span>
+                  <span className="block truncate text-[11px] text-danger">toque para rever e responder</span>
+                </span>
+              </button>
+            )}
             {/* Entrada fixa: despesas por comprovar → abre a vista dedicada */}
             {porComprovar.length > 0 && (
               <button
@@ -141,7 +160,7 @@ function NotificationsBell() {
                 </span>
               </button>
             )}
-            {notificacoes.length === 0 && porComprovar.length === 0 ? (
+            {notificacoes.length === 0 && porComprovar.length === 0 && contestadas.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted">Sem notificações.</p>
             ) : (
               notificacoes.slice(0, 20).map((n) => {

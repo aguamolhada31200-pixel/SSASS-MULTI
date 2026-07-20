@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 const CATEGORIAS = Object.keys(CATEGORIA_PEDIDO_LABEL) as CategoriaPedido[];
 
 export function MaintenanceFormModal() {
-  const { maintenanceForm, closeMaintenanceForm } = useModalStore();
+  const { maintenanceForm, closeMaintenanceForm, openPropertyForm } = useModalStore();
   const { open, editingId, initialPropertyId, lockProperty, prefill } = maintenanceForm;
 
   const add = useMaintenanceStore((s) => s.add);
@@ -193,18 +193,34 @@ export function MaintenanceFormModal() {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted">1 · Imóvel</span>
-              <select
-                value={propertyId}
-                onChange={(e) => { setPropertyId(e.target.value); setTenantId(""); setErros((x) => ({ ...x, propertyId: "" })); }}
-                disabled={lockProperty}
-                className={cn(inputCls, lockProperty && "opacity-60", erros.propertyId && "border-danger")}
-              >
-                <option value="">Escolher imóvel…</option>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              <Erro k="propertyId" />
+              {properties.length === 0 ? (
+                <div className="flex flex-col items-center rounded-lg border border-dashed border-line bg-accent p-5 text-center">
+                  <p className="text-[15px] font-medium text-ink">Ainda não tem imóveis registados.</p>
+                  <p className="mt-0.5 text-[13px] text-muted">A manutenção pertence sempre a um imóvel.</p>
+                  <button
+                    type="button"
+                    onClick={() => { closeMaintenanceForm(); openPropertyForm(); }}
+                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg bg-gold px-4 text-sm font-semibold text-sidebar hover:opacity-90"
+                  >
+                    Adicionar imóvel →
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={propertyId}
+                    onChange={(e) => { setPropertyId(e.target.value); setTenantId(""); setErros((x) => ({ ...x, propertyId: "" })); }}
+                    disabled={lockProperty}
+                    className={cn(inputCls, lockProperty && "opacity-60", erros.propertyId && "border-danger")}
+                  >
+                    <option value="">Escolher imóvel…</option>
+                    {properties.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <Erro k="propertyId" />
+                </>
+              )}
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted">2 · Inquilino afetado (opcional)</span>

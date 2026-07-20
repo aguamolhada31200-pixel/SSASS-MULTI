@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Plus,
@@ -23,10 +24,12 @@ import {
   resumoVotos,
   prazoExpirado,
   DECISAO_TIPO_LABEL,
+  DECISAO_CONTEXTO_LABEL,
   MAIORIA_LABEL,
   MAIORIA_LABEL_SHORT,
   type Decisao,
   type DecisaoTipo,
+  type DecisaoContexto,
   type MaioriaRegra,
   type VotoValor,
 } from "@/store/useDecisionsStore";
@@ -47,10 +50,25 @@ const TIPO_ICON: Record<DecisaoTipo, typeof Wallet> = {
   geral: MessageCircle,
 };
 
+type FiltroContexto = "todas" | DecisaoContexto;
+
+const FILTROS_CONTEXTO: { key: FiltroContexto; label: string }[] = [
+  { key: "todas", label: "Todas" },
+  { key: "geral", label: "Gerais" },
+  { key: "obra", label: "Obras" },
+  { key: "financas", label: "Finanças" },
+  { key: "contrato", label: "Contratos" },
+];
+
 export function DecisoesTab({ project: p }: { project: CollabProject }) {
   const decisoes = useDecisionsStore((s) => s.decisoes.filter((d) => d.projectId === p.id));
   const syncEstados = useDecisionsStore((s) => s.syncEstados);
   const [formOpen, setFormOpen] = useState(false);
+  // Deep-link: /comunidade/colaborativa/:id?tab=decisoes&obra=<obraId> chega já filtrado à obra.
+  const [params] = useSearchParams();
+  const obraParam = params.get("obra");
+  const [filtro, setFiltro] = useState<FiltroContexto>(obraParam ? "obra" : "todas");
+  const [obraFiltro, setObraFiltro] = useState<string | null>(obraParam);
 
   // Auto-fecho por prazo ao abrir a tab.
   useEffect(() => {
@@ -58,18 +76,32 @@ export function DecisoesTab({ project: p }: { project: CollabProject }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.id]);
 
+  const filtradas = useMemo(
+    () =>
+      decisoes.filter((d) => {
+        const ctx = d.contexto ?? "geral";
+        if (obraFiltro) return ctx === "obra" && d.contextoId === obraFiltro;
+        if (filtro === "todas") return true;
+        return ctx === filtro;
+      }),
+    [decisoes, filtro, obraFiltro]
+  );
+
   const ordenadas = useMemo(
     () =>
-      [...decisoes].sort((a, b) => {
+      [...filtradas].sort((a, b) => {
         if (a.estado === "pendente" && b.estado !== "pendente") return -1;
         if (b.estado === "pendente" && a.estado !== "pendente") return 1;
         return a.createdAt < b.createdAt ? 1 : -1;
       }),
-    [decisoes]
+    [filtradas]
   );
 
   const pendentes = decisoes.filter((d) => d.estado === "pendente").length;
   const souSocio = p.partners.some((s) => s.id === CURRENT_USER_ID && (s.status ?? "ativo") === "ativo");
+  const obraFiltroLabel = obraFiltro
+    ? decisoes.find((d) => d.contextoId === obraFiltro)?.contextoLabel ?? "esta obra"
+    : null;
 
   return (
     <div className="mt-5 space-y-4">
@@ -84,12 +116,39 @@ export function DecisoesTab({ project: p }: { project: CollabProject }) {
         )}
       </div>
 
+      {/* Filtros por contexto */}
+      <div className="flex flex-wrap items-center gap-2">
+        {FILTROS_CONTEXTO.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => { setFiltro(f.key); setObraFiltro(null); }}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+              filtro === f.key && !obraFiltro ? "border-gold bg-gold text-sidebar" : "border-line bg-card text-muted hover:text-ink"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+        {obraFiltro && (
+          <button
+            onClick={() => { setObraFiltro(null); setFiltro("obra"); }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-gold bg-gold/15 px-3 py-1.5 text-sm font-semibold text-gold-dark"
+            title="Remover filtro da obra"
+          >
+            {obraFiltroLabel} <X size={13} />
+          </button>
+        )}
+      </div>
+
       {ordenadas.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted">
             <MessageCircle size={28} className="mx-auto mb-2" />
-            <p className="text-sm">Ainda sem decisões neste projeto.</p>
-            {souSocio && (
+            <p className="text-sm">
+              {decisoes.length === 0 ? "Ainda sem decisões neste projeto." : "Nenhuma decisão neste filtro."}
+            </p>
+            {souSocio && decisoes.length === 0 && (
               <Button size="sm" variant="outline" className="mt-3" onClick={() => setFormOpen(true)}>
                 <Plus size={14} /> Propor primeira decisão
               </Button>
@@ -217,6 +276,20 @@ function DecisaoCard({ decisao: d, project: p }: { decisao: Decisao; project: Co
             </span>
             <div className="min-w-0">
               <p className="font-display text-base font-semibold leading-snug text-ink">{d.titulo}</p>
+              {/* Chip do contexto — decisões de obra levam à obra */}
+              {(d.contexto ?? "geral") === "obra" && d.contextoId && (
+                <Link
+                  to={`/obra/${d.contextoId}`}
+                  className="mt-1 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-semibold text-gold-dark hover:bg-gold/20"
+                >
+                  <Hammer size={10} /> {d.contextoLabel ?? "Obra"}
+                </Link>
+              )}
+              {d.contexto && d.contexto !== "geral" && d.contexto !== "obra" && (
+                <span className="mt-1 inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-secondary">
+                  {DECISAO_CONTEXTO_LABEL[d.contexto]}
+                </span>
+              )}
               <p className="mt-0.5 text-[11px] text-muted">
                 {DECISAO_TIPO_LABEL[d.tipo]}
                 {d.valor ? <> · <span className="num font-semibold text-ink">{eur(d.valor)}</span></> : null}
@@ -383,13 +456,32 @@ function renderMentions(texto: string): React.ReactNode {
 
 /* ───────────────────── Modal: nova decisão ───────────────────── */
 
-function NovaDecisaoModal({ project: p, onClose }: { project: CollabProject; onClose: () => void }) {
+/** Prefill quando a decisão nasce noutro contexto (ex.: dentro de uma obra). */
+export interface DecisaoPrefill {
+  contexto?: DecisaoContexto;
+  contextoId?: string;
+  contextoLabel?: string;
+  tituloSugerido?: string;
+  tipo?: DecisaoTipo;
+}
+
+export function NovaDecisaoModal({
+  project: p,
+  onClose,
+  prefill,
+}: {
+  project: CollabProject;
+  onClose: () => void;
+  prefill?: DecisaoPrefill;
+}) {
   const add = useDecisionsStore((s) => s.add);
   const broadcast = useNotificationsStore((s) => s.broadcast);
+  // Estado vazio: sem outros sócios ativos, não há com quem decidir.
+  const outrosSocios = p.partners.filter((s) => s.id !== CURRENT_USER_ID && (s.status ?? "ativo") === "ativo");
 
-  const [titulo, setTitulo] = useState("");
+  const [titulo, setTitulo] = useState(prefill?.tituloSugerido ?? "");
   const [descricao, setDescricao] = useState("");
-  const [tipo, setTipo] = useState<DecisaoTipo>("despesa");
+  const [tipo, setTipo] = useState<DecisaoTipo>(prefill?.tipo ?? "despesa");
   const [valor, setValor] = useState("");
   const [prazo, setPrazo] = useState("");
   const [maioria, setMaioria] = useState<MaioriaRegra>("simples");
@@ -412,6 +504,9 @@ function NovaDecisaoModal({ project: p, onClose }: { project: CollabProject; onC
       titulo: titulo.trim(),
       descricao: descricao.trim(),
       tipo,
+      contexto: prefill?.contexto ?? "geral",
+      contextoId: prefill?.contextoId,
+      contextoLabel: prefill?.contextoLabel,
       valor: Number(valor) > 0 ? Number(valor) : undefined,
       prazo: prazo || undefined,
       maioria,
@@ -433,10 +528,29 @@ function NovaDecisaoModal({ project: p, onClose }: { project: CollabProject; onC
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h3 className="font-display text-base font-semibold text-ink">Nova decisão</h3>
+          <div>
+            <h3 className="font-display text-base font-semibold text-ink">Nova decisão</h3>
+            <p className="text-xs text-muted">
+              {prefill?.contextoLabel ? `${prefill.contextoLabel} · ` : ""}#{p.number} {p.title}
+            </p>
+          </div>
           <button onClick={onClose} className="text-muted hover:text-ink"><X size={18} /></button>
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+          {outrosSocios.length === 0 && (
+            <div className="flex flex-col items-center rounded-lg border border-dashed border-line bg-accent p-5 text-center">
+              <MessageCircle size={20} className="text-muted" />
+              <p className="mt-2 text-[15px] font-medium text-ink">Ainda não tem sócios neste projeto.</p>
+              <p className="mt-0.5 text-[13px] text-muted">As decisões são votadas pelos sócios — convide primeiro.</p>
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg bg-gold px-4 text-sm font-semibold text-sidebar hover:opacity-90"
+              >
+                Convidar sócio (tab Sócios) →
+              </button>
+            </div>
+          )}
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-muted">Título *</span>
             <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Aprovar orçamento da cozinha" className={inputCls} />

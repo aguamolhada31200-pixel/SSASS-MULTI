@@ -36,6 +36,35 @@ import { cn } from "@/lib/utils";
 
 const inpCls = "h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary";
 
+/** Estado vazio do fornecedor: cria o 1.º empreiteiro sem sair do modal. */
+function NovoEmpreiteiroInline({ onCriado }: { onCriado: (nome: string, nif?: string) => void }) {
+  const addTec = useTechniciansStore((s) => s.add);
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  return (
+    <div className="flex flex-col items-stretch rounded-lg border border-dashed border-line bg-accent p-3 text-center">
+      <p className="text-[15px] font-medium text-ink">Ainda não tem empreiteiros.</p>
+      <p className="mt-0.5 text-[13px] text-muted">Crie o primeiro aqui mesmo — fica no diretório.</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome" className={inpCls} />
+        <input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="Telefone" className={inpCls} />
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (!nome.trim()) { toast.error("Indique o nome"); return; }
+          addTec({ nome: nome.trim(), especialidades: ["geral"], telefone: telefone.trim(), email: "", zonas: [], favorito: false, notas: "" });
+          onCriado(nome.trim());
+          toast.success("Empreiteiro criado no diretório");
+        }}
+        className="mt-2 inline-flex min-h-10 items-center justify-center rounded-lg bg-gold px-4 text-sm font-semibold text-sidebar hover:opacity-90"
+      >
+        + Novo empreiteiro
+      </button>
+    </div>
+  );
+}
+
 async function fileToPreview(f: File): Promise<FilePreview> {
   const dataUrl = await new Promise<string>((res) => {
     const r = new FileReader();
@@ -408,29 +437,40 @@ export function ObraExpenseModal() {
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted">Fornecedor / empreiteiro</span>
-              <select
-                value={technicians.some((t) => t.nome === fornecedor) ? fornecedor : fornecedor ? "__outro" : ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "__outro") return; // mantém o texto atual
-                  const tec = technicians.find((t) => t.nome === v);
-                  setFornecedor(v);
-                  if (tec?.nif) setNif(tec.nif);
-                }}
-                className={inpCls}
-              >
-                <option value="">— Selecionar —</option>
-                {technicians.map((t) => (
-                  <option key={t.id} value={t.nome}>{t.nome}</option>
-                ))}
-                <option value="__outro">Outro (escrever abaixo)</option>
-              </select>
-              <input
-                value={fornecedor}
-                onChange={(e) => setFornecedor(e.target.value)}
-                placeholder="Nome do fornecedor"
-                className={cn(inpCls, "mt-1.5")}
-              />
+              {technicians.length === 0 ? (
+                <NovoEmpreiteiroInline
+                  onCriado={(nome, nifNovo) => {
+                    setFornecedor(nome);
+                    if (nifNovo) setNif(nifNovo);
+                  }}
+                />
+              ) : (
+                <>
+                  <select
+                    value={technicians.some((t) => t.nome === fornecedor) ? fornecedor : fornecedor ? "__outro" : ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "__outro") return; // mantém o texto atual
+                      const tec = technicians.find((t) => t.nome === v);
+                      setFornecedor(v);
+                      if (tec?.nif) setNif(tec.nif);
+                    }}
+                    className={inpCls}
+                  >
+                    <option value="">— Selecionar —</option>
+                    {technicians.map((t) => (
+                      <option key={t.id} value={t.nome}>{t.nome}</option>
+                    ))}
+                    <option value="__outro">Outro (escrever abaixo)</option>
+                  </select>
+                  <input
+                    value={fornecedor}
+                    onChange={(e) => setFornecedor(e.target.value)}
+                    placeholder="Nome do fornecedor"
+                    className={cn(inpCls, "mt-1.5")}
+                  />
+                </>
+              )}
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted">NIF (opcional)</span>
