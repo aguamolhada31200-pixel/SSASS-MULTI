@@ -155,8 +155,7 @@ export function MaintenanceFormModal() {
         tecnicoId: tecnicoId || undefined,
         dataAgendada: dataAgendada || undefined,
         estado: dataAgendada ? "agendado" : "aberto",
-        origem: prefill?.conversationId ? "inquilino" : "senhorio",
-        conversationId: prefill?.conversationId,
+        origem: tenantId ? "inquilino" : "senhorio",
         planTaskId: prefill?.planTaskId,
       });
       toast.success("Pedido criado ✓", { description: "Já aparece no kanban e no tab do imóvel." });

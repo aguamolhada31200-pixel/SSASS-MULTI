@@ -12,12 +12,11 @@ export interface ObraPrefill {
   maintenanceId?: string;
 }
 
-/** Prefill do modal de novo pedido de manutenção (ex.: criado a partir de uma conversa). */
+/** Prefill do modal de novo pedido de manutenção (ex.: criado a partir do plano preventivo). */
 export interface MaintenancePrefill {
   titulo?: string;
   descricao?: string;
   tenantId?: string;
-  conversationId?: string;
   /** Tarefa do plano preventivo que origina o pedido. */
   planTaskId?: string;
   categoria?: string;

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CURRENT_USER_ID } from "./useProfilesStore";
 
-export type ContextType = "listing" | "direct" | "tenant";
+export type ContextType = "listing" | "direct";
 
 export interface Message {
   id: string;
@@ -16,7 +16,7 @@ export interface Conversation {
   id: string;
   participantIds: string[];
   contextType: ContextType;
-  contextId?: string; // listingId / tenantId
+  contextId?: string; // listingId
   messages: Message[];
   createdAt: string;
 }
@@ -27,19 +27,6 @@ function uid(prefix = "c"): string {
 }
 
 const SEED: Conversation[] = [
-  // Conversa com INQUILINA (tenant) — dispara o banner "Parece um pedido de manutenção"
-  {
-    id: "conv-tenant-ana",
-    participantIds: [CURRENT_USER_ID, "tenant-ana-martins"],
-    contextType: "tenant",
-    contextId: "tenant-ana-martins",
-    createdAt: "2026-07-16",
-    messages: [
-      { id: "mt1", senderId: "tenant-ana-martins", content: "Bom dia! O esquentador não aquece a água de manhã — já é o terceiro dia seguido. Consegue mandar alguém ver a avaria?", createdAt: "2026-07-16T08:30:00", read: true },
-      { id: "mt2", senderId: CURRENT_USER_ID, content: "Bom dia Ana, obrigado pelo aviso. Vou abrir já um pedido e mando o técnico João Silva ainda esta semana.", createdAt: "2026-07-16T08:44:00", read: true },
-      { id: "mt3", senderId: "tenant-ana-martins", content: "Perfeito, obrigada! De manhã estou em casa até às 10h.", createdAt: "2026-07-16T08:50:00", read: false },
-    ],
-  },
   {
     id: "conv-arroios",
     participantIds: [CURRENT_USER_ID, "carlos-mendes"],
@@ -134,13 +121,16 @@ export const useConversationsStore = create<ConversationsState>()(
     }),
     {
       name: "redegest-conversations",
-      version: 2,
-      // v2: conversa seed com a inquilina Ana Martins (fluxo mensagem → pedido de manutenção).
+      version: 3,
+      // v3: a app é só para senhorios — conversas com inquilinos removidas.
       migrate: (persisted: unknown, version: number) => {
         const s = (persisted ?? {}) as { conversations?: Conversation[] };
         if (version < 2) {
           const presentes = new Set((s.conversations ?? []).map((c) => c.id));
           s.conversations = [...SEED.filter((c) => !presentes.has(c.id)), ...(s.conversations ?? [])];
+        }
+        if (version < 3) {
+          s.conversations = (s.conversations ?? []).filter((c) => (c.contextType as string) !== "tenant");
         }
         return s as ConversationsState;
       },

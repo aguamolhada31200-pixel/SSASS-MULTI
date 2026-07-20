@@ -135,8 +135,6 @@ export interface MaintenanceRequest {
   fotosDepois: string[];
   avaliacaoTecnico?: number; // 1..5
   comentarioAvaliacao?: string;
-  /** Se nasceu de uma mensagem do inquilino. */
-  conversationId?: string;
   origem: OrigemPedido;
   /** Se foi promovido a obra. */
   convertidoEmObraId?: string;
@@ -174,10 +172,9 @@ const SEED: MaintenanceRequest[] = [
     custoEstimado: 180,
     fotosAntes: [IMG("1585129777188-94600bc7b4b3")],
     fotosDepois: [],
-    conversationId: "conv-tenant-ana",
     origem: "inquilino",
     historico: [
-      { ts: "2026-07-16T08:45:00", texto: "Pedido criado a partir da conversa com Ana Martins.", autor: CURRENT_USER_ID },
+      { ts: "2026-07-16T08:45:00", texto: "Pedido criado — avaria reportada pela inquilina Ana Martins.", autor: CURRENT_USER_ID },
       { ts: "2026-07-16T09:10:00", texto: "Técnico atribuído: João Silva.", autor: CURRENT_USER_ID },
       { ts: "2026-07-17T10:00:00", texto: "Estado: Em curso — técnico no local.", autor: CURRENT_USER_ID },
     ],
@@ -361,7 +358,7 @@ export const useMaintenanceStore = create<MaintenanceState>()(
               fotosAntes: input.fotosAntes ?? [],
               fotosDepois: input.fotosDepois ?? [],
               historico: [
-                { ts: agora, texto: input.origem === "inquilino" ? "Pedido criado a partir de conversa com o inquilino." : input.origem === "preventivo" ? "Pedido criado a partir do plano preventivo." : "Pedido criado.", autor: CURRENT_USER_ID },
+                { ts: agora, texto: input.origem === "inquilino" ? "Pedido criado — reportado pelo inquilino." : input.origem === "preventivo" ? "Pedido criado a partir do plano preventivo." : "Pedido criado.", autor: CURRENT_USER_ID },
                 ...(input.estado === "agendado" && input.dataAgendada
                   ? [{ ts: agora, texto: `Agendado para ${input.dataAgendada.slice(8, 10)}/${input.dataAgendada.slice(5, 7)}/${input.dataAgendada.slice(0, 4)}.`, autor: CURRENT_USER_ID }]
                   : []),
@@ -426,12 +423,13 @@ export const useMaintenanceStore = create<MaintenanceState>()(
     }),
     {
       name: "redegest-maintenance",
-      version: 2,
+      version: 3,
       // v2: modelo completo (categoria tipada, responsabilidade, técnico do diretório,
       // fotos, histórico, origem, conversão em obra). Re-semeia mantendo pedidos do utilizador.
+      // v3: app só para senhorios — pedidos sem ligação a conversas (re-semeia os seeds).
       migrate: (persisted: unknown, version: number) => {
         const s = (persisted ?? {}) as { requests?: MaintenanceRequest[] };
-        if (version < 2) {
+        if (version < 3) {
           const seedIds = new Set([...SEED.map((r) => r.id), "mnt-arroios-esquentador"]);
           const categoriasValidas = new Set(Object.keys(CATEGORIA_PEDIDO_LABEL));
           const doUtilizador = (s.requests ?? [])

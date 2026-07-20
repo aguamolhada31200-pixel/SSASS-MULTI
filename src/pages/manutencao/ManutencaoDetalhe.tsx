@@ -13,7 +13,6 @@ import {
   UserPlus,
   ImagePlus,
   FileText,
-  MessageSquare,
   Info,
   X,
   Upload,
@@ -36,7 +35,6 @@ import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { useTenantsStore } from "@/store/useTenantsStore";
 import { useTechniciansStore } from "@/store/useTechniciansStore";
 import { useDocumentsStore } from "@/store/useDocumentsStore";
-import { useConversationsStore } from "@/store/useConversationsStore";
 import { useModalStore } from "@/store/useModalStore";
 import { CURRENT_USER_ID } from "@/store/useProfilesStore";
 import { CATEGORIA_PEDIDO_ICON, PRIORIDADE_TONE, ESTADO_TONE, RespBadge, inputCls } from "@/components/manutencao/shared";
@@ -75,7 +73,6 @@ export default function ManutencaoDetalhe() {
   const technicians = useTechniciansStore((s) => s.technicians);
   const docs = useDocumentsStore((s) => s.documents);
   const addDoc = useDocumentsStore((s) => s.add);
-  const conversations = useConversationsStore((s) => s.conversations);
   const openMaintenanceForm = useModalStore((s) => s.openMaintenanceForm);
   const openMaintenanceExpense = useModalStore((s) => s.openMaintenanceExpense);
   const openObraForm = useModalStore((s) => s.openObraForm);
@@ -111,8 +108,6 @@ export default function ManutencaoDetalhe() {
   const property = properties.find((p) => p.id === pedido.propertyId);
   const tenant = tenants.find((t) => t.id === pedido.tenantId);
   const tec = technicians.find((t) => t.id === pedido.tecnicoId);
-  const conversa = pedido.conversationId ? conversations.find((c) => c.id === pedido.conversationId) : undefined;
-  const excertoConversa = conversa?.messages.find((m) => m.senderId !== CURRENT_USER_ID)?.content;
   const Icon = CATEGORIA_PEDIDO_ICON[pedido.categoria];
   const concluido = pedido.estado === "concluido";
   const sugestao = RESP_SUGERIDA[pedido.categoria];
@@ -308,25 +303,6 @@ export default function ManutencaoDetalhe() {
               )}
             </CardContent>
           </Card>
-
-          {/* Conversa de origem */}
-          {conversa && (
-            <Card>
-              <CardContent className="p-5">
-                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">
-                  <MessageSquare size={12} /> Nasceu de uma conversa com o inquilino
-                </p>
-                {excertoConversa && (
-                  <p className="rounded-xl border border-line bg-bg/40 px-3 py-2.5 text-sm italic text-ink">
-                    «{excertoConversa.length > 180 ? `${excertoConversa.slice(0, 180)}…` : excertoConversa}»
-                  </p>
-                )}
-                <Link to={`/mensagens?c=${conversa.id}`} className="mt-2 inline-block text-xs font-medium text-secondary hover:underline">
-                  Abrir a conversa →
-                </Link>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Linha do tempo */}
           <Card>
