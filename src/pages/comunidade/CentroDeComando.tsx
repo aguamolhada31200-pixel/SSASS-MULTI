@@ -37,6 +37,7 @@ import {
   SAUDE_LABEL,
   SAUDE_HEX,
   gastoNaoComprovado,
+  listaPorComprovar,
   estadoHumanoObras,
   ESTADO_HUMANO_CASA,
   ESTADO_HUMANO_HEX,
@@ -157,6 +158,7 @@ export default function CentroDeComando() {
   const marcos = useObrasStore((s) => s.marcos);
   const openMarcoPay = useModalStore((s) => s.openMarcoPay);
   const openObraForm = useModalStore((s) => s.openObraForm);
+  const openPorComprovar = useModalStore((s) => s.openPorComprovar);
   useViewAs((s) => s.modo); // "Ver como" — re-renderiza os cartões críticos ao alternar o papel
 
   const todayISO = new Date().toISOString().slice(0, 10);
@@ -315,6 +317,9 @@ export default function CentroDeComando() {
               onPagarMarco={(m) => openMarcoPay(m.id)}
               onFocar={focarObra}
             />
+
+            {/* Alerta "por comprovar" — só aparece se houver pendências */}
+            <AlertaPorComprovar obras={listaTodas} despesas={despesas} onAbrir={() => openPorComprovar()} />
 
             {!vistaCompleta ? (
               /* ─── Caminho principal: escolher a CASA ─── */
@@ -581,6 +586,39 @@ function CartoesCriticos({
           <CriticoCard key={it.key} issue={it} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Alerta agregado "por comprovar" — a seguir a "Precisa de atenção hoje". */
+function AlertaPorComprovar({ obras, despesas, onAbrir }: { obras: Obra[]; despesas: Despesa[]; onAbrir: () => void }) {
+  const idsVisiveis = new Set(obras.map((o) => o.id));
+  const lista = listaPorComprovar(despesas).filter((d) => idsVisiveis.has(d.obraId));
+  if (lista.length === 0) return null;
+  const total = lista.reduce((s, d) => s + d.valor, 0);
+  const nObras = new Set(lista.map((d) => d.obraId)).size;
+  return (
+    <div className="mt-4">
+      <Card className="border-warning/40 bg-warning/5">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/15 text-warning">
+              <TriangleAlert size={22} />
+            </span>
+            <div>
+              <p className="num font-display text-lg font-semibold text-ink">
+                {eur(total)} por comprovar
+              </p>
+              <p className="text-sm text-muted">
+                em {lista.length} {lista.length === 1 ? "despesa" : "despesas"} · {nObras} {nObras === 1 ? "obra" : "obras"}
+              </p>
+            </div>
+          </div>
+          <Button variant="gold" onClick={onAbrir}>
+            Ver o que falta →
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

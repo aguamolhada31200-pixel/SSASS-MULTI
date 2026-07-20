@@ -12,6 +12,8 @@ import { NewObraModal } from "@/components/modals/NewObraModal";
 import { TenantFormModal } from "@/components/modals/TenantFormModal";
 import { ContractDocModal } from "@/components/modals/ContractDocModal";
 import { ObraExpenseModal } from "@/components/modals/ObraExpenseModal";
+import { AnexarProvaModal } from "@/components/modals/AnexarProvaModal";
+import { PorComprovarDrawer } from "@/components/obras/PorComprovarDrawer";
 import { MarcoPayModal } from "@/components/modals/MarcoPayModal";
 import { InterestModal } from "@/components/modals/InterestModal";
 import { CollabFormModal } from "@/components/modals/CollabFormModal";
@@ -84,6 +86,8 @@ export function AppLayout() {
       <TenantFormModal />
       <ContractDocModal />
       <ObraExpenseModal />
+      <AnexarProvaModal />
+      <PorComprovarDrawer />
       <MarcoPayModal />
       <InterestModal />
       <CollabFormModal />

@@ -469,6 +469,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
   const docs = useDocumentsStore((s) => s.documents);
   const addNotif = useNotificationsStore((s) => s.add);
   const broadcast = useNotificationsStore((s) => s.broadcast);
+  const openPorComprovar = useModalStore((s) => s.openPorComprovar);
 
   const [votandoId, setVotandoId] = useState<string | null>(null);
   const [soPorComprovar, setSoPorComprovar] = useState(false);
@@ -538,9 +539,13 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
             <ShieldCheck size={14} /> {pctComp}% comprovado
           </span>
           {naoComprovado > 0 && (
-            <span className="flex items-center gap-1 text-warning">
-              <AlertTriangle size={14} /> {eur(naoComprovado)} por comprovar
-            </span>
+            <button
+              onClick={() => openPorComprovar(obraId)}
+              className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/8 px-2.5 py-0.5 font-medium text-warning transition-colors hover:bg-warning/15"
+              title="Ver o que falta comprovar nesta obra"
+            >
+              <AlertTriangle size={14} /> {eur(naoComprovado)} por comprovar →
+            </button>
           )}
           {pendenteAprovacao > 0 && (
             <span className="flex items-center gap-1 text-warning">

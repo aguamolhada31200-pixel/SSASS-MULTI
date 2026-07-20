@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   X,
   FileText,
   Camera,
   AlertTriangle,
-  Lock,
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -46,7 +46,8 @@ async function fileToPreview(f: File): Promise<FilePreview> {
 }
 
 export function ObraExpenseModal() {
-  const { obraExpenseForm, closeObraExpense } = useModalStore();
+  const navigate = useNavigate();
+  const { obraExpenseForm, closeObraExpense, openAnexarProva } = useModalStore();
   const { open, obraId, initialFaseId } = obraExpenseForm;
 
   const obra = useObrasStore((s) => (obraId ? s.obras.find((o) => o.id === obraId) : undefined));
@@ -77,6 +78,7 @@ export function ObraExpenseModal() {
   const [valorComprovativo, setValorComprovativo] = useState<number | null>(null);
   const [fotos, setFotos] = useState<FilePreview[]>([]);
   const [notaCausa, setNotaCausa] = useState("");
+  const [tocado, setTocado] = useState<{ desc?: boolean; valor?: boolean; data?: boolean }>({});
   const fotosRef = useRef<HTMLInputElement>(null);
 
   // Reset quando abre / fecha
@@ -93,6 +95,7 @@ export function ObraExpenseModal() {
       setValorComprovativo(null);
       setFotos([]);
       setNotaCausa("");
+      setTocado({});
     }
   }, [open, initialFaseId]);
 
@@ -119,16 +122,30 @@ export function ObraExpenseModal() {
   const vaiEstourar = obra.orcamento > 0 && gastoAtual + valor > obra.orcamento && valor > 0;
   const faltaNota = vaiEstourar && notaCausa.trim().length === 0;
 
-  const podeSubmeter = descricao.trim().length > 0 && valor > 0 && !!data && !faltaNota;
+  // Validação por campo — mínimos: Descrição + Valor + Data. Erros só depois de tocar.
+  const errDesc = descricao.trim().length === 0 ? "Escreva uma descrição" : undefined;
+  const errValor = !(valor > 0) ? "Indique o valor" : undefined;
+  const errData = !data ? "Indique a data" : undefined;
+  const mins = !errDesc && !errValor && !errData && !faltaNota;
+
+  const emFalta = [
+    errDesc && "Descrição",
+    errValor && "Valor",
+    errData && "Data",
+    faltaNota && "Motivo do valor a mais",
+  ].filter(Boolean) as string[];
+  const tooltipMin = emFalta.length ? `Falta preencher: ${emFalta.join(", ")}` : undefined;
+
   const precisaVoto = requerAprovacao(obra, valor);
 
   const guardar = (semProva: boolean) => {
-    if (!podeSubmeter) {
-      toast.error(faltaNota ? "Explique porquê o valor a mais (o orçamento vai ser ultrapassado)" : "Preencha descrição, valor e data");
+    if (!mins) {
+      setTocado({ desc: true, valor: true, data: true });
+      toast.error(tooltipMin ?? "Faltam campos obrigatórios");
       return;
     }
     if (!semProva && !comprovativo) {
-      toast.error("Anexe um comprovativo ou escolha 'sem comprovativo agora'");
+      toast.error("Anexe um comprovativo ou escolha «Registar sem comprovativo agora»");
       return;
     }
     // 1. Despesa (com aprovação automática se exceder threshold)
@@ -243,21 +260,19 @@ export function ObraExpenseModal() {
       }
     }
 
-    // mensagem
-    if (precisaVoto && obra.members) {
-      toast.success("Despesa submetida a votação dos sócios", {
-        description: `${eur(valor)} acima de ${eur(thresholdDe(obra))} → precisa de aprovação.`,
-      });
-    } else if (semProva) {
-      toast.success("Despesa registada (por comprovar)", {
-        description: "Anexe o comprovativo mais tarde para subir a transparência.",
+    // Toast de confirmação — sempre presente, com ação útil
+    const sufixoVoto = precisaVoto ? " · foi para votação dos sócios" : "";
+    if (semProva) {
+      toast.warning(`Despesa de ${eur(valor)} registada`, {
+        description: `falta o comprovativo${sufixoVoto}`,
+        action: { label: "Anexar agora", onClick: () => openAnexarProva(despesaId) },
       });
     } else {
-      toast.success("Despesa registada e comprovada", {
-        description: fotos.length > 0 ? `${fotos.length} foto${fotos.length === 1 ? "" : "s"} anexada${fotos.length === 1 ? "" : "s"}.` : undefined,
+      toast.success(`Despesa de ${eur(valor)} registada`, {
+        description: `com fatura${sufixoVoto}`,
+        action: { label: "Ver gasto", onClick: () => navigate(`/obra/${obra.id}`) },
       });
     }
-    void despesaId;
     closeObraExpense();
   };
 
@@ -344,8 +359,15 @@ export function ObraExpenseModal() {
 
           {/* Campos */}
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-muted">Descrição</span>
-            <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex.: Pintura completa — mão de obra" className={inpCls} />
+            <span className="mb-1 block text-xs font-medium text-muted">Descrição <span className="text-danger">*</span></span>
+            <input
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              onBlur={() => setTocado((t) => ({ ...t, desc: true }))}
+              placeholder="Ex.: Pintura completa — mão de obra"
+              className={cn(inpCls, tocado.desc && errDesc && "border-danger")}
+            />
+            {tocado.desc && errDesc && <span className="mt-1 block text-[11px] text-danger">{errDesc}</span>}
           </label>
 
           <label className="block">
@@ -360,12 +382,26 @@ export function ObraExpenseModal() {
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-muted">Valor</span>
-              <MoneyBox value={valor || undefined} onChange={(n) => setValor(n ?? 0)} comDecimais />
+              <span className="mb-1 block text-xs font-medium text-muted">Valor <span className="text-danger">*</span></span>
+              <MoneyBox
+                value={valor || undefined}
+                onChange={(n) => setValor(n ?? 0)}
+                onBlur={() => setTocado((t) => ({ ...t, valor: true }))}
+                comDecimais
+                className={cn(tocado.valor && errValor && "border-danger")}
+              />
+              {tocado.valor && errValor && <span className="mt-1 block text-[11px] text-danger">{errValor}</span>}
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-muted">Data</span>
-              <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={inpCls} />
+              <span className="mb-1 block text-xs font-medium text-muted">Data <span className="text-danger">*</span></span>
+              <input
+                type="date"
+                value={data}
+                onChange={(e) => setData(e.target.value)}
+                onBlur={() => setTocado((t) => ({ ...t, data: true }))}
+                className={cn(inpCls, tocado.data && errData && "border-danger")}
+              />
+              {tocado.data && errData && <span className="mt-1 block text-[11px] text-danger">{errData}</span>}
             </label>
           </div>
 
@@ -454,26 +490,32 @@ export function ObraExpenseModal() {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Footer — dois caminhos claros: com comprovativo (recomendado) ou sem */}
         <div className="flex flex-col gap-2 border-t border-line bg-bg/40 px-5 py-4">
           <Button
             variant="gold"
-            disabled={!podeSubmeter || !comprovativo}
+            size="lg"
+            disabled={!mins || !comprovativo}
             onClick={() => guardar(false)}
             className="w-full"
+            title={!comprovativo ? "Anexe um comprovativo (foto ou PDF)" : tooltipMin}
           >
-            <FileText size={15} /> Registar despesa comprovada
+            <FileText size={16} /> Registar despesa comprovada
           </Button>
-          <button
-            type="button"
-            disabled={!podeSubmeter}
-            onClick={() => {
-              if (confirm("Registar sem comprovativo? Aparece como ⚠ Por comprovar aos sócios.")) guardar(true);
-            }}
-            className="text-center text-[11px] text-muted underline transition-colors hover:text-danger disabled:opacity-40"
+          <Button
+            variant="outline"
+            disabled={!mins}
+            onClick={() => guardar(true)}
+            className="w-full"
+            title={tooltipMin ?? "Fica marcada como «Por comprovar» — pode anexar a fatura depois"}
           >
-            <Lock size={11} className="inline" /> Registar sem comprovativo agora
-          </button>
+            <AlertTriangle size={15} /> Registar sem comprovativo agora
+          </Button>
+          {!comprovativo && (
+            <p className="text-center text-[11px] text-muted">
+              Sem fatura, a despesa fica «Por comprovar» e baixa a transparência da obra.
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -1868,6 +1868,32 @@ export function toneTransparencia(pct: number): ToneTransparencia {
   return "vermelho";
 }
 
+/** Data efetiva de registo de uma despesa (para "há N dias"). */
+export function dataRegistoDespesa(d: Despesa): string {
+  return (d.registadoEm ?? `${d.data}T09:00:00`).slice(0, 10);
+}
+
+/** Há quantos dias a despesa foi registada. */
+export function diasDesdeRegisto(d: Despesa): number {
+  return Math.max(0, diffDays(dataRegistoDespesa(d), todayISO()));
+}
+
+/**
+ * Despesas por comprovar (aplicadas, sem comprovativo) — o coração da vista
+ * "Por comprovar". Ordena por antiguidade (mais antigas primeiro). Exclui as
+ * que ainda estão em votação (não aplicadas).
+ */
+export function listaPorComprovar(despesas: Despesa[]): Despesa[] {
+  return despesas
+    .filter((d) => despesaAplicada(d) && estadoProvaDe(d) === "por_comprovar")
+    .sort((a, b) => (dataRegistoDespesa(a) < dataRegistoDespesa(b) ? -1 : 1));
+}
+
+/** Total (€) por comprovar num conjunto de despesas. */
+export function totalPorComprovar(despesas: Despesa[]): number {
+  return listaPorComprovar(despesas).reduce((s, d) => s + d.valor, 0);
+}
+
 /** Quantos sócios investidores confirmaram esta despesa (não conta o registador). */
 export function confirmacoesDespesa(
   obra: Obra,

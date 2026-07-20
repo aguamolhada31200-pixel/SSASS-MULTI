@@ -475,7 +475,11 @@ export function TarefasScreen({ obra, souGestor }: { obra: Obra; souGestor: bool
           {pendentes.map((t) => (
             <div key={t.id} className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3">
               <button
-                onClick={() => (souGestor ? toggleTarefa(obra.id, t.id, CURRENT_USER_ID) : toast.message("Só o gestor pica as tarefas"))}
+                onClick={() => {
+                  if (!souGestor) { toast.message("Só o gestor pica as tarefas"); return; }
+                  toggleTarefa(obra.id, t.id, CURRENT_USER_ID);
+                  toast.success(`Tarefa concluída · ${t.titulo}`);
+                }}
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-colors",
                   souGestor ? "border-line hover:border-success hover:bg-success/10" : "border-line opacity-60"

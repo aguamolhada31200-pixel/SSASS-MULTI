@@ -107,6 +107,16 @@ interface ModalState {
   openObraExpense: (obraId: string, initialFaseId?: string | null) => void;
   closeObraExpense: () => void;
 
+  /** Anexar comprovativo a uma despesa de obra já existente (a partir do "Por comprovar" ou do toast). */
+  anexarProvaForm: { open: boolean; despesaId: string | null };
+  openAnexarProva: (despesaId: string) => void;
+  closeAnexarProva: () => void;
+
+  /** Vista "Por comprovar" — filtrada a uma obra (obraId) ou global (null). */
+  porComprovarDrawer: { open: boolean; obraId: string | null };
+  openPorComprovar: (obraId?: string | null) => void;
+  closePorComprovar: () => void;
+
   marcoPayForm: { open: boolean; marcoId: string | null };
   openMarcoPay: (marcoId: string) => void;
   closeMarcoPay: () => void;
@@ -217,6 +227,14 @@ export const useModalStore = create<ModalState>((set) => ({
     set({ obraExpenseForm: { open: true, obraId, initialFaseId } }),
   closeObraExpense: () =>
     set({ obraExpenseForm: { open: false, obraId: null, initialFaseId: null } }),
+
+  anexarProvaForm: { open: false, despesaId: null },
+  openAnexarProva: (despesaId) => set({ anexarProvaForm: { open: true, despesaId } }),
+  closeAnexarProva: () => set({ anexarProvaForm: { open: false, despesaId: null } }),
+
+  porComprovarDrawer: { open: false, obraId: null },
+  openPorComprovar: (obraId = null) => set({ porComprovarDrawer: { open: true, obraId } }),
+  closePorComprovar: () => set({ porComprovarDrawer: { open: false, obraId: null } }),
 
   marcoPayForm: { open: false, marcoId: null },
   openMarcoPay: (marcoId) => set({ marcoPayForm: { open: true, marcoId } }),

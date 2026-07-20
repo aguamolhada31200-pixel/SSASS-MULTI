@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Menu, Search, Bell, MessageSquare, User, Settings, CreditCard, LogOut, Sun, Moon, Monitor, ChevronDown } from "lucide-react";
+import { Menu, Search, Bell, MessageSquare, User, Settings, CreditCard, LogOut, Sun, Moon, Monitor, ChevronDown, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { NAV } from "./nav";
 import { useConversationsStore } from "@/store/useConversationsStore";
 import { CURRENT_USER_ID, useCurrentUser, useProfilesStore } from "@/store/useProfilesStore";
 import { useAccountStore, PLANOS } from "@/store/useAccountStore";
 import { useNotificationsStore } from "@/store/useNotificationsStore";
-import { relativaTempo } from "@/store/useObrasStore";
+import { relativaTempo, useObrasStore, listaPorComprovar } from "@/store/useObrasStore";
+import { useModalStore } from "@/store/useModalStore";
+import { useExampleData } from "@/store/useExampleData";
+import { eur } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 function useBreadcrumb() {
@@ -86,6 +89,13 @@ function NotificationsBell() {
   const markAllRead = useNotificationsStore((s) => s.markAllRead);
   const naoLidas = notificacoes.filter((n) => !n.lida).length;
 
+  // Entrada sintética "por comprovar" (não é uma notificação guardada — é live).
+  const { enabled } = useExampleData();
+  const despesas = useObrasStore((s) => s.despesas);
+  const openPorComprovar = useModalStore((s) => s.openPorComprovar);
+  const porComprovar = enabled ? listaPorComprovar(despesas) : [];
+  const totalPorComprovar = porComprovar.reduce((s, d) => s + d.valor, 0);
+
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -114,7 +124,24 @@ function NotificationsBell() {
             )}
           </div>
           <div className="max-h-96 overflow-y-auto p-1.5">
-            {notificacoes.length === 0 ? (
+            {/* Entrada fixa: despesas por comprovar → abre a vista dedicada */}
+            {porComprovar.length > 0 && (
+              <button
+                onClick={() => { setOpen(false); openPorComprovar(); }}
+                className="mb-1 flex w-full items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/8 px-2.5 py-2 text-left transition-colors hover:bg-warning/15"
+              >
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning/20 text-warning">
+                  <AlertTriangle size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium leading-snug text-ink">Tem despesas por comprovar</span>
+                  <span className="num block truncate text-[11px] text-warning">
+                    {eur(totalPorComprovar)} em {porComprovar.length} {porComprovar.length === 1 ? "despesa" : "despesas"} · toque para ver
+                  </span>
+                </span>
+              </button>
+            )}
+            {notificacoes.length === 0 && porComprovar.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted">Sem notificações.</p>
             ) : (
               notificacoes.slice(0, 20).map((n) => {
