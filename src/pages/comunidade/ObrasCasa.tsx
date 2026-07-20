@@ -145,8 +145,9 @@ export default function ObrasCasa() {
             ))}
           </div>
 
-          {/* Lista de obras da divisão escolhida (quando tem várias) */}
-          {divisaoAberta && (porDivisao.get(divisaoAberta)?.length ?? 0) > 1 && (
+          {/* Lista de obras da divisão escolhida (quando tem várias) —
+              "casa toda" tem o seu próprio bloco por baixo do cartão, não entra aqui. */}
+          {divisaoAberta && divisaoAberta !== "casa_toda" && (porDivisao.get(divisaoAberta)?.length ?? 0) > 1 && (
             <ListaObrasDivisao
               casaId={casaId!}
               divisao={divisaoAberta}
