@@ -20,6 +20,7 @@ import {
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Lightbox } from "@/components/obras/ObraScreens";
 import {
   useObrasStore,
   gastoReal,
@@ -574,6 +575,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
   // Ninguém confirma às cegas: os botões só ativam DEPOIS de abrir a fatura.
   const [vistas, setVistas] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<{ titulo: string; valorRegistado: number; cp: Comprovativo; fornecedor?: string; nif?: string; data?: string } | null>(null);
+  const [fotoLightbox, setFotoLightbox] = useState<{ lista: string[]; idx: number } | null>(null);
   const [contestarId, setContestarId] = useState<string | null>(null);
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
   const [respostaTxt, setRespostaTxt] = useState("");
@@ -756,9 +758,15 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
                         </span>
                       ))}
                       {fotosD.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noreferrer" className="relative h-11 w-11 overflow-hidden rounded-md border border-line">
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setFotoLightbox({ lista: fotosD, idx: i })}
+                          className="relative h-11 w-11 overflow-hidden rounded-md border border-line"
+                          title="Ver em grande"
+                        >
                           <img src={url} alt="" className="h-full w-full object-cover" />
-                        </a>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -938,6 +946,16 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
 
       {/* Preview da fatura — obrigatório antes de confirmar/contestar */}
       {preview && <FaturaPreviewDialog dados={preview} onClose={() => setPreview(null)} />}
+
+      {/* Lightbox das fotos do gasto — com setas se houver várias */}
+      {fotoLightbox && (
+        <Lightbox
+          fotos={fotoLightbox.lista}
+          index={fotoLightbox.idx}
+          onClose={() => setFotoLightbox(null)}
+          onIndex={(i) => setFotoLightbox((lb) => (lb ? { ...lb, idx: i } : lb))}
+        />
+      )}
 
       {/* Contestar com motivos rápidos */}
       {contestarId && (() => {
