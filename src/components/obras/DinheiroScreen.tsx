@@ -15,6 +15,7 @@ import {
   X,
   Eye,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -99,9 +100,6 @@ export function DinheiroScreen({ obra, souGestor }: { obra: Obra; souGestor: boo
 
   return (
     <div className="space-y-4">
-      {/* Avisos legais automáticos (PT) — informativos, dispensáveis */}
-      <AvisosLegaisBanner obra={obra} souGestor={souGestor} />
-
       {/* Blocos de decisão — co-gestão no topo do ecrã Dinheiro */}
       <BlocoPendentes obra={obra} souGestor={souGestor} souInvestidor={souInvestidor} />
 
@@ -186,6 +184,9 @@ export function DinheiroScreen({ obra, souGestor }: { obra: Obra; souGestor: boo
         </p>
       )}
 
+      {/* Avisos legais — informação secundária, recolhida num dropdown */}
+      <AvisosLegaisBanner obra={obra} souGestor={souGestor} />
+
       {/* Orçamento detalhado — a decomposição completa, colapsada */}
       <OrcamentoDetalhado obra={obra} souGestor={souGestor} />
 
@@ -198,12 +199,14 @@ export function DinheiroScreen({ obra, souGestor }: { obra: Obra; souGestor: boo
   );
 }
 
-// ───────────────────────── Avisos legais (banner âmbar, dispensável) ─────────────────────────
+// ───────────────────────── Avisos legais (dropdown âmbar, colapsado) ─────────────────────────
+// Informação secundária: fica recolhida num só toque para não abafar o essencial.
 
 function AvisosLegaisBanner({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
   const despesas = useObrasStore((s) => s.despesas);
   const dispensarAviso = useObrasStore((s) => s.dispensarAviso);
   const updateDetalhe = useObrasStore((s) => s.updateDetalhe);
+  const [aberto, setAberto] = useState(false);
   const t = totaisObra(obra, despesas);
   const avisos = avisosLegais(obra, t);
   if (avisos.length === 0) return null;
@@ -233,31 +236,45 @@ function AvisosLegaisBanner({ obra, souGestor }: { obra: Obra; souGestor: boolea
   };
 
   return (
-    <div className="space-y-2">
-      {avisos.map((a) => (
-        <div key={a.id} className="flex flex-wrap items-start gap-3 rounded-xl border border-warning/40 bg-warning/8 px-4 py-3">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning" />
-          <p className="min-w-0 flex-1 text-base leading-snug text-ink">{a.texto}</p>
-          {souGestor && (
-            <span className="flex shrink-0 gap-2">
-              <button
-                onClick={() => agir(a.id)}
-                className="rounded-lg border border-warning/50 bg-card px-3 py-2 text-sm font-semibold text-warning hover:bg-warning/10"
-              >
-                {a.acao}
-              </button>
-              <button
-                onClick={() => dispensarAviso(obra.id, a.id)}
-                className="rounded-lg px-2 py-2 text-sm text-muted hover:text-ink"
-                title="Dispensar este aviso"
-              >
-                Já tratei
-              </button>
-            </span>
-          )}
+    <div className="overflow-hidden rounded-2xl border border-warning/40 bg-warning/8">
+      <button
+        onClick={() => setAberto((v) => !v)}
+        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span className="flex items-center gap-2 text-base font-semibold text-warning">
+          <AlertTriangle size={18} className="shrink-0" />
+          {avisos.length} {avisos.length === 1 ? "aviso legal a tratar" : "avisos legais a tratar"}
+        </span>
+        <ChevronDown size={18} className={cn("shrink-0 text-warning transition-transform", aberto && "rotate-180")} />
+      </button>
+
+      {aberto && (
+        <div className="space-y-2 border-t border-warning/25 p-3 animate-fade-in">
+          {avisos.map((a) => (
+            <div key={a.id} className="flex flex-wrap items-start gap-3 rounded-xl border border-warning/30 bg-card px-4 py-3">
+              <p className="min-w-0 flex-1 text-base leading-snug text-ink">{a.texto}</p>
+              {souGestor && (
+                <span className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => agir(a.id)}
+                    className="rounded-lg border border-warning/50 bg-warning/5 px-3 py-2 text-sm font-semibold text-warning hover:bg-warning/10"
+                  >
+                    {a.acao}
+                  </button>
+                  <button
+                    onClick={() => dispensarAviso(obra.id, a.id)}
+                    className="rounded-lg px-2 py-2 text-sm text-muted hover:text-ink"
+                    title="Dispensar este aviso"
+                  >
+                    Já tratei
+                  </button>
+                </span>
+              )}
+            </div>
+          ))}
+          <p className="px-1 text-xs text-muted">Avisos informativos gerados dos dados da obra — não substituem aconselhamento jurídico.</p>
         </div>
-      ))}
-      <p className="px-1 text-xs text-muted">Avisos informativos gerados dos dados da obra — não substituem aconselhamento jurídico.</p>
+      )}
     </div>
   );
 }

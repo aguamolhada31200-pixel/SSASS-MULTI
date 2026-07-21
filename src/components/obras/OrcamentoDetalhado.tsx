@@ -9,6 +9,7 @@ import {
   Sparkles,
   Percent,
   FileText,
+  ListTree,
 } from "lucide-react";
 import {
   useObrasStore,
@@ -66,17 +67,25 @@ export function OrcamentoDetalhado({ obra, souGestor }: { obra: Obra; souGestor:
   };
 
   return (
-    <div className="rounded-2xl border border-line bg-card">
+    <div className={cn("overflow-hidden rounded-2xl border border-gold/40", aberto ? "bg-card" : "bg-gold/5")}>
       <button
         onClick={() => setAberto((v) => !v)}
-        className="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left"
       >
-        <span className="text-base font-semibold text-ink">
-          {t.temDetalhe ? "Ver orçamento detalhado" : souGestor ? "Quer detalhar o orçamento?" : "Orçamento detalhado"}
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold-dark">
+          <ListTree size={20} />
         </span>
-        <span className="flex items-center gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold text-ink">
+            {t.temDetalhe ? "Orçamento detalhado" : souGestor ? "Detalhar o orçamento" : "Orçamento detalhado"}
+          </span>
+          <span className="block text-[13px] leading-snug text-muted">
+            Mão de obra, materiais, IVA, licenças, contingência…
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-3">
           {t.temDetalhe && <span className="num text-base font-bold text-gold-dark">{eur(t.orcamentoTotal)}</span>}
-          <ChevronDown size={18} className={cn("text-muted transition-transform", aberto && "rotate-180")} />
+          <ChevronDown size={20} className={cn("text-gold-dark transition-transform", aberto && "rotate-180")} />
         </span>
       </button>
 
