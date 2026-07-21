@@ -165,6 +165,9 @@ export function DinheiroScreen({ obra, souGestor }: { obra: Obra; souGestor: boo
         </CardContent>
       </Card>
 
+      {/* PROVA DOS GASTOS — quanto tem fatura, quanto falta comprovar (acesso rápido) */}
+      <ResumoProva obra={obra} />
+
       {/* BOTÃO GIGANTE — adicionar/propor despesa */}
       <BotaoDespesa obra={obra} souGestor={souGestor} souInvestidor={souInvestidor} />
 
@@ -466,6 +469,68 @@ function BotaoDespesa({ obra, souGestor, souInvestidor }: { obra: Obra; souGesto
   );
 }
 
+// ───────────────────────── Prova dos gastos (topo — acesso rápido) ─────────────────────────
+// Duas métricas grandes (tem fatura × confirmado pelos sócios) + botão claro
+// "por comprovar". Vive no topo do ecrã Dinheiro, logo a seguir às barras.
+
+function ResumoProva({ obra }: { obra: Obra }) {
+  const despesasAll = useObrasStore((s) => s.despesas);
+  const openPorComprovar = useModalStore((s) => s.openPorComprovar);
+  const despesasObra = despesasAll.filter((d) => d.obraId === obra.id);
+
+  const totalGasto = despesasObra.filter(despesaAplicada).reduce((s, d) => s + d.valor, 0);
+  if (totalGasto <= 0) return null;
+
+  const naoComprovado = gastoNaoComprovado(obra, despesasObra);
+  const pctComp = pctTransparencia(obra, despesasObra);
+  const pctVerif = pctVerificadoSocios(obra, despesasObra);
+  const pendenteAprovacao = despesasObra
+    .filter((d) => d.aprovacao?.estado === "pendente")
+    .reduce((s, d) => s + d.valor, 0);
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <p className="text-sm font-semibold uppercase tracking-wider text-muted">Prova dos gastos</p>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className={cn("rounded-xl border p-3 text-center", pctComp >= 90 ? "border-success/30 bg-success/5" : "border-warning/30 bg-warning/5")}>
+            <p className={cn("num font-display text-[26px] font-bold sm:text-[30px]", pctComp >= 90 ? "text-success" : "text-warning")}>{pctComp}%</p>
+            <p className="mt-0.5 flex items-center justify-center gap-1 text-sm text-muted"><ShieldCheck size={13} /> com fatura</p>
+          </div>
+          {pctVerif != null ? (
+            <div className={cn("rounded-xl border p-3 text-center", pctVerif >= 90 ? "border-success/30 bg-success/5" : "border-warning/30 bg-warning/5")}>
+              <p className={cn("num font-display text-[26px] font-bold sm:text-[30px]", pctVerif >= 90 ? "text-success" : "text-warning")}>{pctVerif}%</p>
+              <p className="mt-0.5 flex items-center justify-center gap-1 text-sm text-muted"><CheckCircle2 size={13} /> confirmado pelos sócios</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-line bg-bg/40 p-3 text-center">
+              <p className="num font-display text-[26px] font-bold text-muted sm:text-[30px]">—</p>
+              <p className="mt-0.5 text-sm text-muted">sem sócios para confirmar</p>
+            </div>
+          )}
+        </div>
+
+        {naoComprovado > 0 && (
+          <button
+            onClick={() => openPorComprovar(obra.id)}
+            className="mt-3 flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border border-warning/40 bg-warning/8 px-4 text-warning transition-colors hover:bg-warning/15"
+          >
+            <span className="flex items-center gap-2 text-base font-semibold">
+              <AlertTriangle size={18} /> {eur(naoComprovado)} por comprovar
+            </span>
+            <span className="shrink-0 text-sm font-medium">Ver o que falta →</span>
+          </button>
+        )}
+        {pendenteAprovacao > 0 && (
+          <p className="mt-2 flex items-center gap-1.5 text-sm text-warning">
+            <Vote size={14} /> {eur(pendenteAprovacao)} em votação (não conta ainda)
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ───────────────────────── Lista de despesas (gastos) ─────────────────────────
 
 function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGestor: boolean; souInvestidor: boolean }) {
@@ -484,7 +549,6 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
   const docs = useDocumentsStore((s) => s.documents);
   const addNotif = useNotificationsStore((s) => s.add);
   const broadcast = useNotificationsStore((s) => s.broadcast);
-  const openPorComprovar = useModalStore((s) => s.openPorComprovar);
   const openAnexarProva = useModalStore((s) => s.openAnexarProva);
   const responderContestacao = useObrasStore((s) => s.responderContestacao);
 
@@ -500,12 +564,6 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
   const fases = fasesAll.filter((f) => f.obraId === obraId);
   const despesasObra = despesasAll.filter((d) => d.obraId === obraId).sort((a, b) => (a.data < b.data ? 1 : -1));
   const lista = soPorComprovar ? despesasObra.filter((d) => estadoProvaDe(d) === "por_comprovar") : despesasObra;
-
-  const totalGasto = despesasObra.filter(despesaAplicada).reduce((s, d) => s + d.valor, 0);
-  const pendenteAprovacao = despesasObra.filter((d) => d.aprovacao?.estado === "pendente").reduce((s, d) => s + d.valor, 0);
-  const comprovado = gastoComprovado(obra, despesasObra);
-  const naoComprovado = gastoNaoComprovado(obra, despesasObra);
-  const pctComp = pctTransparencia(obra, despesasObra);
 
   const aceitarSugestao = (sgId: string, titulo: string, valor: number, autorId: string) => {
     registarDespesa({ obraId, descricao: titulo, valor, data: new Date().toISOString().slice(0, 10) }, CURRENT_USER_ID);
@@ -551,42 +609,6 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
           </button>
         )}
       </div>
-
-      {/* Transparência — DUAS métricas: tem fatura × confirmado pelos sócios */}
-      {totalGasto > 0 && (() => {
-        const pctVerif = pctVerificadoSocios(obra, despesasObra);
-        const ambasVerdes = pctComp >= 90 && (pctVerif == null || pctVerif >= 90);
-        return (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-muted">
-            <span>
-              Total: <strong className="num font-semibold text-ink">{eur(totalGasto)}</strong>
-            </span>
-            <span className={cn("flex items-center gap-1 font-medium", ambasVerdes ? "text-success" : pctComp >= 90 ? "text-success" : "text-warning")}>
-              <ShieldCheck size={14} /> {pctComp}% com fatura
-            </span>
-            {pctVerif != null && (
-              <span className={cn("flex items-center gap-1 font-medium", pctVerif >= 90 ? "text-success" : "text-warning")}>
-                <CheckCircle2 size={14} /> {pctVerif}% confirmado pelos sócios
-              </span>
-            )}
-            {naoComprovado > 0 && (
-              <button
-                onClick={() => openPorComprovar(obraId)}
-                className="inline-flex items-center gap-1 rounded-full border border-warning/40 bg-warning/8 px-2.5 py-0.5 font-medium text-warning transition-colors hover:bg-warning/15"
-                title="Ver o que falta comprovar nesta obra"
-              >
-                <AlertTriangle size={14} /> {eur(naoComprovado)} por comprovar →
-              </button>
-            )}
-            {pendenteAprovacao > 0 && (
-              <span className="flex items-center gap-1 text-warning">
-                <Vote size={14} /> {eur(pendenteAprovacao)} em votação (não conta ainda)
-              </span>
-            )}
-            <span className="text-sm">{eur(comprovado)} com fatura</span>
-          </div>
-        );
-      })()}
 
       {/* Gestor: propostas dos sócios */}
       {souGestor && sugestoesGasto.length > 0 && (
