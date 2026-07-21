@@ -20,6 +20,7 @@ import {
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { MoneyBox } from "@/components/ui/MoneyField";
 import { Lightbox } from "@/components/obras/ObraScreens";
 import {
   useObrasStore,
@@ -1035,13 +1036,37 @@ function MarcosLista({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
   const [showForm, setShowForm] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [valor, setValor] = useState(0);
-  const [dataPrev, setDataPrev] = useState("");
+  const [dataPrev, setDataPrev] = useState(todayISO);
+  const [tocadoM, setTocadoM] = useState<{ titulo?: boolean; valor?: boolean; data?: boolean }>({});
   const [votandoId, setVotandoId] = useState<string | null>(null);
   const precisaVoto = requerAprovacao(obra, valor);
 
+  const errTitulo = titulo.trim().length === 0 ? "Escreva um nome (ex.: A meio da obra 40%)" : undefined;
+  const errValor = !(valor > 0) ? "Indique o valor" : undefined;
+  const errData = !dataPrev ? "Escolha a data prevista" : undefined;
+  const minsM = !errTitulo && !errValor && !errData;
+
+  const abrirForm = () => {
+    setShowForm(true);
+    setDataPrev((d) => d || todayISO);
+    setTocadoM({});
+  };
+  const fecharForm = () => {
+    setShowForm(false);
+    setTitulo("");
+    setValor(0);
+    setDataPrev(todayISO);
+    setTocadoM({});
+  };
+
   const onAdd = () => {
-    if (!titulo.trim() || valor <= 0 || !dataPrev) {
-      toast.error("Preencha título, valor e data");
+    if (!minsM) {
+      setTocadoM({ titulo: true, valor: true, data: true });
+      toast.error(
+        [errTitulo && "nome", errValor && "valor", errData && "data"].filter(Boolean).length
+          ? `Falta preencher: ${[errTitulo && "nome", errValor && "valor", errData && "data"].filter(Boolean).join(", ")}`
+          : "Faltam campos obrigatórios"
+      );
       return;
     }
     registarMarco(
@@ -1069,43 +1094,78 @@ function MarcosLista({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
         link: `/obra/${obraId}`,
       });
     }
-    setTitulo("");
-    setValor(0);
-    setDataPrev("");
-    setShowForm(false);
-    toast.success(precisaVoto ? "Submetido a votação — sócios notificados ✓" : "Pagamento planeado");
+    const nome = titulo.trim();
+    const val = valor;
+    fecharForm();
+    toast.success(
+      precisaVoto ? `Enviado para votação · ${eur(val)}` : `Pagamento planeado · ${eur(val)}`,
+      { description: precisaVoto ? `«${nome}» — os sócios foram notificados.` : `«${nome}» ficou no plano.` }
+    );
   };
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold text-ink">Pagamentos ao empreiteiro</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-ink">Plano de pagamentos ao empreiteiro</h3>
+          <p className="text-sm text-muted">Quando e quanto vai pagar ao empreiteiro. Só planeia e regista — o pagamento é feito por si, fora da app.</p>
+        </div>
         {souGestor && (
-          <Button size="sm" variant={showForm ? "ghost" : "outline"} onClick={() => setShowForm(!showForm)}>
-            {showForm ? "Cancelar" : <><Plus size={14} /> Novo pagamento</>}
+          <Button size="sm" variant={showForm ? "ghost" : "outline"} onClick={() => (showForm ? fecharForm() : abrirForm())}>
+            {showForm ? "Cancelar" : <><Plus size={14} /> Planear pagamento</>}
           </Button>
         )}
       </div>
 
       {showForm && souGestor && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: A meio da obra 40%" className={cn(inputCls, "sm:col-span-3")} />
-              <div className="flex items-center rounded-lg border border-line bg-card">
-                <input type="number" value={valor || ""} onChange={(e) => setValor(Number(e.target.value) || 0)} placeholder="Valor" className="num h-11 w-full bg-transparent px-3 text-base outline-none" />
-                <span className="px-3 text-base text-muted">€</span>
-              </div>
-              <input type="date" value={dataPrev} onChange={(e) => setDataPrev(e.target.value)} className={inputCls} />
-              <Button onClick={onAdd}>
-                {precisaVoto ? <><Vote size={14} /> Submeter a votação</> : <><Plus size={14} /> Adicionar</>}
-              </Button>
+        <Card className="border-gold/40">
+          <CardContent className="space-y-3 p-4">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted">Nome do pagamento <span className="text-danger">*</span></span>
+              <input
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+                onBlur={() => setTocadoM((t) => ({ ...t, titulo: true }))}
+                placeholder="Ex.: A meio da obra 40%"
+                className={cn(inputCls, tocadoM.titulo && errTitulo && "border-danger")}
+              />
+              {tocadoM.titulo && errTitulo && <span className="mt-1 block text-[11px] text-danger">{errTitulo}</span>}
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted">Valor <span className="text-danger">*</span></span>
+                <MoneyBox
+                  value={valor || undefined}
+                  onChange={(n) => setValor(n ?? 0)}
+                  onBlur={() => setTocadoM((t) => ({ ...t, valor: true }))}
+                  comDecimais
+                  className={cn(tocadoM.valor && errValor && "border-danger")}
+                />
+                {tocadoM.valor && errValor && <span className="mt-1 block text-[11px] text-danger">{errValor}</span>}
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted">Data prevista <span className="text-danger">*</span></span>
+                <input
+                  type="date"
+                  value={dataPrev}
+                  onChange={(e) => setDataPrev(e.target.value)}
+                  onBlur={() => setTocadoM((t) => ({ ...t, data: true }))}
+                  className={cn(inputCls, tocadoM.data && errData && "border-danger")}
+                />
+                {tocadoM.data && errData && <span className="mt-1 block text-[11px] text-danger">{errData}</span>}
+              </label>
             </div>
             {precisaVoto && (
-              <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-warning/8 px-3 py-2 text-sm text-warning">
+              <p className="flex items-center gap-1.5 rounded-lg bg-warning/8 px-3 py-2 text-sm text-warning">
                 <Vote size={13} /> Acima de {eur(thresholdDe(obra))} → precisa do voto dos sócios antes de poder ser pago.
               </p>
             )}
+            <div className="flex flex-col gap-2 sm:flex-row-reverse">
+              <Button variant="gold" size="lg" onClick={onAdd} disabled={!minsM} className="w-full sm:w-auto" title={!minsM ? "Preencha nome, valor e data" : undefined}>
+                {precisaVoto ? <><Vote size={15} /> Submeter à votação</> : <><Plus size={15} /> Adicionar ao plano</>}
+              </Button>
+              <Button variant="ghost" onClick={fecharForm} className="w-full sm:w-auto">Cancelar</Button>
+            </div>
           </CardContent>
         </Card>
       )}
