@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, CheckCircle2, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
@@ -36,7 +36,7 @@ export function MarcoPayModal() {
 
   const guardar = () => {
     if (!comprovativo) {
-      toast.error("Anexe o comprovativo de transferência/pagamento");
+      toastError("Anexe o comprovativo de transferência/pagamento");
       return;
     }
     const docId = addDoc({
@@ -88,7 +88,7 @@ export function MarcoPayModal() {
         actorId: CURRENT_USER_ID,
         link: `/obra/${obra.id}`,
       });
-    toast.success(`Pagamento efetuado · ${eur(marco.valor)}`, {
+    toastSuccess(`Pagamento efetuado · ${eur(marco.valor)}`, {
       description: "Comprovativo arquivado · sócios notificados.",
     });
     closeMarcoPay();

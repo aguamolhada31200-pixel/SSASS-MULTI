@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   Lock,
   Eye,
@@ -78,7 +78,7 @@ export default function Perfil() {
   const guardar = () => {
     updatePrivado(p);
     setDirty(false);
-    toast.success("Dados privados atualizados");
+    toastSuccess("Dados privados atualizados");
   };
 
   const ibanMasked = showIban ? p.iban : p.iban.replace(/\w(?=\w{4})/g, "•");
@@ -166,7 +166,7 @@ export default function Perfil() {
               <Field label="Email" className="sm:col-span-2">
                 <div className="flex gap-2">
                   <input value={p.email} onChange={(e) => set("email", e.target.value)} className={inputCls} />
-                  <Button variant="outline" size="sm" onClick={() => toast.success("Email de verificação enviado")}>Verificar</Button>
+                  <Button variant="outline" size="sm" onClick={() => toastSuccess("Email de verificação enviado")}>Verificar</Button>
                 </div>
               </Field>
               <Field label="Telefone">
@@ -313,7 +313,7 @@ export default function Perfil() {
                   explicacao="A verificação dá-lhe o selo ✔ Verificado na Rede e desbloqueia pagamentos. É opcional."
                   variant="gold"
                   size="sm"
-                  onReady={() => { updateVerificacao({ nif_validado: "em_revisao", doc_validado: "em_revisao" }); toast.success("Pedido de verificação enviado — em revisão"); }}
+                  onReady={() => { updateVerificacao({ nif_validado: "em_revisao", doc_validado: "em_revisao" }); toastSuccess("Pedido de verificação enviado — em revisão"); }}
                 >
                   Pedir verificação ✔
                 </UnlockButton>

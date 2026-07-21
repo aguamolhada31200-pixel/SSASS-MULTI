@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -28,7 +28,7 @@ export function TerminarModal({
 
   const submit = () => {
     terminate(arrendamento.id, motivo, data);
-    toast.success("Arrendamento terminado", {
+    toastSuccess("Arrendamento terminado", {
       description: "O imóvel voltou a «Disponível» e deixou de gerar rendas previstas.",
     });
     onClose();

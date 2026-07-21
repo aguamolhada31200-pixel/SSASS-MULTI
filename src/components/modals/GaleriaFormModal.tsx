@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Hammer, Globe, Lock, Star, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { BeforeAfterSlider } from "@/components/galeria/BeforeAfterSlider";
@@ -174,7 +174,7 @@ export function GaleriaFormModal() {
       const url = String(r.result);
       setNovas((n) => [{ url, grupo: "Novas (agora)" }, ...n]);
       if (obraId) addFotoObra(obraId, url); // fica também na obra — fonte única, sem duplicados
-      toast.success("Foto adicionada à obra");
+      toastSuccess("Foto adicionada à obra");
     };
     r.readAsDataURL(file);
   };
@@ -189,7 +189,7 @@ export function GaleriaFormModal() {
   const next = () => {
     if (!podeAvancar()) {
       setMostrarErros(true);
-      toast.error(step === 1 ? "Selecione a foto ANTES e a foto DEPOIS" : "Preencha os campos obrigatórios");
+      toastError(step === 1 ? "Selecione a foto ANTES e a foto DEPOIS" : "Preencha os campos obrigatórios");
       return;
     }
     setMostrarErros(false);
@@ -215,11 +215,11 @@ export function GaleriaFormModal() {
     };
     if (editingId) {
       update(editingId, payload);
-      toast.success("Comparação atualizada");
+      toastSuccess("Comparação atualizada");
     } else {
       add({ ...payload, criadoPor: CURRENT_USER_ID });
       const nome = profiles.find((p) => p.id === CURRENT_USER_ID)?.fullName ?? "";
-      toast.success("Comparação criada", {
+      toastSuccess("Comparação criada", {
         description: visibilidade === "partilhavel_na_rede" ? `Já reforça o track record de ${nome.split(" ")[0]} na Rede.` : undefined,
         action: location.pathname.includes("/galeria")
           ? undefined

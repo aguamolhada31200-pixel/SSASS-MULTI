@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   X,
   FileText,
@@ -52,10 +52,10 @@ function NovoEmpreiteiroInline({ onCriado }: { onCriado: (nome: string, nif?: st
       <button
         type="button"
         onClick={() => {
-          if (!nome.trim()) { toast.error("Indique o nome"); return; }
+          if (!nome.trim()) { toastError("Indique o nome"); return; }
           addTec({ nome: nome.trim(), especialidades: ["geral"], telefone: telefone.trim(), email: "", zonas: [], favorito: false, notas: "" });
           onCriado(nome.trim());
-          toast.success("Empreiteiro criado no diretório");
+          toastSuccess("Empreiteiro criado no diretório");
         }}
         className="mt-2 inline-flex min-h-10 items-center justify-center rounded-lg bg-gold px-4 text-sm font-semibold text-sidebar hover:opacity-90"
       >
@@ -170,11 +170,11 @@ export function ObraExpenseModal() {
   const guardar = (semProva: boolean) => {
     if (!mins) {
       setTocado({ desc: true, valor: true, data: true });
-      toast.error(tooltipMin ?? "Faltam campos obrigatórios");
+      toastError(tooltipMin ?? "Faltam campos obrigatórios");
       return;
     }
     if (!semProva && !comprovativo) {
-      toast.error("Anexe um comprovativo ou escolha «Registar sem comprovativo agora»");
+      toastError("Anexe um comprovativo ou escolha «Registar sem comprovativo agora»");
       return;
     }
     // 1. Despesa (com aprovação automática se exceder threshold)
@@ -292,12 +292,12 @@ export function ObraExpenseModal() {
     // Toast de confirmação — sempre presente, com ação útil
     const sufixoVoto = precisaVoto ? " · foi para votação dos sócios" : "";
     if (semProva) {
-      toast.warning(`Despesa de ${eur(valor)} registada`, {
+      toastWarning(`Despesa de ${eur(valor)} registada`, {
         description: `falta o comprovativo${sufixoVoto}`,
         action: { label: "Anexar agora", onClick: () => openAnexarProva(despesaId) },
       });
     } else {
-      toast.success(`Despesa de ${eur(valor)} registada`, {
+      toastSuccess(`Despesa de ${eur(valor)} registada`, {
         description: `com fatura${sufixoVoto}`,
         action: { label: "Ver gasto", onClick: () => navigate(`/obra/${obra.id}`) },
       });

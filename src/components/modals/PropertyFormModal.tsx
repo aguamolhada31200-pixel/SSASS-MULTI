@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { useNavigate } from "react-router-dom";
 import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Trash2, Plus, Hammer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -253,7 +253,7 @@ export function PropertyFormModal() {
       if (!financiado && entrada > 0 && compra > entrada) {
         const derivado = compra - entrada;
         setValue("financiado", derivado, { shouldDirty: true });
-        toast.info("Valor financiado preenchido automaticamente", {
+        toastInfo("Valor financiado preenchido automaticamente", {
           description: `Compra − entrada = ${eur(derivado)}. Ajuste se não for financiado.`,
         });
       }
@@ -267,7 +267,7 @@ export function PropertyFormModal() {
     let financiado = Number(getValues("financiado")) || 0;
     if (!financiado && entrada > 0 && compra > entrada) financiado = compra - entrada;
     if (financiado <= 0) {
-      toast.error("Indique o valor financiado (ou compra e entrada) primeiro.");
+      toastError("Indique o valor financiado (ou compra e entrada) primeiro.");
       return;
     }
     const prazo = Number(getValues("prazoAnos")) || 30;
@@ -275,7 +275,7 @@ export function PropertyFormModal() {
     const prestacao = Math.round(pmt(taxa / 100, prazo, financiado));
     setValue("financiado", financiado, { shouldDirty: true });
     setValue("prestacaoMensal", prestacao, { shouldDirty: true });
-    toast.info("Prestação estimada", {
+    toastInfo("Prestação estimada", {
       description: `${eur(financiado)} a ${prazo} anos · TAN ${taxa}% → ${eur(prestacao)}/mês. Ajuste ao valor real do banco.`,
     });
   };
@@ -283,7 +283,7 @@ export function PropertyFormModal() {
   const onValid = (values: FormValues) => {
     if (editingId) {
       update(editingId, values);
-      toast.success("Imóvel atualizado", { description: values.name });
+      toastSuccess("Imóvel atualizado", { description: values.name });
       closePropertyForm();
     } else {
       const status = obraData.enabled ? "em_obras" as const : undefined;
@@ -301,18 +301,18 @@ export function PropertyFormModal() {
           progresso: 0,
         });
       }
-      toast.success("Imóvel adicionado", { description: values.name });
+      toastSuccess("Imóvel adicionado", { description: values.name });
       // Plano preventivo recomendado (caldeira, gás, extintor AL…) em 1 toque
       const criado = usePropertiesStore.getState().properties.find((p) => p.id === id);
       if (criado) {
-        toast("Quer criar o plano de manutenção recomendado?", {
+        toastInfo("Quer criar o plano de manutenção recomendado?", {
           description: "Caldeira, inspeção de gás, certificado energético… ajustado ao tipo do imóvel.",
           duration: 10000,
           action: {
             label: "Criar plano",
             onClick: () => {
               const n = useMaintenancePlanStore.getState().criarPlanoRecomendado(criado);
-              toast.success(n > 0 ? `Plano criado · ${n} tarefas` : "O plano já estava completo");
+              toastSuccess(n > 0 ? `Plano criado · ${n} tarefas` : "O plano já estava completo");
             },
           },
         });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, Wrench, ImagePlus, Info } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
@@ -120,7 +120,7 @@ export function MaintenanceFormModal() {
       e.justificacao = "Alterou a sugestão — explique porquê em 1 linha";
     if (Object.keys(e).length > 0) {
       setErros(e);
-      toast.error("Faltam campos obrigatórios");
+      toastError("Faltam campos obrigatórios");
       return;
     }
 
@@ -139,7 +139,7 @@ export function MaintenanceFormModal() {
         tecnicoId: tecnicoId || undefined,
         dataAgendada: dataAgendada || undefined,
       });
-      toast.success("Pedido atualizado ✓");
+      toastSuccess("Pedido atualizado ✓");
     } else {
       add({
         propertyId,
@@ -158,7 +158,7 @@ export function MaintenanceFormModal() {
         origem: tenantId ? "inquilino" : "senhorio",
         planTaskId: prefill?.planTaskId,
       });
-      toast.success("Pedido criado ✓", { description: "Já aparece no kanban e no tab do imóvel." });
+      toastSuccess("Pedido criado ✓", { description: "Já aparece no kanban e no tab do imóvel." });
     }
     closeMaintenanceForm();
   };

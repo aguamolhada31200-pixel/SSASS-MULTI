@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   CreditCard,
   CheckCircle2,
@@ -62,7 +62,7 @@ export default function Faturacao() {
     a.href = URL.createObjectURL(blob);
     a.download = "faturas-redegest.csv";
     a.click();
-    toast.success("Faturas exportadas");
+    toastSuccess("Faturas exportadas");
   };
 
   return (
@@ -174,7 +174,7 @@ export default function Faturacao() {
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => toast.info("Atualização de cartão via Stripe (Fase 4)")}>Atualizar cartão</Button>
+            <Button variant="outline" size="sm" onClick={() => toastInfo("Atualização de cartão via Stripe (Fase 4)")}>Atualizar cartão</Button>
             <Button variant="ghost" size="sm" disabled>Adicionar MB WAY (Em breve)</Button>
           </div>
         </SectionCard>
@@ -183,7 +183,7 @@ export default function Faturacao() {
         <SectionCard title="Código promocional" icon={Tag}>
           <div className="flex gap-2">
             <input value={promo} onChange={(e) => setPromo(e.target.value)} placeholder="Ex.: REDEGEST10" className={inputCls} />
-            <Button variant="outline" size="sm" onClick={() => { aplicarPromo(promo) ? toast.success("Código aplicado") : toast.error("Código inválido"); setPromo(""); }}>Aplicar</Button>
+            <Button variant="outline" size="sm" onClick={() => { aplicarPromo(promo) ? toastSuccess("Código aplicado") : toastError("Código inválido"); setPromo(""); }}>Aplicar</Button>
           </div>
           {plano.promo && (
             <p className="mt-3 flex items-center gap-1.5 text-sm text-success"><CheckCircle2 size={14} /> {plano.promo.codigo} — {plano.promo.desconto}% de desconto ativo</p>
@@ -212,7 +212,7 @@ export default function Faturacao() {
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setMudar(null)}>Cancelar</Button>
-              <Button variant="gold" onClick={() => { updatePlano({ atual: mudar, cicloFaturacao: ciclo }); setMudar(null); toast.success(`Plano alterado para ${PLANOS[mudar].nome}`); }}>
+              <Button variant="gold" onClick={() => { updatePlano({ atual: mudar, cicloFaturacao: ciclo }); setMudar(null); toastSuccess(`Plano alterado para ${PLANOS[mudar].nome}`); }}>
                 <Check size={15} /> Confirmar
               </Button>
             </div>
@@ -254,7 +254,7 @@ function DadosFaturacaoForm() {
         <Field label="País" className="sm:col-span-2"><input value={d.pais} onChange={(e) => set("pais", e.target.value)} className={inputCls} /></Field>
       </div>
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => { updatePlano({ dadosFaturacao: d }); toast.success("Dados de faturação atualizados"); }}>Guardar</Button>
+        <Button size="sm" onClick={() => { updatePlano({ dadosFaturacao: d }); toastSuccess("Dados de faturação atualizados"); }}>Guardar</Button>
       </div>
     </div>
   );
@@ -294,7 +294,7 @@ function FaturasTabela() {
                 <td className="px-3 py-2.5 num text-right text-ink">{eurCents(f.valor)}</td>
                 <td className="px-3 py-2.5 text-center"><Badge tone={tone[f.estado]}>{txt[f.estado]}</Badge></td>
                 <td className="px-3 py-2.5 text-right">
-                  <button onClick={() => toast.success("A descarregar fatura…")} className="text-secondary hover:text-primary"><Download size={15} /></button>
+                  <button onClick={() => toastSuccess("A descarregar fatura…")} className="text-secondary hover:text-primary"><Download size={15} /></button>
                 </td>
               </tr>
             ))}

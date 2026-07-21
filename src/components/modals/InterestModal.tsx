@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, Sparkles, Send, BadgeCheck, LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
@@ -47,7 +47,7 @@ export function InterestModal() {
   const enviar = () => {
     const txt = message.trim();
     if (!txt) {
-      toast.error("Escreva uma mensagem para o anunciante");
+      toastError("Escreva uma mensagem para o anunciante");
       return;
     }
     // 1. Regista o interesse (perfil sempre partilhado — é o mesmo perfil da conta)
@@ -59,7 +59,7 @@ export function InterestModal() {
     incrementContacts(listing.id);
 
     closeInterest();
-    toast.success("Interesse enviado", {
+    toastSuccess("Interesse enviado", {
       description: "Pode continuar a conversa em Mensagens.",
       action: { label: "Abrir conversa", onClick: () => navigate(`/mensagens?c=${convId}`) },
     });

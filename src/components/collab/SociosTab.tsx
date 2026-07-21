@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   UserPlus,
   X,
@@ -81,7 +81,7 @@ export function SociosTab({ project: p }: { project: CollabProject }) {
 
   // ── Remover com reequilíbrio proporcional ──
   const remover = (socio: Partner) => {
-    if (socio.role === "gestor") { toast.error("O gestor não pode ser removido."); return; }
+    if (socio.role === "gestor") { toastError("O gestor não pode ser removido."); return; }
     if (!confirm(`Remover ${socio.name} do projeto?`)) return;
     if (!confirm(`Confirma? A percentagem de ${socio.pct}% será redistribuída pelos restantes sócios.`)) return;
     const restantes = p.partners.filter((s) => s.id !== socio.id);
@@ -99,18 +99,18 @@ export function SociosTab({ project: p }: { project: CollabProject }) {
     }
     setPartners(rebalanced);
     notify({ userId: socio.id, tipo: "geral", titulo: `Foi removido do projeto «${p.title}»`, actorId: CURRENT_USER_ID, link: "/comunidade/colaborativa" });
-    toast.success(`${nomeProprio(socio.name)} removido · percentagens reequilibradas`);
+    toastSuccess(`${nomeProprio(socio.name)} removido · percentagens reequilibradas`);
   };
 
   const reenviar = (socio: Partner) => {
     notify({ userId: socio.id, tipo: "socio_convidado", titulo: `Convite reenviado: «${p.title}»`, descricao: `${socio.pct}% · ${SOCIO_ROLE_LABEL[socio.role ?? "investidor"]}`, actorId: CURRENT_USER_ID, link: `/comunidade/colaborativa/${p.id}` });
-    toast.success(`Convite reenviado a ${nomeProprio(socio.name)}`);
+    toastSuccess(`Convite reenviado a ${nomeProprio(socio.name)}`);
   };
 
   const cancelar = (socio: Partner) => {
     if (!confirm(`Cancelar o convite a ${socio.name}?`)) return;
     setPartners(p.partners.filter((s) => s.id !== socio.id));
-    toast.success("Convite cancelado");
+    toastSuccess("Convite cancelado");
   };
 
   const donut = ativos.map((s, i) => ({ name: s.name, value: s.pct, color: s.color || SOCIO_COLORS[i % SOCIO_COLORS.length] }));
@@ -281,11 +281,11 @@ function InviteModal({ project: p, onClose, prefill }: { project: CollabProject;
   const excede = somaAtual + nova > 100;
 
   const submit = () => {
-    if (nome.trim().length < 2) { toast.error("Indique o nome do sócio."); return; }
-    if (nova <= 0) { toast.error("Indique uma percentagem válida."); return; }
-    if (excede) { toast.error(`Soma ficaria em ${somaAtual + nova}% — o máximo é 100%.`); return; }
+    if (nome.trim().length < 2) { toastError("Indique o nome do sócio."); return; }
+    if (nova <= 0) { toastError("Indique uma percentagem válida."); return; }
+    if (excede) { toastError(`Soma ficaria em ${somaAtual + nova}% — o máximo é 100%.`); return; }
     const id = prefill?.id ?? `inv-${Date.now().toString(36)}`;
-    if (p.partners.some((s) => s.id === id)) { toast.error("Este investidor já pertence ao projeto."); return; }
+    if (p.partners.some((s) => s.id === id)) { toastError("Este investidor já pertence ao projeto."); return; }
     const socio: Partner = {
       id,
       name: nome.trim(),
@@ -300,7 +300,7 @@ function InviteModal({ project: p, onClose, prefill }: { project: CollabProject;
     };
     update(p.id, { partners: [...p.partners, socio] });
     notify({ userId: id, tipo: "socio_convidado", titulo: `Convite: «${p.title}»`, descricao: `${nova}% · ${SOCIO_ROLE_LABEL[role]}`, actorId: CURRENT_USER_ID, link: `/comunidade/colaborativa/${p.id}` });
-    toast.success("Convite enviado", { description: `${nome} · ${nova}% · ${SOCIO_ROLE_LABEL[role]}` });
+    toastSuccess("Convite enviado", { description: `${nome} · ${nova}% · ${SOCIO_ROLE_LABEL[role]}` });
     onClose();
   };
 
@@ -397,15 +397,15 @@ function EditSocioModal({ project: p, socio, onClose }: { project: CollabProject
   const excede = somaOutros + novo > 100;
 
   const submit = () => {
-    if (novo <= 0) { toast.error("Percentagem inválida."); return; }
-    if (excede) { toast.error(`Soma ficaria em ${somaOutros + novo}% — o máximo é 100%.`); return; }
-    if (socio.role === "gestor" && role !== "gestor") { toast.error("O projeto tem de manter um gestor."); return; }
+    if (novo <= 0) { toastError("Percentagem inválida."); return; }
+    if (excede) { toastError(`Soma ficaria em ${somaOutros + novo}% — o máximo é 100%.`); return; }
+    if (socio.role === "gestor" && role !== "gestor") { toastError("O projeto tem de manter um gestor."); return; }
     update(p.id, {
       partners: p.partners.map((s) =>
         s.id === socio.id ? { ...s, pct: novo, role, capitalInvestido: Number(capital) || 0 } : s
       ),
     });
-    toast.success("Sócio atualizado", { description: `${socio.name} · ${novo}%` });
+    toastSuccess("Sócio atualizado", { description: `${socio.name} · ${novo}%` });
     onClose();
   };
 

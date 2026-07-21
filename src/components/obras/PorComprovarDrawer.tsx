@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, AlertTriangle, ShieldCheck, Trash2, ChevronRight, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
@@ -122,7 +122,7 @@ export function PorComprovarDrawer() {
   const eliminar = (l: Linha) => {
     if (!confirm(`Eliminar a despesa "${l.despesa.descricao}" (${eur(l.despesa.valor)})?`)) return;
     removeDespesa(l.despesa.id);
-    toast.success("Despesa eliminada");
+    toastSuccess("Despesa eliminada");
   };
 
   return (

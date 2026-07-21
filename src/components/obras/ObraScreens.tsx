@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   Camera,
   Plus,
@@ -238,7 +238,7 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
     const W = window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike; SpeechRecognition?: new () => SpeechRecognitionLike };
     const Ctor = W.SpeechRecognition ?? W.webkitSpeechRecognition;
     if (!Ctor) {
-      toast.message("Ditado por voz não disponível neste browser");
+      toastInfo("Ditado por voz não disponível neste browser");
       return;
     }
     const rec = new Ctor();
@@ -256,7 +256,7 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
 
   const guardar = () => {
     if (fotos.length === 0 && !texto.trim()) {
-      toast.error("Adicione uma foto ou escreva uma nota");
+      toastError("Adicione uma foto ou escreva uma nota");
       return;
     }
     addDiario(obra.id, {
@@ -270,7 +270,7 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
     setTexto("");
     setTipo("durante");
     setComposerOpen(false);
-    toast.success("Registado no diário da obra");
+    toastSuccess("Registado no diário da obra");
   };
 
   return (
@@ -493,12 +493,12 @@ export function TarefasScreen({ obra, souGestor }: { obra: Obra; souGestor: bool
     if (!t.trim()) return;
     addTarefa(obra.id, t.trim());
     setTitulo("");
-    toast.success("Tarefa adicionada");
+    toastSuccess("Tarefa adicionada");
   };
 
   const enviarSugestao = () => {
     if (!sugTexto.trim()) {
-      toast.error("Descreva a tarefa que sugere");
+      toastError("Descreva a tarefa que sugere");
       return;
     }
     sugerirFase(obra.id, sugTexto.trim(), CURRENT_USER_ID);
@@ -513,7 +513,7 @@ export function TarefasScreen({ obra, souGestor }: { obra: Obra; souGestor: bool
       });
     setSugTexto("");
     setSugOpen(false);
-    toast.success(`Sugestão enviada a ${nomeGestor}`);
+    toastSuccess(`Sugestão enviada a ${nomeGestor}`);
   };
 
   return (
@@ -602,12 +602,12 @@ export function TarefasScreen({ obra, souGestor }: { obra: Obra; souGestor: bool
                     onClick={() => {
                       addTarefa(obra.id, sg.titulo);
                       resolverSugestao(sg.id, "aceite");
-                      toast.success("Tarefa adicionada a partir da sugestão");
+                      toastSuccess("Tarefa adicionada a partir da sugestão");
                     }}
                   >
                     <Plus size={13} /> Adicionar
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { resolverSugestao(sg.id, "rejeitada"); toast.message("Sugestão rejeitada"); }}>
+                  <Button size="sm" variant="ghost" onClick={() => { resolverSugestao(sg.id, "rejeitada"); toastInfo("Sugestão rejeitada"); }}>
                     Rejeitar
                   </Button>
                 </span>
@@ -631,9 +631,9 @@ export function TarefasScreen({ obra, souGestor }: { obra: Obra; souGestor: bool
             <div key={t.id} className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3">
               <button
                 onClick={() => {
-                  if (!souGestor) { toast.message("Só o gestor pica as tarefas"); return; }
+                  if (!souGestor) { toastInfo("Só o gestor pica as tarefas"); return; }
                   toggleTarefa(obra.id, t.id, CURRENT_USER_ID);
-                  toast.success(`Tarefa concluída · ${t.titulo}`);
+                  toastSuccess(`Tarefa concluída · ${t.titulo}`);
                 }}
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-colors",
@@ -781,7 +781,7 @@ function FasesAvancado({ obra, souGestor }: { obra: Obra; souGestor: boolean }) 
                       <span className={cn("num w-11 text-right text-sm font-bold", f.progresso === 100 ? "text-success" : "text-ink")}>{f.progresso}%</span>
                       {souGestor && f.progresso < 100 && (
                         <button
-                          onClick={() => { updateFase(f.id, { progresso: 100 }); toast.success(`Passo concluído · ${f.titulo}`); }}
+                          onClick={() => { updateFase(f.id, { progresso: 100 }); toastSuccess(`Passo concluído · ${f.titulo}`); }}
                           className="rounded-full border border-success/40 bg-success/10 px-2.5 py-1 text-xs font-medium text-success hover:bg-success/20"
                         >
                           Concluído
@@ -804,7 +804,7 @@ function FasesAvancado({ obra, souGestor }: { obra: Obra; souGestor: boolean }) 
                   if (e.key === "Enter" && novoTitulo.trim()) {
                     addFase({ obraId: obra.id, titulo: novoTitulo.trim(), dataInicio: "", dataFim: "", progresso: 0, custoEstimado: 0, ordem: fases.length + 1 });
                     setNovoTitulo("");
-                    toast.success("Passo adicionado");
+                    toastSuccess("Passo adicionado");
                   }
                 }}
               />
@@ -814,7 +814,7 @@ function FasesAvancado({ obra, souGestor }: { obra: Obra; souGestor: boolean }) 
                   if (!novoTitulo.trim()) return;
                   addFase({ obraId: obra.id, titulo: novoTitulo.trim(), dataInicio: "", dataFim: "", progresso: 0, custoEstimado: 0, ordem: fases.length + 1 });
                   setNovoTitulo("");
-                  toast.success("Passo adicionado");
+                  toastSuccess("Passo adicionado");
                 }}
               >
                 <Plus size={15} />
@@ -952,7 +952,7 @@ export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: bo
                       onClick={() => {
                         addContactoObra(obra.id, t.id);
                         setAddOpen(false);
-                        toast.success(`${t.nome} adicionado aos contactos da obra`);
+                        toastSuccess(`${t.nome} adicionado aos contactos da obra`);
                       }}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-accent"
                     >

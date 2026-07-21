@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
@@ -58,7 +58,7 @@ export function MaintenanceExpenseModal() {
 
   const guardar = () => {
     if (valor <= 0 || !data) {
-      toast.error("Indique o valor e a data");
+      toastError("Indique o valor e a data");
       return;
     }
     let documentId: string | undefined;
@@ -94,7 +94,7 @@ export function MaintenanceExpenseModal() {
       transactionId: typeof txId === "string" ? txId : pedido.transactionId,
     });
     logPedido(pedido.id, `Despesa registada: ${eur(valor)}${fornecedor ? ` · ${fornecedor}` : ""} (transação criada${comprovativo ? ", fatura arquivada" : ""}).`);
-    toast.success("Despesa registada ✓", {
+    toastSuccess("Despesa registada ✓", {
       description: "Entrou na Contabilidade e no Balanço/IRS como dedutível.",
     });
     closeMaintenanceExpense();

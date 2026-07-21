@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useModalStore } from "@/store/useModalStore";
@@ -42,7 +42,7 @@ export function AnexarProvaModal() {
 
   const guardar = () => {
     if (!comprovativo) {
-      toast.error("Anexe a foto ou o PDF do comprovativo");
+      toastError("Anexe a foto ou o PDF do comprovativo");
       return;
     }
     const docId = addDoc({
@@ -66,7 +66,7 @@ export function AnexarProvaModal() {
       addedBy: CURRENT_USER_ID,
     });
     void perfilEu;
-    toast.success("Comprovativo anexado", {
+    toastSuccess("Comprovativo anexado", {
       description: `${despesa.descricao} · ${eur(despesa.valor)} · a obra subiu de transparência.`,
     });
     closeAnexarProva();

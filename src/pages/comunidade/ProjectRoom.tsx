@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft,
   UserPlus,
@@ -162,7 +162,7 @@ function HeroProject({ project: p }: { project: CollabProject }) {
   const eliminar = () => {
     if (!confirm(`Eliminar o projeto "${p.title}"? Esta ação não pode ser anulada.`)) return;
     removeProject(p.id);
-    toast.success("Projeto eliminado");
+    toastSuccess("Projeto eliminado");
     navigate("/comunidade/colaborativa");
   };
 
@@ -601,7 +601,7 @@ function ObrasTab({ project: p }: { project: CollabProject }) {
 
   const proporObra = () => {
     if (!propTitulo.trim()) {
-      toast.error("Descreva a obra que propõe");
+      toastError("Descreva a obra que propõe");
       return;
     }
     addDecisao({
@@ -623,7 +623,7 @@ function ObrasTab({ project: p }: { project: CollabProject }) {
     setPropTitulo("");
     setPropValor(0);
     setProporOpen(false);
-    toast.success("Enviado aos sócios ✓", { description: "A proposta entrou nas Decisões para votação." });
+    toastSuccess("Enviado aos sócios ✓", { description: "A proposta entrou nas Decisões para votação." });
   };
 
   const total = obras.reduce((s, o) => s + o.orcamento, 0);

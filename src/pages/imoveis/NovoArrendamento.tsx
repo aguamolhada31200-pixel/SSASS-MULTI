@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft, Check, Save, Plus, Trash2, X, Upload, UserPlus, Info, Calculator,
   KeyRound, Users2, ShieldCheck, FileText, BellRing,
@@ -246,20 +246,20 @@ export default function NovoArrendamento() {
   // ── Primeira renda pro-rata ──
   const calcularProRata = () => {
     if (!form.dataInicio || !form.dataFimPrimeiroPeriodo) {
-      toast.error("Indique a data de início e o fim do 1.º período.");
+      toastError("Indique a data de início e o fim do 1.º período.");
       return;
     }
     const ini = new Date(`${form.dataInicio}T00:00:00`);
     const fim = new Date(`${form.dataFimPrimeiroPeriodo}T00:00:00`);
     if (fim <= ini) {
-      toast.error("O fim do 1.º período tem de ser depois do início.");
+      toastError("O fim do 1.º período tem de ser depois do início.");
       return;
     }
     const dias = Math.round((fim.getTime() - ini.getTime()) / 86400000) + 1;
     const diasNoMes = new Date(ini.getFullYear(), ini.getMonth() + 1, 0).getDate();
     const valor = Math.round((rendaTot / diasNoMes) * dias);
     set({ valorPrimeiraRenda: valor });
-    toast.info("1.ª renda calculada (pro-rata)", { description: `${dias} dias × ${eur(rendaTot)}/${diasNoMes} = ${eur(valor)}` });
+    toastInfo("1.ª renda calculada (pro-rata)", { description: `${dias} dias × ${eur(rendaTot)}/${diasNoMes} = ${eur(valor)}` });
   };
 
   // ── Validação + persistência ──
@@ -357,12 +357,12 @@ export default function NovoArrendamento() {
   const guardar = (rascunho: boolean) => {
     const erro = validarBase();
     if (erro) {
-      toast.error(erro);
+      toastError(erro);
       setTab("gerais");
       return;
     }
     if (!rascunho && anexos.length === 0) {
-      toast.warning("Sem contrato assinado anexado", {
+      toastWarning("Sem contrato assinado anexado", {
         description: "Pode criar na mesma — anexe o contrato na tab Documentos assim que o tiver.",
       });
     }
@@ -375,7 +375,7 @@ export default function NovoArrendamento() {
       const jaReg = editing.caucaoRegistada ?? false;
       const registou = !rascunho && registarCaucao(editing.id, jaReg);
       arrStore.update(editing.id, { documentos: docIds, caucaoRegistada: jaReg || registou });
-      toast.success("Arrendamento atualizado", { description: input.identificador });
+      toastSuccess("Arrendamento atualizado", { description: input.identificador });
       navigate(`/imoveis/arrendamentos/${editing.id}`);
     } else {
       const newId = arrStore.add(input);
@@ -383,10 +383,10 @@ export default function NovoArrendamento() {
       const registou = !rascunho && registarCaucao(newId, false);
       arrStore.update(newId, { documentos: docIds, caucaoRegistada: registou });
       if (rascunho) {
-        toast.success("Rascunho guardado", { description: input.identificador });
+        toastSuccess("Rascunho guardado", { description: input.identificador });
         navigate("/imoveis/arrendamentos");
       } else {
-        toast.success("Arrendamento criado", {
+        toastSuccess("Arrendamento criado", {
           description: registou ? "Caução lançada em Finanças. Rendas previstas na tab Rendas." : "Rendas previstas disponíveis na tab Rendas.",
         });
         navigate(`/imoveis/arrendamentos/${newId}`);
@@ -687,7 +687,7 @@ export default function NovoArrendamento() {
                   onCreate={(payload) => {
                     const tid = addTenant(payload);
                     addInquilino(tid);
-                    toast.success("Inquilino criado e associado", { description: payload.nomeCompleto });
+                    toastSuccess("Inquilino criado e associado", { description: payload.nomeCompleto });
                   }}
                   propertyId={form.propertyId}
                 />
@@ -914,7 +914,7 @@ function NovoInquilinoInline({ onCreate, propertyId }: { onCreate: (payload: Par
   const [telefone, setTelefone] = useState("");
 
   const criar = () => {
-    if (nome.trim().length < 2) { toast.error("Indique o nome do inquilino."); return; }
+    if (nome.trim().length < 2) { toastError("Indique o nome do inquilino."); return; }
     onCreate({
       nomeCompleto: nome.trim(),
       nif: nif.trim(),

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   FileText,
   Image as ImageIcon,
@@ -190,7 +190,7 @@ export default function PastaDigital() {
     const nome = window.prompt("Nome da nova pasta:");
     if (nome && nome.trim()) {
       addFolder(nome.trim());
-      toast.success("Pasta criada", { description: nome.trim() });
+      toastSuccess("Pasta criada", { description: nome.trim() });
     }
   };
 
@@ -739,7 +739,7 @@ function BulkBar({ count, ids, onDone, lixo }: { count: number; ids: string[]; o
     const c = window.prompt(`Nova categoria (${DOC_CATEGORIAS.join(", ")}):`);
     if (c && (DOC_CATEGORIAS as string[]).includes(c)) {
       ids.forEach((id) => setCategoria(id, c as DocCategoria));
-      toast.success(`Categoria alterada para ${c}`);
+      toastSuccess(`Categoria alterada para ${c}`);
       onDone();
     }
   };
@@ -750,7 +750,7 @@ function BulkBar({ count, ids, onDone, lixo }: { count: number; ids: string[]; o
         const doc = useDocumentsStore.getState().documents.find((d) => d.id === id);
         update(id, { tags: [...new Set([...(doc?.tags ?? []), t.trim()])] });
       });
-      toast.success("Etiqueta adicionada");
+      toastSuccess("Etiqueta adicionada");
       onDone();
     }
   };
@@ -759,7 +759,7 @@ function BulkBar({ count, ids, onDone, lixo }: { count: number; ids: string[]; o
     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-accent p-2.5">
       <span className="px-1 text-sm font-medium text-primary">{count} selecionado(s)</span>
       <span className="flex-1" />
-      <Button size="sm" variant="ghost" onClick={() => { toast.success("Download iniciado (ZIP)"); onDone(); }}>
+      <Button size="sm" variant="ghost" onClick={() => { toastSuccess("Download iniciado (ZIP)"); onDone(); }}>
         <Download size={14} /> Descarregar
       </Button>
       {!lixo && (
@@ -770,22 +770,22 @@ function BulkBar({ count, ids, onDone, lixo }: { count: number; ids: string[]; o
           <Button size="sm" variant="ghost" onClick={etiquetar}>
             <TagIcon size={14} /> Etiquetar
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard?.writeText(`${count} documentos`); toast.success("Link de partilha copiado"); onDone(); }}>
+          <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard?.writeText(`${count} documentos`); toastSuccess("Link de partilha copiado"); onDone(); }}>
             <Share2 size={14} /> Partilhar
           </Button>
         </>
       )}
       {lixo ? (
         <>
-          <Button size="sm" variant="ghost" onClick={() => { ids.forEach(restore); toast.success("Restaurado(s)"); onDone(); }}>
+          <Button size="sm" variant="ghost" onClick={() => { ids.forEach(restore); toastSuccess("Restaurado(s)"); onDone(); }}>
             <RotateCcw size={14} /> Restaurar
           </Button>
-          <Button size="sm" variant="danger" onClick={() => { ids.forEach(remove); toast.success("Eliminado(s) definitivamente"); onDone(); }}>
+          <Button size="sm" variant="danger" onClick={() => { ids.forEach(remove); toastSuccess("Eliminado(s) definitivamente"); onDone(); }}>
             <Trash2 size={14} /> Eliminar
           </Button>
         </>
       ) : (
-        <Button size="sm" variant="danger" onClick={() => { ids.forEach(trash); toast.success("Movido(s) para o Lixo"); onDone(); }}>
+        <Button size="sm" variant="danger" onClick={() => { ids.forEach(trash); toastSuccess("Movido(s) para o Lixo"); onDone(); }}>
           <Trash2 size={14} /> Eliminar
         </Button>
       )}
@@ -829,7 +829,7 @@ function DocPanel({
 
   const baixar = () => {
     if (semFicheiro) {
-      toast.info("Documento de exemplo — sem ficheiro real para descarregar.");
+      toastInfo("Documento de exemplo — sem ficheiro real para descarregar.");
       return;
     }
     const a = document.createElement("a");
@@ -839,7 +839,7 @@ function DocPanel({
   };
   const partilhar = () => {
     navigator.clipboard?.writeText(`https://redegest-app.vercel.app/d/${doc.id}`);
-    toast.success("Link de partilha copiado");
+    toastSuccess("Link de partilha copiado");
   };
 
   return (
@@ -969,13 +969,13 @@ function DocPanel({
           <Button variant="outline" size="sm" onClick={partilhar}><Share2 size={14} /> Partilhar</Button>
           {doc.deletedAt ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => { restore(doc.id); toast.success("Restaurado"); onClose(); }}><RotateCcw size={14} /> Restaurar</Button>
-              <Button variant="danger" size="sm" onClick={() => { remove(doc.id); toast.success("Eliminado"); onClose(); }}><Trash2 size={14} /> Eliminar</Button>
+              <Button variant="outline" size="sm" onClick={() => { restore(doc.id); toastSuccess("Restaurado"); onClose(); }}><RotateCcw size={14} /> Restaurar</Button>
+              <Button variant="danger" size="sm" onClick={() => { remove(doc.id); toastSuccess("Eliminado"); onClose(); }}><Trash2 size={14} /> Eliminar</Button>
             </>
           ) : (
             <>
               <Button variant="outline" size="sm" onClick={() => { const n = window.prompt("Novo nome:", doc.nome); if (n?.trim()) rename(doc.id, n.trim()); }}><Pencil size={14} /> Renomear</Button>
-              <Button variant="danger" size="sm" onClick={() => { trash(doc.id); toast.success("Movido para o Lixo"); onClose(); }}><Trash2 size={14} /> Eliminar</Button>
+              <Button variant="danger" size="sm" onClick={() => { trash(doc.id); toastSuccess("Movido para o Lixo"); onClose(); }}><Trash2 size={14} /> Eliminar</Button>
             </>
           )}
         </div>
@@ -1027,7 +1027,7 @@ function UploadModal({ onClose, initialNode }: { onClose: () => void; initialNod
     const novos: PendingFile[] = [];
     Array.from(list).forEach((f) => {
       if (f.size > MAX_BYTES) {
-        toast.error(`${f.name} excede 25 MB`);
+        toastError(`${f.name} excede 25 MB`);
         return;
       }
       const r = new FileReader();
@@ -1052,7 +1052,7 @@ function UploadModal({ onClose, initialNode }: { onClose: () => void; initialNod
 
   const guardar = () => {
     if (files.length === 0) {
-      toast.error("Adicione pelo menos um ficheiro");
+      toastError("Adicione pelo menos um ficheiro");
       return;
     }
     files.forEach((f) => {
@@ -1072,7 +1072,7 @@ function UploadModal({ onClose, initialNode }: { onClose: () => void; initialNod
         notas: notas || undefined,
       });
     });
-    toast.success(`${files.length} documento(s) carregado(s)`);
+    toastSuccess(`${files.length} documento(s) carregado(s)`);
     onClose();
   };
 

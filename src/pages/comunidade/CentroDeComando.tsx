@@ -18,7 +18,7 @@ import {
   PlayCircle,
   ShieldAlert,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ExampleDataToggle } from "@/components/ExampleDataToggle";
@@ -1084,7 +1084,7 @@ function CronogramaPanel({
     if (delta === 0) return;
     if (confirm(`Mover "${o.titulo}" ${delta > 0 ? "+" : ""}${delta} dias?`)) {
       updateObra(o.id, { dataInicio: addDiasISO(o.dataInicio, delta), dataFimPrevista: addDiasISO(o.dataFimPrevista, delta) });
-      toast.success(`Datas atualizadas (${delta > 0 ? "+" : ""}${delta} dias) · sócios notificados`);
+      toastSuccess(`Datas atualizadas (${delta > 0 ? "+" : ""}${delta} dias) · sócios notificados`);
     }
   };
 
@@ -1392,7 +1392,7 @@ function ListaRow({ obra: o, saude: s, fases, despesas, marcos }: { obra: Obra; 
             <div className="absolute right-0 top-7 z-40 w-44 rounded-xl border border-line bg-card py-1 shadow-xl">
               <button onClick={() => navigate(`/obra/${o.id}`)} className="block w-full px-3 py-1.5 text-left text-sm text-ink hover:bg-accent">Abrir detalhe</button>
               {souGestor && o.estado !== "concluida" && (
-                <button onClick={() => { togglePausada(o.id); setMenu(false); toast.success(o.estado === "pausada" ? "Obra retomada" : "Obra pausada"); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink hover:bg-accent">
+                <button onClick={() => { togglePausada(o.id); setMenu(false); toastSuccess(o.estado === "pausada" ? "Obra retomada" : "Obra pausada"); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink hover:bg-accent">
                   {o.estado === "pausada" ? <><PlayCircle size={14} /> Retomar</> : <><PauseCircle size={14} /> Pausar</>}
                 </button>
               )}

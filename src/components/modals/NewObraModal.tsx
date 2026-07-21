@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, Hammer, Pencil, Check, ChevronLeft, Sparkles, Users2, Building2 } from "lucide-react";
 import { EmptyPicker } from "@/components/ui/EmptyPicker";
 import { Button } from "@/components/ui/Button";
@@ -169,7 +169,7 @@ export function NewObraModal() {
         };
         setForm(form);
         setPasso(p.passo);
-        toast.success(p.novoProjectId ? "Projeto criado" : "Imóvel criado", {
+        toastSuccess(p.novoProjectId ? "Projeto criado" : "Imóvel criado", {
           description: "Continue a criar a obra — já está selecionado.",
         });
       } else {
@@ -220,7 +220,7 @@ export function NewObraModal() {
     if (form.orcamento <= 0) e.orcamento = "Indique o orçamento previsto";
     if (Object.keys(e).length > 0) {
       setErros(e);
-      toast.error("Indique quanto pensa gastar");
+      toastError("Indique quanto pensa gastar");
       return;
     }
 
@@ -259,7 +259,7 @@ export function NewObraModal() {
       addMarco({ obraId, titulo: "Conclusão (30%)", valor: form.orcamento - t30 - t40, dataPrevista: fim, estado: "pendente" });
     }
 
-    toast.success("Obra criada", { description: "Pode detalhar o orçamento dentro da obra, quando quiser." });
+    toastSuccess("Obra criada", { description: "Pode detalhar o orçamento dentro da obra, quando quiser." });
     closeObraForm();
   };
 
@@ -269,7 +269,7 @@ export function NewObraModal() {
         ...(form.titulo.trim() ? {} : { titulo: "Indique o nome da obra" }),
         ...(form.orcamento > 0 ? {} : { orcamento: "Indique o orçamento" }),
       });
-      toast.error("Faltam campos obrigatórios");
+      toastError("Faltam campos obrigatórios");
       return;
     }
     updateObra(editingId!, {
@@ -285,7 +285,7 @@ export function NewObraModal() {
       contactoEmpreiteiro: form.contactoEmpreiteiro.trim() || undefined,
       notas: form.descricao.trim(),
     });
-    toast.success("Obra atualizada", { description: form.titulo });
+    toastSuccess("Obra atualizada", { description: form.titulo });
     closeObraForm();
   };
 

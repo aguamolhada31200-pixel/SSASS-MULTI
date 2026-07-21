@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Check, X, ThumbsUp, ThumbsDown, Lock } from "lucide-react";
 import {
   useObrasStore,
@@ -201,7 +201,7 @@ export function VotacaoPanel({
           actorId: CURRENT_USER_ID,
           link: `/obra/${obra.id}`,
         });
-      toast.success(`Voto registado · ${labelVoto}`, { description: "O gestor foi notificado." });
+      toastSuccess(`Voto registado · ${labelVoto}`, { description: "O gestor foi notificado." });
     } else {
       broadcast(
         membrosDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID),
@@ -216,8 +216,8 @@ export function VotacaoPanel({
           link: `/obra/${obra.id}`,
         }
       );
-      if (estado === "aplicado") toast.success("Decisão aprovada · sócios notificados");
-      else toast("Decisão rejeitada", { description: "Os sócios foram notificados." });
+      if (estado === "aplicado") toastSuccess("Decisão aprovada · sócios notificados");
+      else toastInfo("Decisão rejeitada", { description: "Os sócios foram notificados." });
     }
     onResolved?.();
   };

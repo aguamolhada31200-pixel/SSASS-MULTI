@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Menu, Search, Bell, MessageSquare, User, Settings, CreditCard, LogOut, Sun, Moon, Monitor, ChevronDown, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { NAV } from "./nav";
 import { useConversationsStore } from "@/store/useConversationsStore";
 import { CURRENT_USER_ID, useCurrentUser, useProfilesStore } from "@/store/useProfilesStore";
@@ -264,7 +264,7 @@ function AvatarMenu() {
                 return (
                   <button
                     key={t.v}
-                    onClick={() => { updateAparencia({ tema: t.v }); if (t.v !== "claro") toast.info("Tema escuro chega em breve"); }}
+                    onClick={() => { updateAparencia({ tema: t.v }); if (t.v !== "claro") toastInfo("Tema escuro chega em breve"); }}
                     className={cn("flex h-7 w-7 items-center justify-center rounded-lg", tema === t.v ? "bg-primary text-white" : "text-muted hover:bg-accent")}
                     title={t.v}
                   >
@@ -275,7 +275,7 @@ function AvatarMenu() {
             </div>
           </div>
           <div className="my-1 border-t border-line" />
-          <MenuItem icon={LogOut} label="Terminar sessão" danger onClick={() => { setOpen(false); toast.success("Sessão terminada (placeholder)"); }} />
+          <MenuItem icon={LogOut} label="Terminar sessão" danger onClick={() => { setOpen(false); toastSuccess("Sessão terminada (placeholder)"); }} />
         </div>
       )}
     </div>

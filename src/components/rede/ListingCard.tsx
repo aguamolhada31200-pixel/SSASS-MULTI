@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { MapPin, BadgeCheck, Heart } from "lucide-react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   type Listing,
@@ -50,11 +50,11 @@ export function ListingCard({ listing }: { listing: Listing }) {
     e.stopPropagation();
     const now = toggleSaved(listing.id);
     if (now) {
-      toast.success("Guardado nos favoritos ♥", {
+      toastSuccess("Guardado nos favoritos ♥", {
         action: { label: "Ver guardados", onClick: () => navigate("/comunidade/rede?tab=guardados") },
       });
     } else {
-      toast.message("Removido dos guardados");
+      toastInfo("Removido dos guardados");
     }
   };
 

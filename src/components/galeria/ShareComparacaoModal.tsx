@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, Download, Link2, MessageCircle, Instagram, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { duracaoLabel, type Comparacao } from "@/store/useGaleriaStore";
@@ -148,9 +148,9 @@ export function ShareComparacaoModal({ comparacao, onClose }: { comparacao: Comp
     setBusy(true);
     try {
       await descarregar(c, formato);
-      toast.success("Imagem exportada", { description: "PNG pronto a publicar." });
+      toastSuccess("Imagem exportada", { description: "PNG pronto a publicar." });
     } catch {
-      toast.error("Não foi possível gerar a imagem", { description: "Verifique a ligação e tente de novo." });
+      toastError("Não foi possível gerar a imagem", { description: "Verifique a ligação e tente de novo." });
     } finally {
       setBusy(false);
     }
@@ -158,7 +158,7 @@ export function ShareComparacaoModal({ comparacao, onClose }: { comparacao: Comp
 
   const copiarLink = async () => {
     await navigator.clipboard.writeText(linkComparacao(c));
-    toast.success("Link copiado");
+    toastSuccess("Link copiado");
   };
 
   const copiarTexto = async () => {
@@ -166,7 +166,7 @@ export function ShareComparacaoModal({ comparacao, onClose }: { comparacao: Comp
     if (c.valorizacaoEstimada) partes.push(`Valorização estimada +${eur(c.valorizacaoEstimada)}`);
     partes.push(linkComparacao(c));
     await navigator.clipboard.writeText(partes.join("\n"));
-    toast.success("Texto copiado");
+    toastSuccess("Texto copiado");
   };
 
   const whatsapp = () => {
@@ -176,7 +176,7 @@ export function ShareComparacaoModal({ comparacao, onClose }: { comparacao: Comp
 
   const instagram = async () => {
     await exportar();
-    toast.info("Imagem descarregada", { description: "Abra o Instagram e publique o PNG a partir da galeria." });
+    toastInfo("Imagem descarregada", { description: "Abra o Instagram e publique o PNG a partir da galeria." });
   };
 
   return (

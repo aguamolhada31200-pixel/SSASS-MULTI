@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
+import { CheckCircle2, AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { CommandPalette } from "./CommandPalette";
@@ -94,7 +95,19 @@ export function AppLayout() {
       <GaleriaFormModal />
       <MaintenanceFormModal />
       <MaintenanceExpenseModal />
-      <Toaster richColors position="top-center" toastOptions={{ style: { fontFamily: "DM Sans" } }} />
+      <Toaster
+        position="bottom-right"
+        offset={16}
+        gap={12}
+        closeButton
+        duration={4000}
+        icons={{
+          success: <CheckCircle2 size={18} />,
+          error: <AlertCircle size={18} />,
+          warning: <AlertTriangle size={18} />,
+          info: <Info size={18} />,
+        }}
+      />
     </div>
   );
 }

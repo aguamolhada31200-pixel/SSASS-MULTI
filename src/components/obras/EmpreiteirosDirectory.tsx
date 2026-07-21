@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Phone, Mail, Pencil, Plus, Star, MapPin, X, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -155,7 +155,7 @@ function EmpreiteiroForm({ inicial, onClose }: { inicial: Technician | null; onC
     if (!email.trim()) errs.email = "Indique o email";
     if (Object.keys(errs).length > 0) {
       setErros(errs);
-      toast.error("Faltam campos obrigatórios");
+      toastError("Faltam campos obrigatórios");
       return;
     }
     const payload = {
@@ -171,10 +171,10 @@ function EmpreiteiroForm({ inicial, onClose }: { inicial: Technician | null; onC
     };
     if (inicial) {
       update(inicial.id, payload);
-      toast.success("Empreiteiro atualizado");
+      toastSuccess("Empreiteiro atualizado");
     } else {
       add(payload);
-      toast.success("Empreiteiro adicionado ao diretório");
+      toastSuccess("Empreiteiro adicionado ao diretório");
     }
     onClose();
   };
@@ -236,7 +236,7 @@ function EmpreiteiroForm({ inicial, onClose }: { inicial: Technician | null; onC
               onClick={() => {
                 if (confirm(`Remover "${inicial.nome}" do diretório?`)) {
                   remove(inicial.id);
-                  toast.success("Empreiteiro removido");
+                  toastSuccess("Empreiteiro removido");
                   onClose();
                 }
               }}

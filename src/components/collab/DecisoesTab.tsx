@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   Plus,
   X,
@@ -210,9 +210,9 @@ function DecisaoCard({ decisao: d, project: p }: { decisao: Decisao; project: Co
       actorId: CURRENT_USER_ID,
       link: `/comunidade/colaborativa/${p.id}`,
     });
-    if (estado === "aprovada") toast.success("Maioria atingida — decisão aprovada");
-    else if (estado === "rejeitada") toast("Decisão rejeitada", { description: "Aprovação já não era possível." });
-    else toast.success(`Voto registado · ${labelVoto}`);
+    if (estado === "aprovada") toastSuccess("Maioria atingida — decisão aprovada");
+    else if (estado === "rejeitada") toastInfo("Decisão rejeitada", { description: "Aprovação já não era possível." });
+    else toastSuccess(`Voto registado · ${labelVoto}`);
   };
 
   const onComment = () => {
@@ -232,7 +232,7 @@ function DecisaoCard({ decisao: d, project: p }: { decisao: Decisao; project: Co
   const aplicar = () => {
     const hoje = new Date().toISOString().slice(0, 10);
     if (d.tipo === "despesa") {
-      if (!p.propertyId) { toast.error("O projeto não tem imóvel associado."); return; }
+      if (!p.propertyId) { toastError("O projeto não tem imóvel associado."); return; }
       addTx({
         tipo: "despesa",
         propertyId: p.propertyId,
@@ -243,7 +243,7 @@ function DecisaoCard({ decisao: d, project: p }: { decisao: Decisao; project: Co
         recorrente: false,
         deduzivelIrs: true,
       });
-      toast.success("Despesa criada nas Finanças ✓");
+      toastSuccess("Despesa criada nas Finanças ✓");
     } else if (d.tipo === "obra") {
       const fim = new Date();
       fim.setDate(fim.getDate() + 30);
@@ -259,7 +259,7 @@ function DecisaoCard({ decisao: d, project: p }: { decisao: Decisao; project: Co
         progresso: 0,
         notas: d.descricao,
       });
-      toast.success("Obra criada no kanban ✓");
+      toastSuccess("Obra criada no kanban ✓");
     }
     marcarAplicada(d.id);
   };
@@ -504,8 +504,8 @@ export function NovaDecisaoModal({
   };
 
   const submit = () => {
-    if (titulo.trim().length < 3) { toast.error("Indique o título da decisão."); return; }
-    if ((tipo === "despesa" || tipo === "venda") && !(Number(valor) > 0)) { toast.error("Indique o valor."); return; }
+    if (titulo.trim().length < 3) { toastError("Indique o título da decisão."); return; }
+    if ((tipo === "despesa" || tipo === "venda") && !(Number(valor) > 0)) { toastError("Indique o valor."); return; }
     add({
       projectId: p.id,
       titulo: titulo.trim(),
@@ -527,7 +527,7 @@ export function NovaDecisaoModal({
       actorId: CURRENT_USER_ID,
       link: `/comunidade/colaborativa/${p.id}`,
     });
-    toast.success("Decisão proposta", { description: "Todos os sócios foram notificados." });
+    toastSuccess("Decisão proposta", { description: "Todos os sócios foram notificados." });
     onClose();
   };
 

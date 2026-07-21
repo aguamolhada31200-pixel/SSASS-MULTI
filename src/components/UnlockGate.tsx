@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Lock, X, Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAccountStore, type Privado, type RegimeFiscal } from "@/store/useAccountStore";
@@ -96,11 +96,11 @@ export function UnlockModal({
     });
     const faltou = aPedir.some((c) => c !== "regimeFiscal" && !valores[c]?.trim());
     if (faltou) {
-      toast.error("Preencha os campos para destravar a funcionalidade");
+      toastError("Preencha os campos para destravar a funcionalidade");
       return;
     }
     updatePrivado(patch);
-    toast.success(`Tudo pronto para ${feature}`);
+    toastSuccess(`Tudo pronto para ${feature}`);
     onClose();
     onDone?.();
   };
@@ -192,7 +192,7 @@ export function UnlockGate({
         )}
         <div className="mt-4 flex flex-col items-center gap-2">
           <Button variant="gold" onClick={() => setModal(true)}>Preencher agora (30 segundos)</Button>
-          <button onClick={() => toast.message("Sem problema — pode preencher quando quiser.")} className="text-xs text-muted hover:text-ink">
+          <button onClick={() => toastInfo("Sem problema — pode preencher quando quiser.")} className="text-xs text-muted hover:text-ink">
             Continuar a explorar
           </button>
         </div>

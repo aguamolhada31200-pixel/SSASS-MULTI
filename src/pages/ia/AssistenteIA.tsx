@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import {
   Plus,
@@ -114,7 +114,7 @@ export default function AssistenteIA() {
     a.href = URL.createObjectURL(blob);
     a.download = `${active.title}.md`;
     a.click();
-    toast.success("Conversa exportada");
+    toastSuccess("Conversa exportada");
   };
 
   const grupos = useMemo(() => agruparPorRecencia(conversations.filter((c) => c.title.toLowerCase().includes(q.toLowerCase()))), [conversations, q]);
@@ -225,7 +225,7 @@ export default function AssistenteIA() {
         {/* Composer */}
         <div className="border-t border-line p-3">
           <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-line bg-bg px-3 py-2 focus-within:border-secondary">
-            <button onClick={() => toast.info("Anexos chegam em breve.")} className="pb-1.5 text-muted hover:text-ink" title="Anexar"><Paperclip size={18} /></button>
+            <button onClick={() => toastInfo("Anexos chegam em breve.")} className="pb-1.5 text-muted hover:text-ink" title="Anexar"><Paperclip size={18} /></button>
             <textarea
               ref={inputRef}
               value={input}
@@ -284,7 +284,7 @@ function MessageBubble({ m, onAction, onFollowup }: { m: AiMessage; onAction: (a
             {m.actions?.map((a, i) => (
               <button
                 key={`a${i}`}
-                onClick={() => (a.kind === "copy" ? (navigator.clipboard?.writeText(m.content), toast.success("Copiado")) : onAction(a))}
+                onClick={() => (a.kind === "copy" ? (navigator.clipboard?.writeText(m.content), toastSuccess("Copiado")) : onAction(a))}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 px-3 py-1.5 text-xs font-medium text-primary hover:bg-accent"
               >
                 {a.kind === "copy" ? <Copy size={13} /> : <ArrowRight size={13} />} {a.label}

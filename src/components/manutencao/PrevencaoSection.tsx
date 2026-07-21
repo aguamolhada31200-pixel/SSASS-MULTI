@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Plus, X, CalendarClock, CheckCircle2, Pencil, Trash2, History, ShieldCheck, Sparkles, FileText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -132,7 +132,7 @@ export function PrevencaoSection({ propertyId }: { propertyId?: string }) {
                 const p = properties.find((x) => x.id === propertyId);
                 if (!p) return;
                 const n = criarPlano(p);
-                toast.success(n > 0 ? `Plano criado · ${n} tarefas recomendadas` : "O plano já estava completo");
+                toastSuccess(n > 0 ? `Plano criado · ${n} tarefas recomendadas` : "O plano já estava completo");
               }}
             >
               <Sparkles size={14} /> Criar plano de manutenção recomendado
@@ -164,7 +164,7 @@ export function PrevencaoSection({ propertyId }: { propertyId?: string }) {
                   onEliminar={() => {
                     if (confirm(`Eliminar a tarefa "${t.titulo}"?`)) {
                       removeTask(t.id);
-                      toast.success("Tarefa eliminada");
+                      toastSuccess("Tarefa eliminada");
                     }
                   }}
                 />
@@ -225,7 +225,7 @@ function TarefaRow({
       planTaskId: t.id,
     });
     void id;
-    toast.success("Pedido agendado criado ✓", { description: "Aparece no kanban de pedidos." });
+    toastSuccess("Pedido agendado criado ✓", { description: "Aparece no kanban de pedidos." });
   };
 
   return (
@@ -306,7 +306,7 @@ function MarcarFeitaDialog({ tarefa, onClose }: { tarefa: PlanTask; onClose: () 
 
   const guardar = () => {
     if (!data) {
-      toast.error("Indique a data da execução");
+      toastError("Indique a data da execução");
       return;
     }
     let documentId: string | undefined;
@@ -330,7 +330,7 @@ function MarcarFeitaDialog({ tarefa, onClose }: { tarefa: PlanTask; onClose: () 
       observacoes: obs.trim() || undefined,
       documentId,
     });
-    toast.success("Execução registada ✓", {
+    toastSuccess("Execução registada ✓", {
       description: `Próxima: ${dataPT(somarPeriodicidade(data, tarefa.periodicidade))}.`,
     });
     onClose();
@@ -410,7 +410,7 @@ function TarefaFormDialog({
 
   const guardar = () => {
     if (!propertyId || !titulo.trim() || !proxima) {
-      toast.error("Preencha imóvel, título e próxima execução");
+      toastError("Preencha imóvel, título e próxima execução");
       return;
     }
     if (tarefa) {
@@ -426,7 +426,7 @@ function TarefaFormDialog({
         custoTipico: custoTipico || undefined,
         lembreteAntecedenciaDias: antecedencia,
       });
-      toast.success("Tarefa atualizada ✓");
+      toastSuccess("Tarefa atualizada ✓");
     } else {
       add({
         propertyId,
@@ -440,7 +440,7 @@ function TarefaFormDialog({
         custoTipico: custoTipico || undefined,
         lembreteAntecedenciaDias: antecedencia,
       });
-      toast.success("Tarefa preventiva criada ✓");
+      toastSuccess("Tarefa preventiva criada ✓");
     }
     onClose();
   };
@@ -544,7 +544,7 @@ function HistoricoDialog({ tarefa, onClose }: { tarefa: PlanTask; onClose: () =>
                     <button
                       onClick={() => {
                         if (doc.ficheiroUrl && doc.ficheiroUrl !== "#") window.open(doc.ficheiroUrl, "_blank");
-                        else toast.message("Comprovativo", { description: doc.nome });
+                        else toastInfo("Comprovativo", { description: doc.nome });
                       }}
                       className="inline-flex items-center gap-1 text-secondary hover:underline"
                     >

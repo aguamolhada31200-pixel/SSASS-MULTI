@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   Plus,
   TrendingUp,
@@ -241,7 +241,7 @@ export function FinancasTab({
   const onDelete = (t: Transaction) => {
     if (!confirm(`Eliminar este movimento de ${eur(t.valor)}?`)) return;
     removeTx(t.id);
-    toast.success("Movimento eliminado");
+    toastSuccess("Movimento eliminado");
   };
 
   const previewRecibo = (url: string) => {

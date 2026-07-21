@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ChevronDown,
   Plus,
@@ -810,7 +810,7 @@ function SecaoContrato({ obra, souGestor, patch }: { obra: Obra; souGestor: bool
           disabled={!souGestor}
           onChange={(v) => {
             set({ alvaraVerificadoIMPIC: v });
-            if (v) toast.success("Alvará marcado como verificado no IMPIC");
+            if (v) toastSuccess("Alvará marcado como verificado no IMPIC");
           }}
         />
         {ct.alvaraVerificadoIMPIC && (

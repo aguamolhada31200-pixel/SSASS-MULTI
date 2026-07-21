@@ -88,3 +88,102 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* ─────────────────── Toast (sonner) — design system madeira ───────────────────
+   Fundo SEMPRE #FDF8F0. A variante só muda o ícone + a barra lateral de 3px.
+   Estilizado no nível global para que NENHUM toast fique com o estilo default. */
+[data-sonner-toast] {
+  --normal-bg: #fdf8f0;
+  --normal-border: #e8d5be;
+  --normal-text: #1a0f08;
+  background: #fdf8f0 !important;
+  border: 1px solid #e8d5be !important;
+  border-left: 3px solid #8b5e3c !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 16px rgba(92, 61, 46, 0.12) !important;
+  padding: 14px 16px !important;
+  gap: 12px !important;
+  width: 100%;
+  max-width: 380px;
+  font-family: "Inter", system-ui, sans-serif !important;
+  align-items: flex-start !important;
+  transition: transform 200ms ease-out, opacity 200ms ease-out !important;
+}
+[data-sonner-toast][data-removed="true"] {
+  transition-duration: 150ms !important;
+}
+[data-sonner-toast] [data-title] {
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+  color: #1a0f08 !important;
+}
+[data-sonner-toast] [data-description] {
+  font-weight: 400 !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  color: #8b5e3c !important;
+}
+[data-sonner-toast] [data-icon] {
+  margin: 1px 0 0 0 !important;
+  width: 18px;
+  height: 18px;
+}
+[data-sonner-toast] [data-icon] svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Variantes — só o ícone e a barra lateral mudam de cor. */
+[data-sonner-toast][data-type="success"] { border-left-color: #4a7c59 !important; }
+[data-sonner-toast][data-type="success"] [data-icon] { color: #4a7c59; }
+[data-sonner-toast][data-type="error"] { border-left-color: #9b3a2a !important; }
+[data-sonner-toast][data-type="error"] [data-icon] { color: #9b3a2a; }
+[data-sonner-toast][data-type="warning"] { border-left-color: #c17e2a !important; }
+[data-sonner-toast][data-type="warning"] [data-icon] { color: #c17e2a; }
+[data-sonner-toast][data-type="info"] { border-left-color: #8b5e3c !important; }
+[data-sonner-toast][data-type="info"] [data-icon] { color: #8b5e3c; }
+[data-sonner-toast][data-type="default"] { border-left-color: #8b5e3c !important; }
+[data-sonner-toast][data-type="default"] [data-icon] { color: #8b5e3c; }
+
+/* Botão de ação (ex.: "Ver gasto") — coerente com o gold do site. */
+[data-sonner-toast] [data-button] {
+  background: #c8a664 !important;
+  color: #2e1a0e !important;
+  border-radius: 8px !important;
+  font-family: "Inter", system-ui, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  height: 30px !important;
+}
+
+/* Fechar (X) — discreto, só em hover. */
+[data-sonner-toast] [data-close-button] {
+  left: auto !important;
+  right: 8px !important;
+  top: 8px !important;
+  transform: none !important;
+  color: #8b5e3c !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+[data-sonner-toast]:hover [data-close-button],
+[data-sonner-toast]:focus-within [data-close-button] {
+  opacity: 1;
+}
+
+/* Mobile: barra inferior, largura total com margem de 16px. */
+@media (max-width: 600px) {
+  [data-sonner-toaster] {
+    left: 16px !important;
+    right: 16px !important;
+    width: auto !important;
+  }
+  [data-sonner-toast] {
+    max-width: none;
+    width: 100%;
+  }
+}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm, type Control, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { useNavigate } from "react-router-dom";
 import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Trash2, Hammer, Handshake, KeyRound, Plus, Info, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -290,14 +290,14 @@ export function PublishListingModal() {
     const payload = { ...base, ...typed } as never;
     if (editingId) {
       update(editingId, payload);
-      toast.success("Anúncio atualizado");
+      toastSuccess("Anúncio atualizado");
       closeListingForm();
     } else {
       const id = add(payload);
       // Alertas de oportunidade: notifica quem tem critérios que este anúncio cumpre.
       const novo = getById(id);
       if (novo) notificarAlertasComNovoAnuncio(novo);
-      toast.success("Anúncio publicado", { description: values.title });
+      toastSuccess("Anúncio publicado", { description: values.title });
       closeListingForm();
       navigate(`/comunidade/rede/anuncio/${id}`);
     }
@@ -329,7 +329,7 @@ export function PublishListingModal() {
     if (step === 1) {
       const ok = await trigger();
       if (!ok) {
-        toast.error("Preencha os campos obrigatórios");
+        toastError("Preencha os campos obrigatórios");
         return;
       }
     }
@@ -339,7 +339,7 @@ export function PublishListingModal() {
   // Se o Publicar disparar com o form inválido, leva o utilizador ao passo Detalhes
   // e diz porquê — o botão nunca fica "morto" sem feedback.
   const onInvalidSubmit = () => {
-    toast.error("Faltam campos obrigatórios", { description: "Volte ao passo Detalhes e preencha os campos assinalados a vermelho." });
+    toastError("Faltam campos obrigatórios", { description: "Volte ao passo Detalhes e preencha os campos assinalados a vermelho." });
     setStep(1);
   };
 

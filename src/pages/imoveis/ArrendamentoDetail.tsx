@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft, Pencil, Trash2, LogOut, Building2, Users2, ShieldCheck,
   FileText, History as HistoryIcon, CheckCircle2, Clock, TrendingUp, Wallet,
@@ -59,7 +59,7 @@ export default function ArrendamentoDetail() {
   const onDelete = () => {
     if (!confirm(`Eliminar o arrendamento ${arrendamento.identificador}? Esta ação não pode ser anulada.`)) return;
     remove(arrendamento.id);
-    toast.success("Arrendamento eliminado");
+    toastSuccess("Arrendamento eliminado");
     navigate("/imoveis/arrendamentos");
   };
 
@@ -351,7 +351,7 @@ function RendasTab({ a }: { a: Arrendamento }) {
       deduzivelIrs: false,
       notas: `Arrendamento ${a.identificador}`,
     });
-    toast.success("Renda registada em Finanças", { description: `${mesPT(p.periodoIso)} · ${eur(p.valor)}` });
+    toastSuccess("Renda registada em Finanças", { description: `${mesPT(p.periodoIso)} · ${eur(p.valor)}` });
   };
 
   const pagas = linhas.filter((l) => l.estado === "pago").length;

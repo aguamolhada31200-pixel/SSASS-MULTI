@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   Plus,
   Trash2,
@@ -217,15 +217,15 @@ function AvisosLegaisBanner({ obra, souGestor }: { obra: Obra; souGestor: boolea
     // Ações diretas quando possível; caso contrário aponta para o orçamento detalhado.
     if (id === "impic") {
       updateDetalhe(obra.id, { contrato: { ...(obra.contrato ?? {}), alvaraVerificadoIMPIC: true } });
-      toast.success("Alvará marcado como verificado no IMPIC");
+      toastSuccess("Alvará marcado como verificado no IMPIC");
       return;
     }
     if (id === "seguro-at") {
       updateDetalhe(obra.id, { seguros: { ...(obra.seguros ?? {}), atVerificado: true } });
-      toast.success("Seguro de acidentes de trabalho confirmado");
+      toastSuccess("Seguro de acidentes de trabalho confirmado");
       return;
     }
-    toast.message("Abra «Ver orçamento detalhado» em baixo", {
+    toastInfo("Abra «Ver orçamento detalhado» em baixo", {
       description:
         id === "contrato"
           ? "Secção «Contrato e alvará» — marque o contrato como assinado."
@@ -331,7 +331,7 @@ function BlocoPendentes({ obra, souGestor, souInvestidor }: { obra: Obra; souGes
       actorId: CURRENT_USER_ID,
       link: `/obra/${obra.id}`,
     });
-    toast.success(`Lembrete enviado a ${emFalta.length} sócio${emFalta.length === 1 ? "" : "s"}`);
+    toastSuccess(`Lembrete enviado a ${emFalta.length} sócio${emFalta.length === 1 ? "" : "s"}`);
   };
 
   return (
@@ -430,7 +430,7 @@ function BotaoDespesa({ obra, souGestor, souInvestidor }: { obra: Obra; souGesto
 
   const enviar = () => {
     if (!propDesc.trim() || propValor <= 0) {
-      toast.error("Descreva a despesa e indique o valor");
+      toastError("Descreva a despesa e indique o valor");
       return;
     }
     sugerirGasto(obra.id, propDesc.trim(), propValor, CURRENT_USER_ID);
@@ -446,7 +446,7 @@ function BotaoDespesa({ obra, souGestor, souInvestidor }: { obra: Obra; souGesto
     setPropDesc("");
     setPropValor(0);
     setProporOpen(false);
-    toast.success(`Proposta enviada a ${nomeGestor} ✓`, { description: "Ele decide se regista a despesa." });
+    toastSuccess(`Proposta enviada a ${nomeGestor} ✓`, { description: "Ele decide se regista a despesa." });
   };
 
   return (
@@ -610,7 +610,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
         link: `/obra/${obraId}`,
       });
     }
-    toast.success(precisaVoto ? "Registado — acima do threshold, entrou em votação" : "Gasto registado ✓");
+    toastSuccess(precisaVoto ? "Registado — acima do threshold, entrou em votação" : "Gasto registado ✓");
   };
 
   return (
@@ -661,7 +661,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
                           actorId: CURRENT_USER_ID,
                           link: `/obra/${obraId}`,
                         });
-                      toast.message("Proposta rejeitada — o sócio foi avisado");
+                      toastInfo("Proposta rejeitada — o sócio foi avisado");
                     }}
                   >
                     Rejeitar
@@ -851,7 +851,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
                                   })
                                 );
                                 setRespondendoId(null);
-                                toast.success("Resposta enviada aos sócios");
+                                toastSuccess("Resposta enviada aos sócios");
                               }
                             }}
                           />
@@ -871,7 +871,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
                                 })
                               );
                               setRespondendoId(null);
-                              toast.success("Resposta enviada aos sócios");
+                              toastSuccess("Resposta enviada aos sócios");
                             }}
                           >
                             <Send size={13} />
@@ -892,7 +892,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
                           onClick={() => {
                             if (meuVotoConfirma?.valor === "confirma") {
                               removerConfirmacaoDespesa(d.id, CURRENT_USER_ID);
-                              toast.message("Confirmação removida");
+                              toastInfo("Confirmação removida");
                               return;
                             }
                             confirmarDespesa(d.id, CURRENT_USER_ID, "confirma");
@@ -906,7 +906,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
                                 actorId: CURRENT_USER_ID,
                                 link: `/obra/${obraId}`,
                               });
-                            toast.success("Gasto confirmado — o gestor foi notificado");
+                            toastSuccess("Gasto confirmado — o gestor foi notificado");
                           }}
                           className={cn(
                             "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
@@ -980,7 +980,7 @@ function DespesasLista({ obra, souGestor, souInvestidor }: { obra: Obra; souGest
                   link: `/obra/${obraId}`,
                 });
               setContestarId(null);
-              toast.message("Contestação enviada", { description: "O gestor foi notificado com o motivo." });
+              toastInfo("Contestação enviada", { description: "O gestor foi notificado com o motivo." });
             }}
           />
         );
@@ -1062,7 +1062,7 @@ function MarcosLista({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
   const onAdd = () => {
     if (!minsM) {
       setTocadoM({ titulo: true, valor: true, data: true });
-      toast.error(
+      toastError(
         [errTitulo && "nome", errValor && "valor", errData && "data"].filter(Boolean).length
           ? `Falta preencher: ${[errTitulo && "nome", errValor && "valor", errData && "data"].filter(Boolean).join(", ")}`
           : "Faltam campos obrigatórios"
@@ -1097,7 +1097,7 @@ function MarcosLista({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
     const nome = titulo.trim();
     const val = valor;
     fecharForm();
-    toast.success(
+    toastSuccess(
       precisaVoto ? `Enviado para votação · ${eur(val)}` : `Pagamento planeado · ${eur(val)}`,
       { description: precisaVoto ? `«${nome}» — os sócios foram notificados.` : `«${nome}» ficou no plano.` }
     );
@@ -1265,7 +1265,7 @@ function MarcosLista({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
                                     actorId: CURRENT_USER_ID,
                                     link: `/obra/${obraId}`,
                                   });
-                                toast.success("Pagamento confirmado — o gestor foi notificado");
+                                toastSuccess("Pagamento confirmado — o gestor foi notificado");
                               }}
                               className={cn(
                                 "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
@@ -1342,7 +1342,7 @@ function MarcosLista({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
                 link: `/obra/${obraId}`,
               });
             setContestarM(null);
-            toast.message("Contestação enviada", { description: "O gestor foi notificado com o motivo." });
+            toastInfo("Contestação enviada", { description: "O gestor foi notificado com o motivo." });
           }}
         />
       )}
@@ -1636,9 +1636,9 @@ function DecisoesDaObra({ obra, souGestor, souInvestidor }: { obra: Obra; souGes
         link: `/comunidade/colaborativa/${project.id}?tab=decisoes&obra=${obra.id}`,
       }
     );
-    if (estado === "aprovada") toast.success("Maioria atingida — decisão aprovada");
-    else if (estado === "rejeitada") toast("Decisão rejeitada");
-    else toast.success("Voto registado");
+    if (estado === "aprovada") toastSuccess("Maioria atingida — decisão aprovada");
+    else if (estado === "rejeitada") toastInfo("Decisão rejeitada");
+    else toastSuccess("Voto registado");
   };
 
   return (

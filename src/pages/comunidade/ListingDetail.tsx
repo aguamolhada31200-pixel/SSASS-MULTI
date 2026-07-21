@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft,
   MapPin,
@@ -850,20 +850,20 @@ function useListingActions(listing: L) {
   const guardar = () => {
     const now = toggleSaved(listing.id);
     if (now) {
-      toast.success("Guardado nos favoritos ♥", {
+      toastSuccess("Guardado nos favoritos ♥", {
         action: { label: "Ver guardados", onClick: () => navigate("/comunidade/rede?tab=guardados") },
       });
     } else {
-      toast.message("Removido dos guardados");
+      toastInfo("Removido dos guardados");
     }
   };
   const partilhar = async () => {
     const url = `${window.location.origin}/comunidade/rede/anuncio/${listing.id}`;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Link copiado", { description: url });
+      toastSuccess("Link copiado", { description: url });
     } catch {
-      toast.info(url);
+      toastInfo(url);
     }
   };
   const interesse = () => openInterest(listing.id);
@@ -937,12 +937,12 @@ function AcoesAutor({ listing }: { listing: L }) {
   const pausar = () => {
     const next = listing.status === "paused" ? "active" : "paused";
     setStatus(listing.id, next);
-    toast.success(next === "paused" ? "Anúncio pausado" : "Anúncio reativado");
+    toastSuccess(next === "paused" ? "Anúncio pausado" : "Anúncio reativado");
   };
   const eliminar = () => {
     if (!confirm(`Eliminar "${listing.title}"?`)) return;
     remove(listing.id);
-    toast.success("Anúncio eliminado");
+    toastSuccess("Anúncio eliminado");
     navigate("/comunidade/rede");
   };
 

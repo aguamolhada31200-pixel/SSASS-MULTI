@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   Search,
   Plus,
@@ -737,10 +737,10 @@ function AlertasModal({
   const guardar = () => {
     if (editando) {
       update(editando.id, { nome, criterios: crit });
-      toast.success("Alerta atualizado");
+      toastSuccess("Alerta atualizado");
     } else {
       add(nome, crit);
-      toast.success("Alerta criado", { description: `${contar(crit)} anúncios cumprem agora os critérios.` });
+      toastSuccess("Alerta criado", { description: `${contar(crit)} anúncios cumprem agora os critérios.` });
     }
     onTrocarModo("lista");
     setEditando(null);
@@ -850,7 +850,7 @@ function AlertasModal({
                           {a.ativo ? <Pause size={15} /> : <Play size={15} />}
                         </button>
                         <button onClick={() => abrirEdicao(a)} className="rounded-md p-1.5 text-muted hover:bg-accent hover:text-ink" title="Editar"><Pencil size={15} /></button>
-                        <button onClick={() => { remove(a.id); toast.success("Alerta eliminado"); }} className="rounded-md p-1.5 text-muted hover:bg-danger/10 hover:text-danger" title="Eliminar"><Trash2 size={15} /></button>
+                        <button onClick={() => { remove(a.id); toastSuccess("Alerta eliminado"); }} className="rounded-md p-1.5 text-muted hover:bg-danger/10 hover:text-danger" title="Eliminar"><Trash2 size={15} /></button>
                       </div>
                     </div>
                   </div>

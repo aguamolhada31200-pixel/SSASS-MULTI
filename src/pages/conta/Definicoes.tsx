@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   UserCog,
   BellRing,
@@ -120,7 +120,7 @@ function TabConta() {
         <Field label="Email" hint="Alterar o email requer confirmação no novo endereço.">
           <div className="flex gap-2">
             <input defaultValue={privado.email} className={inputCls} />
-            <Button variant="outline" size="sm" onClick={() => toast.success("Email de confirmação enviado")}>Alterar</Button>
+            <Button variant="outline" size="sm" onClick={() => toastSuccess("Email de confirmação enviado")}>Alterar</Button>
           </div>
         </Field>
       </SectionCard>
@@ -142,14 +142,14 @@ function TabConta() {
           </div>
         )}
         <div className="mt-3 flex justify-end">
-          <Button size="sm" onClick={() => { toast.success("Palavra-passe atualizada"); setNovaPw(""); }}>Guardar</Button>
+          <Button size="sm" onClick={() => { toastSuccess("Palavra-passe atualizada"); setNovaPw(""); }}>Guardar</Button>
         </div>
       </SectionCard>
 
       <SectionCard title="Autenticação em dois passos" icon={ShieldCheck} badge={<Badge tone="neutral" className="ml-auto">Em breve</Badge>}>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">Proteja a conta com um segundo fator (app autenticadora ou SMS).</p>
-          <Toggle on={seguranca.dois_fatores} onChange={() => toast.info("2FA chega na Fase 4")} />
+          <Toggle on={seguranca.dois_fatores} onChange={() => toastInfo("2FA chega na Fase 4")} />
         </div>
       </SectionCard>
 
@@ -164,7 +164,7 @@ function TabConta() {
             </li>
           ))}
         </ul>
-        <Button variant="outline" size="sm" className="mt-3" onClick={() => { updateSeguranca({ ultimosLogins: seguranca.ultimosLogins.filter((l) => l.atual) }); toast.success("Outras sessões terminadas"); }}>
+        <Button variant="outline" size="sm" className="mt-3" onClick={() => { updateSeguranca({ ultimosLogins: seguranca.ultimosLogins.filter((l) => l.atual) }); toastSuccess("Outras sessões terminadas"); }}>
           <LogOut size={14} /> Terminar todas as outras sessões
         </Button>
       </SectionCard>
@@ -172,7 +172,7 @@ function TabConta() {
       <SectionCard title="Exportar os meus dados (RGPD)" icon={Download}>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">Gera um ZIP com todos os seus dados na plataforma.</p>
-          <Button variant="outline" size="sm" onClick={() => toast.success("A preparar exportação… receberá um email com o ZIP.")}><Download size={14} /> Exportar</Button>
+          <Button variant="outline" size="sm" onClick={() => toastSuccess("A preparar exportação… receberá um email com o ZIP.")}><Download size={14} /> Exportar</Button>
         </div>
       </SectionCard>
     </>
@@ -246,7 +246,7 @@ function TabPrivacidade() {
       <SectionCard title="Eliminação de dados pessoais (RGPD)" icon={Trash2}>
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">Peça a remoção dos seus dados pessoais da plataforma.</p>
-          <Button variant="outline" size="sm" onClick={() => toast.success("Pedido de eliminação registado")}>Pedir eliminação</Button>
+          <Button variant="outline" size="sm" onClick={() => toastSuccess("Pedido de eliminação registado")}>Pedir eliminação</Button>
         </div>
       </SectionCard>
     </>
@@ -283,7 +283,7 @@ function TabAparencia() {
             const Icon = t.icon;
             const ativo = ap.tema === t.v;
             return (
-              <button key={t.v} onClick={() => { update({ tema: t.v }); if (t.v !== "claro") toast.info("Tema escuro madeira chega em breve"); }} className={cn("flex flex-col items-center gap-2 rounded-xl border p-4 transition-all", ativo ? "border-primary bg-accent" : "border-line hover:bg-accent/60")}>
+              <button key={t.v} onClick={() => { update({ tema: t.v }); if (t.v !== "claro") toastInfo("Tema escuro madeira chega em breve"); }} className={cn("flex flex-col items-center gap-2 rounded-xl border p-4 transition-all", ativo ? "border-primary bg-accent" : "border-line hover:bg-accent/60")}>
                 <Icon size={20} className={ativo ? "text-primary" : "text-muted"} />
                 <span className={cn("text-sm", ativo ? "font-medium text-primary" : "text-ink")}>{t.label}</span>
               </button>
@@ -346,7 +346,7 @@ function TabIntegracoes() {
               <span className="ml-auto">{estadoBadge(estado)}</span>
             </div>
             <p className="mt-2 text-xs text-muted">{it.desc}</p>
-            <Button variant="outline" size="sm" className="mt-3 w-full" disabled={estado !== "disponivel"} onClick={() => toast.success(`${it.nome} ligada`)}>
+            <Button variant="outline" size="sm" className="mt-3 w-full" disabled={estado !== "disponivel"} onClick={() => toastSuccess(`${it.nome} ligada`)}>
               {estado === "ligada" ? "Gerir" : "Ligar"}
             </Button>
           </div>
@@ -418,7 +418,7 @@ function TabApagar() {
     <div className="rounded-xl border border-danger/30 bg-danger/5 p-5">
       <h3 className="font-display text-base font-semibold text-danger">Zona de perigo</h3>
       <p className="mt-1 text-sm text-muted">Antes de apagar, exporte os seus dados.</p>
-      <Button variant="outline" size="sm" className="mt-3" onClick={() => toast.success("A preparar exportação…")}><Download size={14} /> Exportar dados</Button>
+      <Button variant="outline" size="sm" className="mt-3" onClick={() => toastSuccess("A preparar exportação…")}><Download size={14} /> Exportar dados</Button>
 
       <ul className="mt-4 space-y-1 text-sm text-ink">
         <li>• Todos os imóveis, contratos, mensagens e ficheiros serão removidos.</li>
@@ -436,7 +436,7 @@ function TabApagar() {
             <input value={conf} onChange={(e) => setConf(e.target.value)} placeholder={email} className={cn(inputCls, "mt-3")} />
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button variant="danger" disabled={conf.trim() !== email} onClick={() => { setOpen(false); toast.success("Conta marcada para eliminação (placeholder)"); }}>
+              <Button variant="danger" disabled={conf.trim() !== email} onClick={() => { setOpen(false); toastSuccess("Conta marcada para eliminação (placeholder)"); }}>
                 <Check size={15} /> Apagar definitivamente
               </Button>
             </div>

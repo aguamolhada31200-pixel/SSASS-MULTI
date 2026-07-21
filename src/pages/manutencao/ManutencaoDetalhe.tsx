@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft,
   Pencil,
@@ -115,7 +115,7 @@ export default function ManutencaoDetalhe() {
   const eliminar = () => {
     if (!confirm(`Eliminar o pedido "${pedido.titulo}"?`)) return;
     remove(pedido.id);
-    toast.success("Pedido eliminado");
+    toastSuccess("Pedido eliminado");
     navigate("/manutencao");
   };
 
@@ -146,7 +146,7 @@ export default function ManutencaoDetalhe() {
     }
     update(pedido.id, { fotosDepois: [...pedido.fotosDepois, ...novas].slice(0, 8) });
     log(pedido.id, `${novas.length} ${novas.length === 1 ? "foto adicionada" : "fotos adicionadas"} (depois).`);
-    toast.success("Fotos adicionadas ✓");
+    toastSuccess("Fotos adicionadas ✓");
   };
 
   const onDocs = async (files: FileList | null) => {
@@ -171,7 +171,7 @@ export default function ManutencaoDetalhe() {
       });
     }
     log(pedido.id, "Documento(s) anexado(s).");
-    toast.success("Documentos anexados ✓");
+    toastSuccess("Documentos anexados ✓");
   };
 
   return (
@@ -199,7 +199,7 @@ export default function ManutencaoDetalhe() {
                   value={pedido.estado}
                   onChange={(e) => {
                     setEstado(pedido.id, e.target.value as EstadoPedido);
-                    toast.success(`Estado: ${ESTADO_PEDIDO_LABEL[e.target.value as EstadoPedido]}`);
+                    toastSuccess(`Estado: ${ESTADO_PEDIDO_LABEL[e.target.value as EstadoPedido]}`);
                   }}
                   className={cn("h-7 rounded-full border-0 px-2.5 text-[11px] font-semibold outline-none", ESTADO_TONE[pedido.estado])}
                   title="Mudar estado"
@@ -372,11 +372,11 @@ export default function ManutencaoDetalhe() {
                     <Button
                       size="sm"
                       onClick={() => {
-                        if (!justResp.trim()) { toast.error("Indique a justificação"); return; }
+                        if (!justResp.trim()) { toastError("Indique a justificação"); return; }
                         update(pedido.id, { responsabilidade: novaResp, justificacaoResponsabilidade: justResp.trim() });
                         log(pedido.id, `Responsabilidade alterada para ${RESPONSABILIDADE_LABEL[novaResp]} — ${justResp.trim()}.`);
                         setAlterandoResp(false);
-                        toast.success("Responsabilidade atualizada ✓");
+                        toastSuccess("Responsabilidade atualizada ✓");
                       }}
                     >
                       Guardar
@@ -487,7 +487,7 @@ export default function ManutencaoDetalhe() {
                     update(pedido.id, { tecnicoId: t.id });
                     log(pedido.id, `Técnico atribuído: ${t.nome}.`);
                     setTecnicoDropdown(false);
-                    toast.success(`Técnico atribuído · ${t.nome}`);
+                    toastSuccess(`Técnico atribuído · ${t.nome}`);
                   }}
                 >
                   <option value="" disabled>Escolher do diretório…</option>
@@ -516,7 +516,7 @@ export default function ManutencaoDetalhe() {
                       <button
                         onClick={() => {
                           if (d.ficheiroUrl && d.ficheiroUrl !== "#") window.open(d.ficheiroUrl, "_blank");
-                          else toast.message("Documento", { description: d.nome });
+                          else toastInfo("Documento", { description: d.nome });
                         }}
                         className="inline-flex max-w-full items-center gap-1.5 truncate rounded-md border border-line bg-bg/40 px-2 py-1.5 text-[12px] text-ink hover:bg-accent"
                       >

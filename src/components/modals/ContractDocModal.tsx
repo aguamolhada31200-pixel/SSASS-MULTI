@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { useNavigate } from "react-router-dom";
 import { X, Upload, FileText, Image as ImageIcon, UserPlus, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -109,7 +109,7 @@ export function ContractDocModal() {
 
   const onFile = (file: File) => {
     if (file.size > MAX) {
-      toast.error("O ficheiro excede 25 MB");
+      toastError("O ficheiro excede 25 MB");
       return;
     }
     const r = new FileReader();
@@ -119,7 +119,7 @@ export function ContractDocModal() {
 
   const guardar = () => {
     if (!editingId && !ficheiro) {
-      toast.error("Carregue o documento do contrato para continuar");
+      toastError("Carregue o documento do contrato para continuar");
       return;
     }
     const durationMonths = monthsBetween(startDate, endDate);
@@ -149,7 +149,7 @@ export function ContractDocModal() {
         patch.fileName = ficheiro.nome;
       }
       updateContract(editingId, patch);
-      toast.success("Contrato atualizado");
+      toastSuccess("Contrato atualizado");
       closeContractDoc();
       navigate(`/contratos/${editingId}`);
       return;
@@ -169,7 +169,7 @@ export function ContractDocModal() {
       pasta: property ? `Imóveis/${property.name}/Contratos` : undefined,
     });
     updateContract(id, { documentId: docId });
-    toast.success("Documento de contrato guardado");
+    toastSuccess("Documento de contrato guardado");
     closeContractDoc();
     navigate(`/contratos/${id}`);
   };

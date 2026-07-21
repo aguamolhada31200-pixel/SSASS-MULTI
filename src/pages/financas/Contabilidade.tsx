@@ -28,7 +28,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
@@ -198,7 +198,7 @@ export default function Contabilidade() {
 
   const exportar = () => {
     if (filtered.length === 0) {
-      toast.info("Nada para exportar");
+      toastInfo("Nada para exportar");
       return;
     }
     const csv = toCsv(filtered, [
@@ -212,7 +212,7 @@ export default function Contabilidade() {
     ]);
     const stamp = new Date().toISOString().slice(0, 10);
     downloadFile(`contabilidade-${stamp}.csv`, csv);
-    toast.success("CSV exportado", { description: `${filtered.length} movimentos` });
+    toastSuccess("CSV exportado", { description: `${filtered.length} movimentos` });
   };
 
   const resetFiltros = () => {
@@ -227,7 +227,7 @@ export default function Contabilidade() {
   const onDelete = (t: Transaction) => {
     if (!confirm(`Eliminar este movimento de ${eur(t.valor)}?`)) return;
     removeTx(t.id);
-    toast.success("Movimento eliminado");
+    toastSuccess("Movimento eliminado");
   };
 
   return (

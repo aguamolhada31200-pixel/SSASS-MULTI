@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft,
   Pencil,
@@ -59,7 +59,7 @@ export default function InquilinoDetail() {
   const onDelete = () => {
     if (!confirm(`Eliminar "${tenant.nomeCompleto}"? Esta ação não pode ser anulada.`)) return;
     remove(tenant.id);
-    toast.success("Inquilino eliminado");
+    toastSuccess("Inquilino eliminado");
     navigate("/pessoas/inquilinos");
   };
 
@@ -434,7 +434,7 @@ function DocumentosTab({ tenantId }: { tenantId: string }) {
 
   const add = () => {
     if (!nome.trim() || !url.trim()) {
-      toast.error("Indique nome e URL/ficheiro do documento");
+      toastError("Indique nome e URL/ficheiro do documento");
       return;
     }
     setDocs((d) => [
@@ -443,7 +443,7 @@ function DocumentosTab({ tenantId }: { tenantId: string }) {
     ]);
     setNome("");
     setUrl("");
-    toast.success("Documento adicionado");
+    toastSuccess("Documento adicionado");
   };
 
   const onFile = (file: File) => {
@@ -453,7 +453,7 @@ function DocumentosTab({ tenantId }: { tenantId: string }) {
         { id: `doc-${Date.now()}`, nome: file.name, url: String(r.result), ts: new Date().toISOString().slice(0, 10) },
         ...d,
       ]);
-      toast.success("Documento carregado");
+      toastSuccess("Documento carregado");
     };
     r.readAsDataURL(file);
   };

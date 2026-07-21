@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   X,
   Hammer,
@@ -156,8 +156,8 @@ export function CollabFormModal() {
   const next = () => {
     if (!podeAvancar()) {
       setMostrarErros(true);
-      if (step === 3 && !somaOk) toast.error(`As percentagens somam ${soma}% — devem somar 100%.`);
-      else toast.error("Preencha os campos obrigatórios.");
+      if (step === 3 && !somaOk) toastError(`As percentagens somam ${soma}% — devem somar 100%.`);
+      else toastError("Preencha os campos obrigatórios.");
       return;
     }
     setMostrarErros(false);
@@ -269,7 +269,7 @@ export function CollabFormModal() {
   const onSubmit = () => {
     if (!somaOk) {
       setStep(3);
-      toast.error(`As percentagens somam ${soma}% — devem somar 100%.`);
+      toastError(`As percentagens somam ${soma}% — devem somar 100%.`);
       return;
     }
     const partners = buildPartners();
@@ -285,7 +285,7 @@ export function CollabFormModal() {
         propertyId: form.imovelMode === "existente" ? form.propertyId || editing.propertyId : editing.propertyId,
         ...financeFields(),
       });
-      toast.success("Projeto atualizado", { description: form.nome });
+      toastSuccess("Projeto atualizado", { description: form.nome });
       closeCollabForm();
       return;
     }
@@ -310,7 +310,7 @@ export function CollabFormModal() {
       ...financeFields(),
     });
 
-    toast.success("Projeto criado", { description: form.nome });
+    toastSuccess("Projeto criado", { description: form.nome });
     closeCollabForm();
     // Retorno ao fluxo: se o utilizador veio da "Nova obra" sem projetos,
     // reabre o modal da obra com este projeto já selecionado.

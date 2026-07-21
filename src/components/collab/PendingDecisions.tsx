@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { ThumbsUp, ThumbsDown, BellRing, Vote, CheckCircle2, Clock, X, Banknote } from "lucide-react";
 import {
   useObrasStore,
@@ -193,9 +193,9 @@ function useVotar() {
         actorId: CURRENT_USER_ID,
         link: item.link,
       });
-      if (estado === "aprovada") toast.success("Maioria atingida — decisão aprovada");
-      else if (estado === "rejeitada") toast("Decisão rejeitada");
-      else toast.success("Voto registado ✓");
+      if (estado === "aprovada") toastSuccess("Maioria atingida — decisão aprovada");
+      else if (estado === "rejeitada") toastInfo("Decisão rejeitada");
+      else toastSuccess("Voto registado ✓");
       return;
     }
 
@@ -212,7 +212,7 @@ function useVotar() {
           actorId: CURRENT_USER_ID,
           link: item.link,
         });
-      toast.success("Voto registado ✓", { description: "O gestor foi notificado." });
+      toastSuccess("Voto registado ✓", { description: "O gestor foi notificado." });
     } else {
       broadcast(
         membrosDe(obra).map((m) => m.userId).filter((id) => id !== CURRENT_USER_ID),
@@ -227,8 +227,8 @@ function useVotar() {
           link: item.link,
         }
       );
-      if (estado === "aplicado") toast.success("Maioria atingida — aprovado ✓", { description: "Sócios notificados." });
-      else toast("Rejeitado", { description: "Os sócios foram notificados." });
+      if (estado === "aplicado") toastSuccess("Maioria atingida — aprovado ✓", { description: "Sócios notificados." });
+      else toastInfo("Rejeitado", { description: "Os sócios foram notificados." });
     }
   };
 }
@@ -333,7 +333,7 @@ export function BlocoPedirAosSocios({
       })
     );
     setLembrados((s) => new Set(s).add(`${it.kind}-${it.id}`));
-    toast.success(`Lembrete enviado ✓`, {
+    toastSuccess(`Lembrete enviado ✓`, {
       description: pendentes.map((v) => v.nome).join(", ") || "Sem sócios por votar.",
     });
   };

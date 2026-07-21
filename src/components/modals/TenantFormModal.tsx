@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { useNavigate } from "react-router-dom";
 import { X, ChevronLeft, ChevronRight, Check, User, GraduationCap, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -167,11 +167,11 @@ export function TenantFormModal() {
 
     if (editingId) {
       update(editingId, payload);
-      toast.success("Inquilino atualizado", { description: payload.nomeCompleto });
+      toastSuccess("Inquilino atualizado", { description: payload.nomeCompleto });
       closeTenantForm();
     } else {
       const id = add(payload);
-      toast.success("Inquilino registado", { description: payload.nomeCompleto });
+      toastSuccess("Inquilino registado", { description: payload.nomeCompleto });
       closeTenantForm();
       navigate(`/pessoas/inquilinos/${id}`);
     }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft,
   Pencil,
@@ -229,7 +229,7 @@ export default function ObraDetalhe() {
   const onDelete = () => {
     if (!confirm(`Eliminar a obra "${obra.titulo}"?`)) return;
     removeObra(obra.id);
-    toast.success("Obra eliminada");
+    toastSuccess("Obra eliminada");
     navigate("/comunidade/colaborativa/obras");
   };
 
@@ -327,7 +327,7 @@ export default function ObraDetalhe() {
                             actorId: CURRENT_USER_ID,
                             link: `/obra/${obra.id}`,
                           });
-                        toast.success("Obra concluída", {
+                        toastSuccess("Obra concluída", {
                           description: "Quer criar um antes/depois com as fotos desta obra?",
                           action: { label: "Criar", onClick: () => openGaleriaForm({ initialObraId: obra.id }) },
                         });
@@ -520,7 +520,7 @@ export default function ObraDetalhe() {
                             onClick={() => {
                               updateObraProg(obra.id, { thresholdAprovacao: Math.max(0, thVal), regraVotacao: regraVal });
                               setEditandoRegras(false);
-                              toast.success("Regras de aprovação atualizadas ✓");
+                              toastSuccess("Regras de aprovação atualizadas ✓");
                             }}
                             className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-medium text-white hover:bg-primary/90"
                           >

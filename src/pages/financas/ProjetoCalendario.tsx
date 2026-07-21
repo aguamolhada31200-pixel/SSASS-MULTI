@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft,
   ArrowRight,
@@ -153,7 +153,7 @@ export default function ProjetoCalendario() {
             projectId={project.id}
             propertyId={project.propertyId}
             isLast={selecionada.stageNumber === stages.length}
-            onAdvance={() => { advanceStage(project.id); toast.success("Etapa concluída — avançou para a seguinte"); }}
+            onAdvance={() => { advanceStage(project.id); toastSuccess("Etapa concluída — avançou para a seguinte"); }}
             onNavigate={navigate}
           />
         )}
@@ -386,7 +386,7 @@ function DocumentosEtapa({ stage, propertyId }: { stage: Stage; propertyId?: str
     r.onload = () => {
       const id = addDoc({ propertyId, categoria: "Outros" as DocCategoria, nome: file.name, ficheiroUrl: String(r.result), mimeType: file.type || "application/octet-stream", uploadedAt: new Date().toISOString().slice(0, 10) });
       associarDoc(stage.id, id);
-      toast.success("Documento carregado e associado");
+      toastSuccess("Documento carregado e associado");
     };
     r.readAsDataURL(file);
   };
@@ -427,7 +427,7 @@ function DocumentosEtapa({ stage, propertyId }: { stage: Stage; propertyId?: str
             <ul className="space-y-1">
               {disponiveis.map((d) => (
                 <li key={d.id}>
-                  <button onClick={() => { associarDoc(stage.id, d.id); setPicker(false); toast.success("Documento associado"); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-accent">
+                  <button onClick={() => { associarDoc(stage.id, d.id); setPicker(false); toastSuccess("Documento associado"); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-accent">
                     <FileText size={14} className="text-secondary" /> <span className="flex-1 truncate">{d.nome}</span>
                     <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-muted">{d.categoria}</span>
                   </button>

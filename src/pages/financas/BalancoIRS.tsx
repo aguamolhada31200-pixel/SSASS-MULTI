@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   FileBarChart,
   Download,
@@ -183,7 +183,7 @@ export default function BalancoIRS() {
 
   const exportCsv = () => {
     if (txAno.length === 0) {
-      toast.info("Sem movimentos no ano selecionado");
+      toastInfo("Sem movimentos no ano selecionado");
       return;
     }
     const csv = toCsv(
@@ -200,7 +200,7 @@ export default function BalancoIRS() {
     );
     downloadFile(`movimentos-irs-${ano}.csv`, csv);
     setExportOpen(false);
-    toast.success("CSV exportado", { description: `${txAno.length} movimentos de ${ano}` });
+    toastSuccess("CSV exportado", { description: `${txAno.length} movimentos de ${ano}` });
   };
 
   const exportPdf = () => {
@@ -307,12 +307,12 @@ export default function BalancoIRS() {
       notas: `Apuramento Anexo F ${ano} — gerado no Balanço/IRS.`,
     });
     setExportOpen(false);
-    toast.success("PDF exportado", { description: "Guardado na Pasta Digital · categoria Fiscal" });
+    toastSuccess("PDF exportado", { description: "Guardado na Pasta Digital · categoria Fiscal" });
   };
 
   const classificar = (t: Transaction, dedutivel: boolean) => {
     updateTx(t.id, { deduzivelIrs: dedutivel });
-    toast.success(dedutivel ? "Marcada como dedutível" : "Marcada como não dedutível", { description: `${t.descricao} · ${eur(t.valor)}` });
+    toastSuccess(dedutivel ? "Marcada como dedutível" : "Marcada como não dedutível", { description: `${t.descricao} · ${eur(t.valor)}` });
   };
 
   const verMovimentos = (propertyId: string) => navigate(`/financas/contabilidade?imovel=${propertyId}&periodo=ano`);

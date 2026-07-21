@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm, type Resolver, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   X,
   Check,
@@ -143,7 +143,7 @@ export function ExpenseFormModal() {
       setValue("valor", pick.valor, { shouldValidate: true });
       setValue("data", new Date().toISOString().slice(0, 10));
       setScanning(false);
-      toast.success("Recibo lido", { description: `${pick.categoria} · ${pick.valor.toLocaleString("pt-PT")} €` });
+      toastSuccess("Recibo lido", { description: `${pick.categoria} · ${pick.valor.toLocaleString("pt-PT")} €` });
     }, 850);
   };
 
@@ -169,10 +169,10 @@ export function ExpenseFormModal() {
     };
     if (editingId) {
       update(editingId, payload);
-      toast.success("Movimento atualizado");
+      toastSuccess("Movimento atualizado");
     } else {
       add(payload);
-      toast.success("Movimento registado", {
+      toastSuccess("Movimento registado", {
         description: `${values.tipo === "receita" ? "Receita" : "Despesa"} · ${eur(values.valor)}`,
       });
     }
@@ -182,7 +182,7 @@ export function ExpenseFormModal() {
   // Validação falhou → além do realce nos campos, dizer PORQUÊ num toast
   const onInvalid = (errs: FieldErrors<FormValues>) => {
     const primeiro = Object.values(errs).find((e) => e?.message);
-    toast.error("Não foi possível registar o movimento", {
+    toastError("Não foi possível registar o movimento", {
       description: String(primeiro?.message ?? "Verifique os campos assinalados a vermelho."),
     });
   };

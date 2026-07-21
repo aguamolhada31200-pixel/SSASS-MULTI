@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   CalendarClock,
   CalendarRange,
@@ -144,7 +144,7 @@ export default function CalendarioInvestimento() {
   const onCreate = (nome: string, modo: InvestMode, propertyId?: string) => {
     const id = addProject({ nome, modo, propertyId });
     setShowNew(false);
-    toast.success("Investimento iniciado", { description: nome });
+    toastSuccess("Investimento iniciado", { description: nome });
     navigate(`/financas/calendario-investimento/${id}`);
   };
 

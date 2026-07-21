@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, Phone, Mail, Star, Hammer, MapPin, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useTechniciansStore, ESPECIALIDADE_LABEL, type Technician } from "@/store/useTechniciansStore";
@@ -130,7 +130,7 @@ export function AvaliarEmpreiteiroDialog({
 
   const submeter = () => {
     if (estrelas < 1) {
-      toast.error("Escolha as estrelas (1 a 5)");
+      toastError("Escolha as estrelas (1 a 5)");
       return;
     }
     avaliar(technician.id, estrelas);
@@ -139,7 +139,7 @@ export function AvaliarEmpreiteiroDialog({
         notas: [technician.notas, comentario.trim()].filter(Boolean).join(" · "),
       });
     }
-    toast.success(`Avaliação registada · ${technician.nome}`, { description: `${estrelas} de 5 estrelas.` });
+    toastSuccess(`Avaliação registada · ${technician.nome}`, { description: `${estrelas} de 5 estrelas.` });
     onClose(estrelas);
   };
 

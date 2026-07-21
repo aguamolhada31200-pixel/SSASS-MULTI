@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Plus, KanbanSquare, LayoutList, ChevronDown, Hammer, Wrench, AlertTriangle, Euro, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -157,7 +157,7 @@ export function PedidosBoard({ propertyId }: { propertyId?: string }) {
 
   const mover = (r: MaintenanceRequest, estado: EstadoPedido) => {
     setEstado(r.id, estado);
-    toast.success(`Estado atualizado · ${ESTADO_PEDIDO_LABEL[estado]}`);
+    toastSuccess(`Estado atualizado · ${ESTADO_PEDIDO_LABEL[estado]}`);
   };
 
   return (

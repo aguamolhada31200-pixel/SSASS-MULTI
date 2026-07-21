@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Building2, Pencil, Trash2, ArrowLeft, TriangleAlert, Clock, Plus, Hammer, KeyRound, CalendarClock } from "lucide-react";
 import {
   BarChart,
@@ -97,7 +97,7 @@ export default function ImovelDetail() {
   const onDelete = () => {
     if (!confirm(`Eliminar "${property.name}"? Esta ação não pode ser anulada.`)) return;
     remove(property.id);
-    toast.success("Imóvel eliminado", { description: property.name });
+    toastSuccess("Imóvel eliminado", { description: property.name });
     navigate("/imoveis");
   };
 
@@ -548,7 +548,7 @@ function NovaObraForm({ propertyId, onClose }: { propertyId: string; onClose: ()
   const [estado, setEstado] = useState<ObraEstado>("por_iniciar");
 
   const onSubmit = () => {
-    if (!titulo.trim()) { toast.error("Indique o nome da obra"); return; }
+    if (!titulo.trim()) { toastError("Indique o nome da obra"); return; }
     addObra({
       propertyId,
       titulo: titulo.trim(),
@@ -560,7 +560,7 @@ function NovaObraForm({ propertyId, onClose }: { propertyId: string; onClose: ()
       estado,
       progresso: 0,
     });
-    toast.success("Obra adicionada", { description: titulo });
+    toastSuccess("Obra adicionada", { description: titulo });
     onClose();
   };
 
@@ -746,7 +746,7 @@ export function ImovelInquilinosTab({ propertyId }: { propertyId: string }) {
 
   const associar = (id: string) => {
     update(id, { propertyId });
-    toast.success("Inquilino associado");
+    toastSuccess("Inquilino associado");
     setAssocOpen(false);
     setQ("");
   };
@@ -991,14 +991,14 @@ export function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
     const finalNome = (fileName ?? nome).trim();
     const finalUrl = dataUrl ?? url.trim();
     if (!finalNome || !finalUrl) {
-      toast.error("Indique nome e ficheiro/URL");
+      toastError("Indique nome e ficheiro/URL");
       return;
     }
     add({ propertyId, categoria, nome: finalNome, ficheiroUrl: finalUrl, mimeType: dataUrl ? "application/octet-stream" : "link", uploadedAt: new Date().toISOString().slice(0, 10) });
     setNome("");
     setUrl("");
     setShowForm(false);
-    toast.success("Documento adicionado");
+    toastSuccess("Documento adicionado");
   };
 
   const onFiles = (files: FileList) => {
@@ -1007,7 +1007,7 @@ export function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
       r.onload = () => add({ propertyId, categoria, nome: f.name, ficheiroUrl: String(r.result), mimeType: f.type || "application/octet-stream", uploadedAt: new Date().toISOString().slice(0, 10) });
       r.readAsDataURL(f);
     });
-    toast.success("Documento(s) carregado(s)");
+    toastSuccess("Documento(s) carregado(s)");
   };
 
   return (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft,
   Upload,
@@ -92,7 +92,7 @@ export default function ContratoDetalhe() {
       const url = String(r.result);
       update(contract.id, { pdfUrl: url, fileName: file.name });
       if (contract.documentId) updateDoc(contract.documentId, { ficheiroUrl: url, nome: file.name, mimeType: file.type || "application/octet-stream" });
-      toast.success("Documento substituído");
+      toastSuccess("Documento substituído");
     };
     r.readAsDataURL(file);
   };
@@ -112,14 +112,14 @@ export default function ContratoDetalhe() {
         contractId: contract.id,
         pasta: property ? `Imóveis/${property.name}/Contratos` : undefined,
       });
-      toast.success("Aditamento carregado e associado");
+      toastSuccess("Aditamento carregado e associado");
     };
     r.readAsDataURL(file);
   };
 
   const baixar = () => {
     if (!ehDataUrl) {
-      toast.info("Documento de exemplo — sem ficheiro real para descarregar.");
+      toastInfo("Documento de exemplo — sem ficheiro real para descarregar.");
       return;
     }
     const a = document.createElement("a");
@@ -133,7 +133,7 @@ export default function ContratoDetalhe() {
     if (!motivo?.trim()) return;
     const data = window.prompt("Data da cessação (AAAA-MM-DD):", new Date().toISOString().slice(0, 10));
     terminate(contract.id, motivo.trim(), data?.trim() || undefined);
-    toast.success("Contrato terminado");
+    toastSuccess("Contrato terminado");
   };
 
   return (

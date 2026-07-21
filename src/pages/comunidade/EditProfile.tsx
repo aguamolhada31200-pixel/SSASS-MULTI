@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { ArrowLeft, X, Plus, ImagePlus, Lock } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -49,7 +49,7 @@ export default function EditProfile() {
       interesses,
       experienciaAutoDeclaradaAnos: anos,
     });
-    toast.success("Perfil atualizado");
+    toastSuccess("Perfil atualizado");
     navigate("/comunidade/rede/meu-perfil");
   };
 

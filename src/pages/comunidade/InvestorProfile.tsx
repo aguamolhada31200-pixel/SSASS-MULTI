@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -59,7 +59,7 @@ export default function InvestorProfile() {
 
   const mensagem = () => {
     if (isMe) {
-      toast("Modo de pré-visualização", { description: "É assim que os outros investidores contactam consigo." });
+      toastInfo("Modo de pré-visualização", { description: "É assim que os outros investidores contactam consigo." });
       return;
     }
     const convId = getOrCreate(profile.id, "direct");
@@ -67,10 +67,10 @@ export default function InvestorProfile() {
   };
   const convidar = () => {
     if (isMe) {
-      toast("Modo de pré-visualização", { description: "É assim que os outros investidores contactam consigo." });
+      toastInfo("Modo de pré-visualização", { description: "É assim que os outros investidores contactam consigo." });
       return;
     }
-    toast.success("Convite de parceria enviado", { description: `${profile.fullName} foi notificado(a).` });
+    toastSuccess("Convite de parceria enviado", { description: `${profile.fullName} foi notificado(a).` });
   };
 
   return (

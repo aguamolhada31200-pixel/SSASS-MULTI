@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Upload, Camera, CheckCircle2, Trash2, ScanLine, FileText } from "lucide-react";
 import { lerFaturaDeImagem, type FaturaLida } from "@/lib/fatura";
 import { eur, dataPT } from "@/lib/format";
@@ -43,7 +43,7 @@ export function FaturaScanZone({
 
   const tentarLer = async (preview: FilePreview) => {
     if (!preview.mime.startsWith("image/")) {
-      toast.message("PDF anexado", {
+      toastInfo("PDF anexado", {
         description: "A leitura automática funciona com foto do QR da fatura — confirme os campos.",
       });
       return;
@@ -54,7 +54,7 @@ export function FaturaScanZone({
     if (fatura) {
       setLido(fatura);
       onLido?.(fatura);
-      toast.success("Fatura lida pelo QR", {
+      toastSuccess("Fatura lida pelo QR", {
         description: [
           fatura.data ? dataPT(fatura.data) : null,
           fatura.nifEmitente ? `NIF ${fatura.nifEmitente}` : null,
@@ -64,7 +64,7 @@ export function FaturaScanZone({
           .join(" · "),
       });
     } else {
-      toast.message("QR não encontrado na imagem", {
+      toastInfo("QR não encontrado na imagem", {
         description: "Fique com o anexo na mesma e preencha os campos manualmente.",
       });
     }
@@ -74,7 +74,7 @@ export function FaturaScanZone({
     if (!files || files.length === 0) return;
     const f = files[0];
     if (f.size > 8 * 1024 * 1024) {
-      toast.error("Ficheiro demasiado grande (máx 8 MB)");
+      toastError("Ficheiro demasiado grande (máx 8 MB)");
       return;
     }
     const preview = await fileToPreview(f);
