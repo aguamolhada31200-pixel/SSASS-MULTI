@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Camera,
@@ -14,10 +14,13 @@ import {
   Volume2,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ArrowUp,
   ArrowDown,
   Hammer,
   ImagePlus,
+  X,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -43,6 +46,110 @@ import { cn } from "@/lib/utils";
 
 const inputCls = "h-11 w-full rounded-lg border border-line bg-card px-3 text-base outline-none focus:border-secondary";
 
+// Lê a foto na melhor qualidade viável. Só reduz quando é enorme (>2400px no
+// lado maior) — aí redimensiona com alta qualidade para caber no armazenamento
+// sem perder nitidez visível. Fotos normais ficam intactas.
+async function fileParaFoto(f: File): Promise<string> {
+  const dataUrl = await new Promise<string>((res) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.readAsDataURL(f);
+  });
+  const MAX = 2400;
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = dataUrl;
+    });
+    const maior = Math.max(img.width, img.height);
+    if (maior <= MAX) return dataUrl; // já é boa e não é pesada de mais
+    const escala = MAX / maior;
+    const w = Math.round(img.width * escala);
+    const h = Math.round(img.height * escala);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/jpeg", 0.92);
+  } catch {
+    return dataUrl;
+  }
+}
+
+// Lightbox — pré-visualização em grande, com setas/teclado/contador para
+// percorrer muitas fotos. Reutilizável no diário.
+export function Lightbox({
+  fotos,
+  index,
+  onClose,
+  onIndex,
+}: {
+  fotos: string[];
+  index: number;
+  onClose: () => void;
+  onIndex: (i: number) => void;
+}) {
+  const total = fotos.length;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") onIndex((index - 1 + total) % total);
+      else if (e.key === "ArrowRight") onIndex((index + 1) % total);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, total, onClose, onIndex]);
+
+  const foto = fotos[index];
+  if (!foto) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/90 p-4 animate-fade-in" onClick={onClose}>
+      <button onClick={onClose} className="absolute right-3 top-3 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20" title="Fechar (Esc)">
+        <X size={22} />
+      </button>
+
+      {total > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onIndex((index - 1 + total) % total); }}
+          className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white transition-colors hover:bg-white/20 sm:left-4"
+          title="Anterior (←)"
+        >
+          <ChevronLeft size={26} />
+        </button>
+      )}
+
+      <img
+        src={foto}
+        alt=""
+        className="max-h-[88vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+
+      {total > 1 && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onIndex((index + 1) % total); }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white transition-colors hover:bg-white/20 sm:right-4"
+          title="Seguinte (→)"
+        >
+          <ChevronRight size={26} />
+        </button>
+      )}
+
+      {total > 1 && (
+        <span className="num absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-sm font-medium text-white">
+          {index + 1} / {total}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ───────────────────────── 📸 DIÁRIO ─────────────────────────
 // Feed cronológico estilo mensagens — prova do que foi feito.
 // Gestor e investidor adicionam; observador só vê.
@@ -60,21 +167,26 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
   const [texto, setTexto] = useState("");
   const [tipo, setTipo] = useState<DiarioTipo>("durante");
   const [aOuvir, setAOuvir] = useState(false);
+  // Lightbox: { lista de fotos a percorrer, índice atual }
+  const [lightbox, setLightbox] = useState<{ lista: string[]; idx: number } | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const entradas = [...(obra.diario ?? [])].sort((a, b) => (a.data < b.data ? 1 : -1));
   const totalFotos = entradas.reduce((s, e) => s + e.fotos.length, 0) + obra.fotos.length;
 
+  // Todas as fotos do diário numa só lista (feed + outras), para as setas
+  // percorrerem tudo. offsets[e] = índice global onde começam as fotos da entrada e.
+  const fotosFeed = entradas.flatMap((e) => e.fotos);
+  const todasFotos = [...fotosFeed, ...obra.fotos];
+  let acc = 0;
+  const offsets = entradas.map((e) => { const o = acc; acc += e.fotos.length; return o; });
+
   const onPick = async (files: FileList | null) => {
     if (!files) return;
     for (const f of Array.from(files)) {
       if (!f.type.startsWith("image/")) continue;
-      const url = await new Promise<string>((res) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result));
-        r.readAsDataURL(f);
-      });
+      const url = await fileParaFoto(f);
       setFotos((p) => [...p, url]);
     }
     setComposerOpen(true);
@@ -152,7 +264,9 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
               <div className="flex flex-wrap gap-2">
                 {fotos.map((f, i) => (
                   <div key={i} className="relative h-20 w-20 overflow-hidden rounded-lg border border-line">
-                    <img src={f} alt="" className="h-full w-full object-cover" />
+                    <button type="button" onClick={() => setLightbox({ lista: fotos, idx: i })} className="block h-full w-full" title="Ver em grande">
+                      <img src={f} alt="" className="h-full w-full object-cover" />
+                    </button>
                     <button
                       onClick={() => setFotos((p) => p.filter((_, j) => j !== i))}
                       className="absolute right-0.5 top-0.5 rounded-md bg-ink/60 p-0.5 text-white hover:bg-danger"
@@ -228,7 +342,7 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
         </Card>
       ) : (
         <div className="space-y-3">
-          {entradas.map((e) => {
+          {entradas.map((e, eIdx) => {
             const autor = profiles.find((p) => p.id === e.autorId);
             const tone =
               e.tipo === "antes" ? "bg-accent text-secondary" : e.tipo === "depois" ? "bg-success/12 text-success" : e.tipo === "nota" ? "bg-line/60 text-muted" : "bg-gold/15 text-gold-dark";
@@ -255,9 +369,15 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
                   {e.fotos.length > 0 && (
                     <div className={cn("mt-3 grid gap-2", e.fotos.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
                       {e.fotos.map((f, i) => (
-                        <a key={i} href={f} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-line">
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setLightbox({ lista: todasFotos, idx: offsets[eIdx] + i })}
+                          className="block overflow-hidden rounded-xl border border-line"
+                          title="Ver em grande"
+                        >
                           <img src={f} alt="" className="max-h-72 w-full object-cover" loading="lazy" />
-                        </a>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -274,9 +394,15 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
                 <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">Outras fotos</p>
                 <div className="grid grid-cols-3 gap-2">
                   {obra.fotos.map((f, i) => (
-                    <a key={i} href={f} target="_blank" rel="noreferrer" className="block aspect-video overflow-hidden rounded-lg border border-line">
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setLightbox({ lista: todasFotos, idx: fotosFeed.length + i })}
+                      className="block aspect-video overflow-hidden rounded-lg border border-line"
+                      title="Ver em grande"
+                    >
                       <img src={f} alt="" className="h-full w-full object-cover" />
-                    </a>
+                    </button>
                   ))}
                 </div>
               </CardContent>
@@ -289,6 +415,15 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
       <p className="flex items-center gap-1.5 px-1 text-sm text-muted">
         <Volume2 size={13} /> Obras com ruído: dias úteis, das 8h às 20h.
       </p>
+
+      {lightbox && (
+        <Lightbox
+          fotos={lightbox.lista}
+          index={lightbox.idx}
+          onClose={() => setLightbox(null)}
+          onIndex={(i) => setLightbox((lb) => (lb ? { ...lb, idx: i } : lb))}
+        />
+      )}
     </div>
   );
 }
