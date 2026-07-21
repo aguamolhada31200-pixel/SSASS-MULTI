@@ -22,6 +22,7 @@ import {
   ImagePlus,
   X,
   UserPlus,
+  Pencil,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -44,7 +45,7 @@ import {
   type DiarioTipo,
 } from "@/store/useObrasStore";
 import { useProfilesStore, CURRENT_USER_ID } from "@/store/useProfilesStore";
-import { useTechniciansStore, ESPECIALIDADE_LABEL, type Especialidade } from "@/store/useTechniciansStore";
+import { useTechniciansStore, ESPECIALIDADE_LABEL, type Especialidade, type Technician } from "@/store/useTechniciansStore";
 import { useNotificationsStore } from "@/store/useNotificationsStore";
 import { useModalStore } from "@/store/useModalStore";
 import { RoleAvatar, nomeProprio } from "@/components/obras/CoGestao";
@@ -831,48 +832,129 @@ function FasesAvancado({ obra, souGestor }: { obra: Obra; souGestor: boolean }) 
 // ───────────────────────── 📞 CONTACTOS (botão de pânico) ─────────────────────────
 // Um toque no cartão LIGA. Todos veem e ligam; só o gestor adiciona/edita.
 
+interface DadosContacto {
+  nome: string;
+  telefone: string;
+  especialidade: Especialidade;
+  empresa: string;
+  email: string;
+}
+
+// Formulário de contacto — reutilizado para criar E editar. Estado próprio.
+function ContactoForm({
+  inicial,
+  submitLabel,
+  onGuardar,
+  onCancelar,
+}: {
+  inicial?: Partial<Technician>;
+  submitLabel: string;
+  onGuardar: (d: DadosContacto) => void;
+  onCancelar: () => void;
+}) {
+  const [nome, setNome] = useState(inicial?.nome ?? "");
+  const [tel, setTel] = useState(inicial?.telefone ?? "");
+  const [esp, setEsp] = useState<Especialidade>(inicial?.especialidades?.[0] ?? "geral");
+  const [empresa, setEmpresa] = useState(inicial?.empresa ?? "");
+  const [email, setEmail] = useState(inicial?.email ?? "");
+
+  const submit = () => {
+    if (nome.trim().length < 2) { toastError("Escreva o nome do contacto"); return; }
+    if (tel.replace(/\D/g, "").length < 6) { toastError("Indique um telefone válido"); return; }
+    onGuardar({ nome: nome.trim(), telefone: tel.trim(), especialidade: esp, empresa: empresa.trim(), email: email.trim() });
+  };
+
+  return (
+    <div className="space-y-2.5">
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-muted">Nome <span className="text-danger">*</span></span>
+        <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: João Silva" className={inputCls} />
+      </label>
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted">Telefone <span className="text-danger">*</span></span>
+          <input value={tel} onChange={(e) => setTel(e.target.value)} inputMode="tel" placeholder="912 345 678" className={inputCls} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted">Especialidade</span>
+          <select value={esp} onChange={(e) => setEsp(e.target.value as Especialidade)} className={inputCls}>
+            {(Object.keys(ESPECIALIDADE_LABEL) as Especialidade[]).map((k) => (
+              <option key={k} value={k}>{ESPECIALIDADE_LABEL[k]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted">Empresa (opcional)</span>
+          <input value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Ex.: Silva & Filhos, Lda." className={inputCls} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted">Email (opcional)</span>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" placeholder="nome@email.pt" className={inputCls} />
+        </label>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row-reverse">
+        <Button variant="gold" size="lg" onClick={submit} className="w-full sm:w-auto">
+          <CheckCircle2 size={15} /> {submitLabel}
+        </Button>
+        <Button variant="ghost" onClick={onCancelar} className="w-full sm:w-auto">Cancelar</Button>
+      </div>
+    </div>
+  );
+}
+
 export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: boolean }) {
   const technicians = useTechniciansStore((s) => s.technicians);
   const addTecnico = useTechniciansStore((s) => s.add);
+  const updateTecnico = useTechniciansStore((s) => s.update);
+  const removeTecnico = useTechniciansStore((s) => s.remove);
   const addContactoObra = useObrasStore((s) => s.addContactoObra);
   const removeContactoObra = useObrasStore((s) => s.removeContactoObra);
+  const updateObra = useObrasStore((s) => s.updateObra);
   const [addOpen, setAddOpen] = useState(false);
+  const [criarOpen, setCriarOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [cartaoId, setCartaoId] = useState<string | null>(null);
 
-  // Criar um contacto NOVO (que não está no diretório), preenchendo os campos.
-  const [criarOpen, setCriarOpen] = useState(false);
-  const [novoNome, setNovoNome] = useState("");
-  const [novoTel, setNovoTel] = useState("");
-  const [novaEsp, setNovaEsp] = useState<Especialidade>("geral");
-  const [novaEmpresa, setNovaEmpresa] = useState("");
-  const [novoEmail, setNovoEmail] = useState("");
+  const fecharAdd = () => { setAddOpen(false); setCriarOpen(false); };
 
-  const fecharAdd = () => {
-    setAddOpen(false);
-    setCriarOpen(false);
-    setNovoNome("");
-    setNovoTel("");
-    setNovaEsp("geral");
-    setNovaEmpresa("");
-    setNovoEmail("");
-  };
-
-  const criarContacto = () => {
-    if (novoNome.trim().length < 2) { toastError("Escreva o nome do contacto"); return; }
-    if (novoTel.replace(/\D/g, "").length < 6) { toastError("Indique um telefone válido"); return; }
+  const criarContacto = (d: DadosContacto) => {
     const id = addTecnico({
-      nome: novoNome.trim(),
-      empresa: novaEmpresa.trim() || undefined,
-      especialidades: [novaEsp],
-      telefone: novoTel.trim(),
-      email: novoEmail.trim(),
+      nome: d.nome,
+      empresa: d.empresa || undefined,
+      especialidades: [d.especialidade],
+      telefone: d.telefone,
+      email: d.email,
       zonas: [],
       favorito: false,
       notas: "",
     });
     addContactoObra(obra.id, id);
     fecharAdd();
-    toastSuccess(`${novoNome.trim()} adicionado aos contactos da obra`, "Também ficou guardado no diretório de empreiteiros.");
+    toastSuccess(`${d.nome} adicionado aos contactos da obra`, "Também ficou guardado no diretório de empreiteiros.");
+  };
+
+  const guardarEdicao = (t: Technician, d: DadosContacto) => {
+    updateTecnico(t.id, {
+      nome: d.nome,
+      telefone: d.telefone,
+      especialidades: [d.especialidade],
+      empresa: d.empresa || undefined,
+      email: d.email,
+    });
+    setEditId(null);
+    toastSuccess("Contacto atualizado");
+  };
+
+  const eliminarContacto = (t: Technician) => {
+    if (!confirm(`Eliminar o contacto "${t.nome}"? Sai desta obra e do diretório de empreiteiros.`)) return;
+    removeContactoObra(obra.id, t.id);
+    const patch: Partial<Obra> = {};
+    if (t.id === obra.empreiteiroId) patch.empreiteiroId = undefined;
+    if (t.nome === obra.empreiteiro) patch.empreiteiro = undefined;
+    if (Object.keys(patch).length > 0) updateObra(obra.id, patch);
+    removeTecnico(t.id);
+    setEditId(null);
+    toastSuccess(`${t.nome} eliminado`);
   };
 
   const empreiteiro = technicians.find((t) => t.id === obra.empreiteiroId) ?? technicians.find((t) => t.nome === obra.empreiteiro);
@@ -906,6 +988,24 @@ export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: bo
       {lista.map((t) => {
         const ehEmpreiteiro = t.id === empreiteiro?.id;
         const profissao = t.especialidades[0] ? ESPECIALIDADE_LABEL[t.especialidades[0]] : "Técnico";
+
+        // Em edição — mostra o formulário no lugar do cartão.
+        if (souGestor && editId === t.id) {
+          return (
+            <Card key={t.id} className="border-gold/40">
+              <CardContent className="space-y-2 p-4">
+                <p className="px-1 text-xs font-semibold uppercase tracking-wider text-muted">Editar contacto</p>
+                <ContactoForm
+                  inicial={t}
+                  submitLabel="Guardar alterações"
+                  onGuardar={(d) => guardarEdicao(t, d)}
+                  onCancelar={() => setEditId(null)}
+                />
+              </CardContent>
+            </Card>
+          );
+        }
+
         return (
           <Card key={t.id} className={cn(ehEmpreiteiro && "border-gold/40")}>
             <CardContent className="p-4">
@@ -947,12 +1047,22 @@ export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: bo
                   </a>
                 </div>
               </div>
-              <div className="mt-2 flex items-center justify-between">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                 <button onClick={() => setCartaoId(t.id)} className="text-sm text-secondary hover:underline">Ver ficha completa</button>
-                {souGestor && !ehEmpreiteiro && (
-                  <button onClick={() => removeContactoObra(obra.id, t.id)} className="text-sm text-muted hover:text-danger">
-                    Remover desta obra
-                  </button>
+                {souGestor && (
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => setEditId(t.id)} className="inline-flex items-center gap-1 text-sm text-secondary hover:text-ink">
+                      <Pencil size={13} /> Editar
+                    </button>
+                    {!ehEmpreiteiro && (
+                      <button onClick={() => removeContactoObra(obra.id, t.id)} className="text-sm text-muted hover:text-ink">
+                        Remover desta obra
+                      </button>
+                    )}
+                    <button onClick={() => eliminarContacto(t)} className="inline-flex items-center gap-1 text-sm text-muted hover:text-danger">
+                      <Trash2 size={13} /> Eliminar
+                    </button>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -1022,38 +1132,7 @@ export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: bo
                 ) : (
                   <div className="space-y-2.5">
                     <p className="px-1 text-xs font-semibold uppercase tracking-wider text-muted">Novo contacto</p>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-muted">Nome <span className="text-danger">*</span></span>
-                      <input value={novoNome} onChange={(e) => setNovoNome(e.target.value)} placeholder="Ex.: João Silva" className={inputCls} />
-                    </label>
-                    <div className="grid gap-2.5 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-muted">Telefone <span className="text-danger">*</span></span>
-                        <input value={novoTel} onChange={(e) => setNovoTel(e.target.value)} inputMode="tel" placeholder="912 345 678" className={inputCls} />
-                      </label>
-                      <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-muted">Especialidade</span>
-                        <select value={novaEsp} onChange={(e) => setNovaEsp(e.target.value as Especialidade)} className={inputCls}>
-                          {(Object.keys(ESPECIALIDADE_LABEL) as Especialidade[]).map((k) => (
-                            <option key={k} value={k}>{ESPECIALIDADE_LABEL[k]}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-muted">Empresa (opcional)</span>
-                        <input value={novaEmpresa} onChange={(e) => setNovaEmpresa(e.target.value)} placeholder="Ex.: Silva & Filhos, Lda." className={inputCls} />
-                      </label>
-                      <label className="block">
-                        <span className="mb-1 block text-xs font-medium text-muted">Email (opcional)</span>
-                        <input value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)} inputMode="email" placeholder="nome@email.pt" className={inputCls} />
-                      </label>
-                    </div>
-                    <div className="flex flex-col gap-2 sm:flex-row-reverse">
-                      <Button variant="gold" size="lg" onClick={criarContacto} className="w-full sm:w-auto">
-                        <Plus size={15} /> Adicionar contacto
-                      </Button>
-                      <Button variant="ghost" onClick={() => setCriarOpen(false)} className="w-full sm:w-auto">Voltar</Button>
-                    </div>
+                    <ContactoForm submitLabel="Adicionar contacto" onGuardar={criarContacto} onCancelar={() => setCriarOpen(false)} />
                   </div>
                 )}
               </CardContent>
