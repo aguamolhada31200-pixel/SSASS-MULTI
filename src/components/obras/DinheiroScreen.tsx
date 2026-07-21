@@ -1380,8 +1380,11 @@ function VerificacaoChip({ verif, profiles }: { verif: Verificacao; profiles: Pr
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning">
-      <Eye size={11} /> Por verificar
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-semibold text-warning"
+      title="A fatura está anexada. Falta os sócios investidores confirmarem o gasto."
+    >
+      <Eye size={11} /> Aguarda sócios
       {verif.confirmadaPor.length > 0 ? ` · ${verif.confirmadaPor.length}/${verif.totalInvestidores}` : ""}
     </span>
   );

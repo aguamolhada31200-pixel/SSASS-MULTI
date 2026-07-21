@@ -30,7 +30,7 @@ type TabProva = "sem_fatura" | "por_verificar" | "contestados";
 
 const TAB_PROVA_LABEL: Record<TabProva, string> = {
   sem_fatura: "Sem fatura",
-  por_verificar: "Por verificar",
+  por_verificar: "Aguarda sócios",
   contestados: "Contestados",
 };
 
@@ -210,7 +210,7 @@ export function PorComprovarDrawer() {
                 <ShieldCheck size={30} />
               </span>
               <p className="text-lg font-semibold text-success">
-                {tab === "sem_fatura" ? "Está tudo comprovado." : tab === "por_verificar" ? "Nada por verificar." : "Sem contestações."}
+                {tab === "sem_fatura" ? "Está tudo comprovado." : tab === "por_verificar" ? "Nada a aguardar." : "Sem contestações."}
               </p>
               <p className="text-sm text-muted">
                 {tab === "sem_fatura"

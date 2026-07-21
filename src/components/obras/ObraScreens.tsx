@@ -25,6 +25,13 @@ import {
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNavigation,
+  CarouselIndicator,
+} from "@/components/ui/carousel";
+import {
   useObrasStore,
   custoRealFase,
   roleDe,
@@ -150,6 +157,47 @@ export function Lightbox({
   );
 }
 
+// Carrossel de fotos — 1 foto de cada vez, deslize/setas/indicadores. Aguenta
+// muitas fotos sem virar uma grelha gigante. Toque abre o lightbox em grande.
+function FotosCarousel({ fotos, onAbrir }: { fotos: string[]; onAbrir: (i: number) => void }) {
+  const [idx, setIdx] = useState(0);
+  if (fotos.length === 0) return null;
+
+  if (fotos.length === 1) {
+    return (
+      <button
+        type="button"
+        onClick={() => onAbrir(0)}
+        className="mt-3 block w-full overflow-hidden rounded-xl border border-line"
+        title="Ver em grande"
+      >
+        <img src={fotos[0]} alt="" className="max-h-72 w-full object-cover" loading="lazy" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <Carousel index={idx} onIndexChange={setIdx} className="rounded-xl border border-line">
+        <CarouselContent>
+          {fotos.map((f, i) => (
+            <CarouselItem key={i}>
+              <button type="button" onClick={() => onAbrir(i)} className="block w-full" title="Ver em grande">
+                <img src={f} alt="" className="h-64 w-full object-cover sm:h-72" loading="lazy" />
+              </button>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <CarouselNavigation alwaysShow />
+        <CarouselIndicator />
+      </Carousel>
+      <p className="mt-1 text-center text-[11px] text-muted">
+        <span className="num">{idx + 1} / {fotos.length}</span> · deslize ou use as setas · toque para ver em grande
+      </p>
+    </div>
+  );
+}
+
 // ───────────────────────── 📸 DIÁRIO ─────────────────────────
 // Feed cronológico estilo mensagens — prova do que foi feito.
 // Gestor e investidor adicionam; observador só vê.
@@ -174,13 +222,6 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
 
   const entradas = [...(obra.diario ?? [])].sort((a, b) => (a.data < b.data ? 1 : -1));
   const totalFotos = entradas.reduce((s, e) => s + e.fotos.length, 0) + obra.fotos.length;
-
-  // Todas as fotos do diário numa só lista (feed + outras), para as setas
-  // percorrerem tudo. offsets[e] = índice global onde começam as fotos da entrada e.
-  const fotosFeed = entradas.flatMap((e) => e.fotos);
-  const todasFotos = [...fotosFeed, ...obra.fotos];
-  let acc = 0;
-  const offsets = entradas.map((e) => { const o = acc; acc += e.fotos.length; return o; });
 
   const onPick = async (files: FileList | null) => {
     if (!files) return;
@@ -261,20 +302,23 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
         <Card>
           <CardContent className="space-y-3 p-4">
             {fotos.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {fotos.map((f, i) => (
-                  <div key={i} className="relative h-20 w-20 overflow-hidden rounded-lg border border-line">
-                    <button type="button" onClick={() => setLightbox({ lista: fotos, idx: i })} className="block h-full w-full" title="Ver em grande">
-                      <img src={f} alt="" className="h-full w-full object-cover" />
-                    </button>
-                    <button
-                      onClick={() => setFotos((p) => p.filter((_, j) => j !== i))}
-                      className="absolute right-0.5 top-0.5 rounded-md bg-ink/60 p-0.5 text-white hover:bg-danger"
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                ))}
+              <div>
+                <p className="mb-1.5 text-xs text-muted"><span className="num font-medium text-ink">{fotos.length}</span> {fotos.length === 1 ? "foto" : "fotos"} · deslize para ver todas</p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {fotos.map((f, i) => (
+                    <div key={i} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-line">
+                      <button type="button" onClick={() => setLightbox({ lista: fotos, idx: i })} className="block h-full w-full" title="Ver em grande">
+                        <img src={f} alt="" className="h-full w-full object-cover" />
+                      </button>
+                      <button
+                        onClick={() => setFotos((p) => p.filter((_, j) => j !== i))}
+                        className="absolute right-0.5 top-0.5 rounded-md bg-ink/60 p-0.5 text-white hover:bg-danger"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             <div className="flex flex-wrap gap-2">
@@ -342,7 +386,7 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
         </Card>
       ) : (
         <div className="space-y-3">
-          {entradas.map((e, eIdx) => {
+          {entradas.map((e) => {
             const autor = profiles.find((p) => p.id === e.autorId);
             const tone =
               e.tipo === "antes" ? "bg-accent text-secondary" : e.tipo === "depois" ? "bg-success/12 text-success" : e.tipo === "nota" ? "bg-line/60 text-muted" : "bg-gold/15 text-gold-dark";
@@ -367,19 +411,7 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
                     </span>
                   </div>
                   {e.fotos.length > 0 && (
-                    <div className={cn("mt-3 grid gap-2", e.fotos.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
-                      {e.fotos.map((f, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setLightbox({ lista: todasFotos, idx: offsets[eIdx] + i })}
-                          className="block overflow-hidden rounded-xl border border-line"
-                          title="Ver em grande"
-                        >
-                          <img src={f} alt="" className="max-h-72 w-full object-cover" loading="lazy" />
-                        </button>
-                      ))}
-                    </div>
+                    <FotosCarousel fotos={e.fotos} onAbrir={(i) => setLightbox({ lista: e.fotos, idx: i })} />
                   )}
                   {e.texto && <p className="mt-2.5 text-base leading-relaxed text-ink">{e.texto}</p>}
                 </CardContent>
@@ -392,19 +424,7 @@ export function DiarioScreen({ obra, souGestor }: { obra: Obra; souGestor: boole
             <Card>
               <CardContent className="p-4">
                 <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">Outras fotos</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {obra.fotos.map((f, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setLightbox({ lista: todasFotos, idx: fotosFeed.length + i })}
-                      className="block aspect-video overflow-hidden rounded-lg border border-line"
-                      title="Ver em grande"
-                    >
-                      <img src={f} alt="" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
-                </div>
+                <FotosCarousel fotos={obra.fotos} onAbrir={(i) => setLightbox({ lista: obra.fotos, idx: i })} />
               </CardContent>
             </Card>
           )}
