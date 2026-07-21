@@ -16,6 +16,8 @@ import {
   Wallet,
   MessageCircle,
   Sparkles,
+  Upload,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -485,15 +487,20 @@ export function NovaDecisaoModal({
   const [valor, setValor] = useState("");
   const [prazo, setPrazo] = useState("");
   const [maioria, setMaioria] = useState<MaioriaRegra>("simples");
-  const [anexoNome, setAnexoNome] = useState("");
-  const [anexoUrl, setAnexoUrl] = useState("");
   const [anexos, setAnexos] = useState<{ nome: string; url: string }[]>([]);
 
-  const addAnexo = () => {
-    if (!anexoNome.trim() || !anexoUrl.trim()) return;
-    setAnexos((a) => [...a, { nome: anexoNome.trim(), url: anexoUrl.trim() }]);
-    setAnexoNome("");
-    setAnexoUrl("");
+  const onAnexos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const novos: { nome: string; url: string }[] = [];
+    for (const f of Array.from(files).slice(0, 6)) {
+      const url = await new Promise<string>((res) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result));
+        r.readAsDataURL(f);
+      });
+      novos.push({ nome: f.name, url });
+    }
+    setAnexos((a) => [...a, ...novos].slice(0, 8));
   };
 
   const submit = () => {
@@ -585,24 +592,30 @@ export function NovaDecisaoModal({
               </select>
             </label>
           </div>
-          {/* Anexos */}
+          {/* Anexos — carregar ficheiros do dispositivo */}
           <div className="rounded-xl border border-line/60 bg-bg/40 p-3">
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted"><Paperclip size={12} /> Anexos</p>
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted"><Paperclip size={12} /> Anexos (opcional)</p>
             {anexos.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
+              <ul className="mb-2 space-y-1.5">
                 {anexos.map((a, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[11px] text-secondary">
-                    {a.nome}
-                    <button onClick={() => setAnexos((x) => x.filter((_, idx) => idx !== i))} className="text-muted hover:text-danger"><X size={11} /></button>
-                  </span>
+                  <li key={i} className="flex items-center gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-[13px] text-ink">
+                    <FileText size={14} className="shrink-0 text-secondary" />
+                    <span className="min-w-0 flex-1 truncate">{a.nome}</span>
+                    <button onClick={() => setAnexos((x) => x.filter((_, idx) => idx !== i))} className="shrink-0 text-muted hover:text-danger" title="Remover"><X size={14} /></button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-              <input value={anexoNome} onChange={(e) => setAnexoNome(e.target.value)} placeholder="Nome" className={inputCls} />
-              <input value={anexoUrl} onChange={(e) => setAnexoUrl(e.target.value)} placeholder="URL" className={inputCls} />
-              <Button size="sm" variant="outline" onClick={addAnexo}><Plus size={13} /></Button>
-            </div>
+            <label
+              className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-card py-5 text-center hover:bg-accent"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); onAnexos(e.dataTransfer.files); }}
+            >
+              <Upload size={18} className="text-secondary" />
+              <span className="text-[13px] font-medium text-ink">Carregar ficheiro</span>
+              <span className="text-[11px] text-muted">Fatura, orçamento, planta… (PDF ou imagem)</span>
+              <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => onAnexos(e.target.files)} />
+            </label>
           </div>
           <p className="text-[11px] text-muted">
             Os votos são ponderados pela percentagem de cada sócio. A decisão fecha automaticamente quando a maioria é atingida (ou impossível) ou o prazo termina.
