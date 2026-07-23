@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toastSuccess, toastError, toastInfo } from "@/lib/toast";
 import {
   FileText,
   Image as ImageIcon,
@@ -12,26 +12,27 @@ import {
   List as ListIcon,
   Trash2,
   RotateCcw,
-  Share2,
   Download,
   Pencil,
   FolderInput,
-  Link2,
   X,
   AlertTriangle,
+  Folder as FolderIcon,
   FolderOpen,
   Building2,
-  User as UserIcon,
-  Network,
+  Users,
   ChevronRight,
   ChevronDown,
-  Tag as TagIcon,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  SlidersHorizontal,
   Maximize2,
+  ExternalLink,
   type LucideIcon,
 } from "lucide-react";
-import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import { ExampleDataToggle } from "@/components/ExampleDataToggle";
 import { Lightbox } from "@/components/Lightbox";
 import {
   useDocumentsStore,
@@ -43,27 +44,41 @@ import {
   type DocCategoria,
   type PropertyDocument,
 } from "@/store/useDocumentsStore";
+import { useFoldersStore, type Folder } from "@/store/useFoldersStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
-import { useTenantsStore } from "@/store/useTenantsStore";
-import { useContractsStore } from "@/store/useContractsStore";
-import { useProjectStagesStore } from "@/store/useProjectStagesStore";
+import { useCollabStore } from "@/store/useCollabStore";
 import { useExampleData } from "@/store/useExampleData";
 import { dataPT } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-// ───────────────────────── Tipos da árvore ─────────────────────────
+// ───────────────────────── Tipos de localização (Explorador) ─────────────────────────
 
-type TreeNode =
-  | { kind: "todas" }
-  | { kind: "property"; propertyId: string; categoria?: DocCategoria }
-  | { kind: "categoria"; categoria: DocCategoria }
-  | { kind: "tenant"; tenantId: string }
-  | { kind: "projeto"; projectId: string }
-  | { kind: "folder"; nome: string }
-  | { kind: "lixo" };
+type Loc =
+  | { kind: "root" }
+  | { kind: "imoveis" }
+  | { kind: "colaborativa" }
+  | { kind: "sem" }
+  | { kind: "lixo" }
+  | { kind: "property"; propertyId: string }
+  | { kind: "project"; projectId: string }
+  | { kind: "folder"; folderId: string };
+
+function locKey(l: Loc): string {
+  switch (l.kind) {
+    case "property": return `property:${l.propertyId}`;
+    case "project": return `project:${l.projectId}`;
+    case "folder": return `folder:${l.folderId}`;
+    default: return l.kind;
+  }
+}
+function sameLoc(a: Loc, b: Loc) { return locKey(a) === locKey(b); }
+
+function isSeedDoc(d: PropertyDocument) { return d.id.startsWith("seed-doc-"); }
+function isSeedProperty(id: string) { return id.startsWith("seed-"); }
+
+// ───────────────────────── Ícones por tipo ─────────────────────────
 
 type TipoGrupo = "pdf" | "imagem" | "doc" | "sheet" | "outro";
-
 function tipoGrupo(mime: string): TipoGrupo {
   if (mime === "application/pdf") return "pdf";
   if (mime.startsWith("image/")) return "imagem";
@@ -71,7 +86,6 @@ function tipoGrupo(mime: string): TipoGrupo {
   if (/sheet|excel|spreadsheet/.test(mime)) return "sheet";
   return "outro";
 }
-
 function iconForDoc(d: PropertyDocument): LucideIcon {
   const g = tipoGrupo(d.mimeType);
   if (g === "imagem") return ImageIcon;
@@ -79,768 +93,596 @@ function iconForDoc(d: PropertyDocument): LucideIcon {
   if (g === "outro") return FileIcon;
   return FileText;
 }
-
-function temAssociacao(d: PropertyDocument): boolean {
-  return !!(d.propertyId || d.tenantId || d.contractId || d.projectId || d.obraId);
-}
-
 function isDataImage(d: PropertyDocument): boolean {
   return d.mimeType.startsWith("image/") && d.ficheiroUrl !== "#" && d.ficheiroUrl !== "";
 }
+
+// Item mostrado no conteúdo (pasta navegável OU documento).
+type Item =
+  | { type: "folder"; id: string; nome: string; loc: Loc; icon: LucideIcon; count: number }
+  | { type: "doc"; doc: PropertyDocument };
 
 // ───────────────────────── Página ─────────────────────────
 
 export default function PastaDigital() {
   const documents = useDocumentsStore((s) => s.documents);
-  const customFolders = useDocumentsStore((s) => s.customFolders);
-  const addFolder = useDocumentsStore((s) => s.addFolder);
+  const addDoc = useDocumentsStore((s) => s.add);
+  const folders = useFoldersStore((s) => s.folders);
+  const addFolder = useFoldersStore((s) => s.add);
   const enabled = useExampleData((s) => s.enabled);
 
   const properties = usePropertiesStore((s) => s.properties);
-  const tenants = useTenantsStore((s) => s.tenants);
-  const projects = useProjectStagesStore((s) => s.projects);
+  const collabProjects = useCollabStore((s) => s.projects);
 
-  const propName = (id?: string) => properties.find((p) => p.id === id)?.name ?? "Imóvel";
-  const tenantName = (id?: string) => tenants.find((t) => t.id === id)?.nomeCompleto ?? "Inquilino";
-  const projName = (id?: string) => projects.find((p) => p.id === id)?.nome ?? "Projeto";
+  // Exemplo OFF → esconde os seeds, mas mantém sempre os dados do utilizador.
+  const docs = enabled ? documents : documents.filter((d) => !isSeedDoc(d));
+  const imoveis = enabled ? properties : properties.filter((p) => !isSeedProperty(p.id));
+  const ativos = docs.filter((d) => !d.deletedAt);
+  const naLixeira = docs.filter((d) => d.deletedAt);
+  const projetos = enabled ? collabProjects : collabProjects.filter((p) => ativos.some((d) => d.projectId === p.id));
 
-  const [node, setNode] = useState<TreeNode>({ kind: "todas" });
-  const [q, setQ] = useState("");
-  const [fTipo, setFTipo] = useState<"todos" | TipoGrupo>("todos");
-  const [fPeriodo, setFPeriodo] = useState<"todos" | "30" | "90" | "365">("todos");
-  const [fExpira, setFExpira] = useState(false);
-  const [fAssoc, setFAssoc] = useState<"todos" | "com" | "sem">("todos");
-  const [view, setView] = useState<"grid" | "lista">("grid");
-  const [sel, setSel] = useState<Set<string>>(new Set());
-  const [panelId, setPanelId] = useState<string | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [expandProp, setExpandProp] = useState<Set<string>>(new Set());
+  const propName = (id?: string) => imoveis.find((p) => p.id === id)?.name ?? properties.find((p) => p.id === id)?.name ?? "Imóvel";
+  const projName = (id?: string) => collabProjects.find((p) => p.id === id)?.title ?? "Projeto";
+  const folderById = (id?: string) => folders.find((f) => f.id === id);
 
-  const all = enabled ? documents : [];
-  const ativos = all.filter((d) => !d.deletedAt);
-  const naLixeira = all.filter((d) => d.deletedAt);
-
-  // Documentos correspondentes ao nó selecionado
-  const baseList = useMemo(() => {
-    const inNode = (d: PropertyDocument): boolean => {
-      switch (node.kind) {
-        case "todas":
-          return !d.deletedAt;
-        case "property":
-          return !d.deletedAt && d.propertyId === node.propertyId && (!node.categoria || d.categoria === node.categoria);
-        case "categoria":
-          return !d.deletedAt && d.categoria === node.categoria;
-        case "tenant":
-          return !d.deletedAt && d.tenantId === node.tenantId;
-        case "projeto":
-          return !d.deletedAt && d.projectId === node.projectId;
-        case "folder":
-          return !d.deletedAt && d.pasta === node.nome;
-        case "lixo":
-          return !!d.deletedAt;
+  // Navegação com histórico (setas voltar/avançar)
+  const [hist, setHist] = useState<Loc[]>([{ kind: "root" }]);
+  const [hi, setHi] = useState(0);
+  const loc = hist[hi];
+  const navigate = (l: Loc) => {
+    if (sameLoc(l, loc)) return;
+    const novo = hist.slice(0, hi + 1);
+    novo.push(l);
+    setHist(novo);
+    setHi(novo.length - 1);
+    setSel(new Set());
+  };
+  const back = () => { if (hi > 0) { setHi(hi - 1); setSel(new Set()); } };
+  const forward = () => { if (hi < hist.length - 1) { setHi(hi + 1); setSel(new Set()); } };
+  const parentLoc = (l: Loc): Loc => {
+    switch (l.kind) {
+      case "property": return { kind: "imoveis" };
+      case "project": return { kind: "colaborativa" };
+      case "folder": {
+        const f = folderById(l.folderId);
+        if (f?.parentId) return { kind: "folder", folderId: f.parentId };
+        if (f?.propertyId) return { kind: "property", propertyId: f.propertyId };
+        if (f?.projectId) return { kind: "project", projectId: f.projectId };
+        return { kind: "root" };
       }
-    };
-    return all.filter(inNode);
-  }, [all, node]);
-
-  // Filtros
-  const lista = useMemo(() => {
-    const ql = q.trim().toLowerCase();
-    const now = Date.now();
-    return baseList
-      .filter((d) => {
-        if (ql) {
-          const hay = `${d.nome} ${(d.tags ?? []).join(" ")} ${d.notas ?? ""}`.toLowerCase();
-          if (!hay.includes(ql)) return false;
-        }
-        if (fTipo !== "todos" && tipoGrupo(d.mimeType) !== fTipo) return false;
-        if (fPeriodo !== "todos") {
-          const dias = (now - new Date(`${d.uploadedAt}T00:00:00`).getTime()) / 86400000;
-          if (dias > Number(fPeriodo)) return false;
-        }
-        if (fExpira && !expiraEmBreve(d, 30)) return false;
-        if (fAssoc === "com" && !temAssociacao(d)) return false;
-        if (fAssoc === "sem" && temAssociacao(d)) return false;
-        return true;
-      })
-      .sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1));
-  }, [baseList, q, fTipo, fPeriodo, fExpira, fAssoc]);
-
-  // Alertas
-  const aExpirar = ativos.filter((d) => expiraEmBreve(d, 30));
-  const semAssoc = ativos.filter((d) => !temAssociacao(d));
-
-  // Agrupamentos para a árvore
-  const propsComDocs = properties.filter((p) => ativos.some((d) => d.propertyId === p.id));
-  const catsComDocs = DOC_CATEGORIAS.filter((c) => ativos.some((d) => d.categoria === c));
-  const tenantsComDocs = tenants.filter((t) => ativos.some((d) => d.tenantId === t.id));
-  const projsComDocs = projects.filter((p) => ativos.some((d) => d.projectId === p.id));
-
-  const panelDoc = panelId ? all.find((d) => d.id === panelId) ?? null : null;
-
-  const toggleSel = (id: string) =>
-    setSel((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  const clearSel = () => setSel(new Set());
-
-  const novaPasta = () => {
-    const nome = window.prompt("Nome da nova pasta:");
-    if (nome && nome.trim()) {
-      addFolder(nome.trim());
-      toastSuccess("Pasta criada", { description: nome.trim() });
+      case "imoveis": case "colaborativa": case "sem": case "lixo": return { kind: "root" };
+      default: return { kind: "root" };
     }
   };
+  const up = () => navigate(parentLoc(loc));
 
-  const breadcrumb = nodeBreadcrumb(node, { propName, tenantName, projName });
+  const [q, setQ] = useState("");
+  const [view, setView] = useState<"lista" | "grid">("lista");
+  const [sort, setSort] = useState<{ campo: "nome" | "tipo" | "tamanho" | "data" | "validade"; asc: boolean }>({ campo: "nome", asc: true });
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [lastClick, setLastClick] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(["imoveis", "colaborativa"]));
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [panelId, setPanelId] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; doc: PropertyDocument } | null>(null);
+  const [filtOpen, setFiltOpen] = useState(false);
+  const [fTipo, setFTipo] = useState<"todos" | TipoGrupo>("todos");
+  const [fExpira, setFExpira] = useState(false);
+
+  const toggleExpand = (k: string) =>
+    setExpanded((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
+
+  // ── Conteúdo derivado da localização atual ──
+  const subFoldersDe = (propertyId: string | null, projectId: string | null, parentId: string | null): Folder[] =>
+    folders.filter((f) => f.propertyId === propertyId && f.projectId === projectId && f.parentId === parentId);
+
+  const docCountFolder = (fid: string) => ativos.filter((d) => d.pastaId === fid).length;
+
+  const conteudo: Item[] = useMemo(() => {
+    const folderItem = (f: Folder): Item => ({ type: "folder", id: f.id, nome: f.nome, loc: { kind: "folder", folderId: f.id }, icon: FolderIcon, count: docCountFolder(f.id) });
+    switch (loc.kind) {
+      case "root":
+        return [
+          { type: "folder", id: "g-imoveis", nome: "Os meus imóveis", loc: { kind: "imoveis" }, icon: Building2, count: imoveis.length },
+          { type: "folder", id: "g-colab", nome: "Gestão Colaborativa", loc: { kind: "colaborativa" }, icon: Users, count: projetos.length },
+          { type: "folder", id: "g-sem", nome: "Sem associação", loc: { kind: "sem" }, icon: FolderIcon, count: ativos.filter((d) => !d.propertyId && !d.projectId && !d.pastaId).length },
+        ];
+      case "imoveis":
+        return imoveis.map((p) => ({ type: "folder", id: p.id, nome: p.name, loc: { kind: "property", propertyId: p.id }, icon: FolderIcon, count: ativos.filter((d) => d.propertyId === p.id).length } as Item));
+      case "colaborativa":
+        return projetos.map((p) => ({ type: "folder", id: p.id, nome: p.title, loc: { kind: "project", projectId: p.id }, icon: FolderIcon, count: ativos.filter((d) => d.projectId === p.id).length } as Item));
+      case "property": {
+        const subs = subFoldersDe(loc.propertyId, null, null).map(folderItem);
+        const ds = ativos.filter((d) => d.propertyId === loc.propertyId && !d.pastaId).map((d) => ({ type: "doc", doc: d } as Item));
+        return [...subs, ...ds];
+      }
+      case "project": {
+        const subs = subFoldersDe(null, loc.projectId, null).map(folderItem);
+        const ds = ativos.filter((d) => d.projectId === loc.projectId && !d.pastaId).map((d) => ({ type: "doc", doc: d } as Item));
+        return [...subs, ...ds];
+      }
+      case "folder": {
+        const subs = folders.filter((f) => f.parentId === loc.folderId).map(folderItem);
+        const ds = ativos.filter((d) => d.pastaId === loc.folderId).map((d) => ({ type: "doc", doc: d } as Item));
+        return [...subs, ...ds];
+      }
+      case "sem":
+        return ativos.filter((d) => !d.propertyId && !d.projectId && !d.pastaId).map((d) => ({ type: "doc", doc: d } as Item));
+      case "lixo":
+        return naLixeira.map((d) => ({ type: "doc", doc: d } as Item));
+    }
+  }, [loc, ativos, naLixeira, folders, imoveis, projetos]);
+
+  // Filtro + pesquisa + ordenação (pastas sempre primeiro)
+  const itens = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    const filtrados = conteudo.filter((it) => {
+      if (it.type === "folder") return ql ? it.nome.toLowerCase().includes(ql) : true;
+      const d = it.doc;
+      if (ql && !`${d.nome} ${d.notas ?? ""}`.toLowerCase().includes(ql)) return false;
+      if (fTipo !== "todos" && tipoGrupo(d.mimeType) !== fTipo) return false;
+      if (fExpira && !expiraEmBreve(d, 30)) return false;
+      return true;
+    });
+    const pastas = filtrados.filter((i) => i.type === "folder");
+    const docsF = filtrados.filter((i) => i.type === "doc") as Extract<Item, { type: "doc" }>[];
+    const dir = sort.asc ? 1 : -1;
+    const cmp = (a: Extract<Item, { type: "doc" }>, b: Extract<Item, { type: "doc" }>) => {
+      const da = a.doc, db = b.doc;
+      switch (sort.campo) {
+        case "nome": return da.nome.localeCompare(db.nome) * dir;
+        case "tipo": return tipoGrupo(da.mimeType).localeCompare(tipoGrupo(db.mimeType)) * dir;
+        case "tamanho": return ((da.tamanho ?? 0) - (db.tamanho ?? 0)) * dir;
+        case "data": return da.uploadedAt.localeCompare(db.uploadedAt) * dir;
+        case "validade": return (da.expiraEm ?? "9999").localeCompare(db.expiraEm ?? "9999") * dir;
+      }
+    };
+    docsF.sort(cmp);
+    (pastas as Extract<Item, { type: "folder" }>[]).sort((a, b) => a.nome.localeCompare(b.nome) * (sort.campo === "nome" ? dir : 1));
+    return [...pastas, ...docsF];
+  }, [conteudo, q, fTipo, fExpira, sort]);
+
+  const docsNaVista = itens.filter((i) => i.type === "doc") as Extract<Item, { type: "doc" }>[];
+  const totalBytes = docsNaVista.reduce((s, i) => s + (i.doc.tamanho ?? 0), 0);
+  const aExpirar = ativos.filter((d) => expiraEmBreve(d, 30));
+
+  const breadcrumb = useMemo(() => {
+    const segs: { label: string; loc: Loc }[] = [{ label: "Pasta Digital", loc: { kind: "root" } }];
+    const chain: Loc[] = [];
+    let cur: Loc = loc;
+    while (cur.kind !== "root") { chain.unshift(cur); cur = parentLoc(cur); }
+    for (const l of chain) {
+      let label = "";
+      if (l.kind === "imoveis") label = "Os meus imóveis";
+      else if (l.kind === "colaborativa") label = "Gestão Colaborativa";
+      else if (l.kind === "sem") label = "Sem associação";
+      else if (l.kind === "lixo") label = "Lixo";
+      else if (l.kind === "property") label = propName(l.propertyId);
+      else if (l.kind === "project") label = projName(l.projectId);
+      else if (l.kind === "folder") label = folderById(l.folderId)?.nome ?? "Pasta";
+      segs.push({ label, loc: l });
+    }
+    return segs;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loc, folders, imoveis, projetos]);
+
+  // Contexto para criar subpasta / pré-preencher upload a partir da localização
+  const contextoAtual = useMemo(() => {
+    if (loc.kind === "property") return { propertyId: loc.propertyId as string | null, projectId: null as string | null, parentId: null as string | null };
+    if (loc.kind === "project") return { propertyId: null, projectId: loc.projectId, parentId: null };
+    if (loc.kind === "folder") { const f = folderById(loc.folderId); return { propertyId: f?.propertyId ?? null, projectId: f?.projectId ?? null, parentId: loc.folderId }; }
+    return { propertyId: null, projectId: null, parentId: null };
+  }, [loc, folders]);
+
+  const podeCriarPasta = loc.kind === "property" || loc.kind === "project" || loc.kind === "folder";
+
+  const novaPasta = () => {
+    if (!podeCriarPasta) { toastInfo("Entre num imóvel ou projeto para criar uma subpasta."); return; }
+    const nome = window.prompt("Nome da nova pasta:");
+    if (!nome || !nome.trim()) return;
+    addFolder({ nome: nome.trim(), propertyId: contextoAtual.propertyId, projectId: contextoAtual.projectId, parentId: contextoAtual.parentId });
+    toastSuccess("Pasta criada", nome.trim());
+  };
+
+  // Seleção com click / Ctrl / Shift
+  const idsVisiveis = docsNaVista.map((i) => i.doc.id);
+  const clicarDoc = (id: string, e: React.MouseEvent) => {
+    if (e.shiftKey && lastClick) {
+      const a = idsVisiveis.indexOf(lastClick), b = idsVisiveis.indexOf(id);
+      if (a >= 0 && b >= 0) { const [lo, hi2] = a < b ? [a, b] : [b, a]; setSel(new Set(idsVisiveis.slice(lo, hi2 + 1))); return; }
+    }
+    if (e.ctrlKey || e.metaKey) { setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; }); setLastClick(id); return; }
+    setSel(new Set([id])); setLastClick(id);
+  };
+
+  useEffect(() => { const close = () => setCtx(null); if (ctx) { window.addEventListener("click", close); window.addEventListener("scroll", close, true); return () => { window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); }; } }, [ctx]);
+
+  const abrirDoc = (d: PropertyDocument) => setPanelId(d.id);
+  const panelDoc = panelId ? documents.find((d) => d.id === panelId) ?? null : null;
 
   return (
     <div>
-      <PageHeader
-        title="Pasta Digital"
-        subtitle="Arquivo central de todos os documentos — contratos, escrituras, faturas, seguros e mais."
-        showExampleToggle
-        actions={
-          <Button onClick={() => setUploadOpen(true)}>
-            <Upload size={16} /> Carregar documento
-          </Button>
-        }
-      />
-
-      {/* Alertas */}
-      {node.kind !== "lixo" && (aExpirar.length > 0 || semAssoc.length > 0) && (
-        <div className="mb-5 space-y-2">
-          {aExpirar.length > 0 && (
-            <div className="rounded-xl border border-danger/30 bg-danger/8 p-3">
-              <p className="flex items-center gap-2 text-sm font-medium text-danger">
-                <AlertTriangle size={15} /> {aExpirar.length} documento(s) expiram nos próximos 30 dias
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {aExpirar.map((d) => (
-                  <button
-                    key={d.id}
-                    onClick={() => setPanelId(d.id)}
-                    className="rounded-full bg-card px-2.5 py-1 text-xs text-danger ring-1 ring-danger/20 hover:bg-danger/10"
-                  >
-                    {d.nome} · {diasAteExpiracao(d.expiraEm)}d
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {semAssoc.length > 0 && (
-            <div className="rounded-xl border border-warning/30 bg-warning/10 p-3">
-              <button
-                onClick={() => {
-                  setNode({ kind: "todas" });
-                  setFAssoc("sem");
-                }}
-                className="flex items-center gap-2 text-sm font-medium text-warning"
-              >
-                <AlertTriangle size={15} /> {semAssoc.length} documento(s) sem associação a imóvel/inquilino — clicar para ver
-              </button>
-            </div>
-          )}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-ink">Pasta Digital</h1>
+          <p className="text-sm text-muted">Todos os documentos num só sítio — organizados por imóvel e projeto, como no explorador.</p>
         </div>
+        <ExampleDataToggle />
+      </div>
+
+      {/* Alerta de expiração compacto */}
+      {aExpirar.length > 0 && loc.kind !== "lixo" && (
+        <button
+          onClick={() => { navigate({ kind: "root" }); setFExpira(true); toastInfo("Filtro aplicado: expira em breve"); }}
+          className="mb-3 flex w-full items-center gap-2 rounded-lg border border-warning/40 bg-warning/8 px-3 py-2 text-sm text-warning"
+        >
+          <AlertTriangle size={15} className="shrink-0" />
+          <span className="font-medium">{aExpirar.length} {aExpirar.length === 1 ? "documento expira" : "documentos expiram"} nos próximos 30 dias</span>
+          <span className="ml-auto underline">Ver</span>
+        </button>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
-        {/* ───────── Árvore ───────── */}
-        <aside className="rounded-xl border border-line bg-card p-2 lg:sticky lg:top-2 lg:h-fit">
-          <TreeRow
-            active={node.kind === "todas"}
-            icon={FolderOpen}
-            label="Todas"
-            count={ativos.length}
-            onClick={() => setNode({ kind: "todas" })}
-          />
-
-          <TreeGroup label="Por imóvel">
-            {propsComDocs.map((p) => {
-              const open = expandProp.has(p.id);
-              const cats = DOC_CATEGORIAS.filter((c) =>
-                ativos.some((d) => d.propertyId === p.id && d.categoria === c)
-              );
-              return (
-                <div key={p.id}>
-                  <TreeRow
-                    active={node.kind === "property" && node.propertyId === p.id && !node.categoria}
-                    icon={Building2}
-                    label={p.name}
-                    count={ativos.filter((d) => d.propertyId === p.id).length}
-                    chevron={cats.length > 0 ? (open ? "down" : "right") : undefined}
-                    onChevron={() =>
-                      setExpandProp((s) => {
-                        const n = new Set(s);
-                        n.has(p.id) ? n.delete(p.id) : n.add(p.id);
-                        return n;
-                      })
-                    }
-                    onClick={() => setNode({ kind: "property", propertyId: p.id })}
-                  />
-                  {open &&
-                    cats.map((c) => (
-                      <TreeRow
-                        key={c}
-                        indent
-                        active={node.kind === "property" && node.propertyId === p.id && node.categoria === c}
-                        label={c}
-                        count={ativos.filter((d) => d.propertyId === p.id && d.categoria === c).length}
-                        onClick={() => setNode({ kind: "property", propertyId: p.id, categoria: c })}
-                      />
-                    ))}
-                </div>
-              );
-            })}
-          </TreeGroup>
-
-          <TreeGroup label="Por categoria">
-            {catsComDocs.map((c) => (
-              <TreeRow
-                key={c}
-                active={node.kind === "categoria" && node.categoria === c}
-                label={c}
-                count={ativos.filter((d) => d.categoria === c).length}
-                onClick={() => setNode({ kind: "categoria", categoria: c })}
-              />
-            ))}
-          </TreeGroup>
-
-          {tenantsComDocs.length > 0 && (
-            <TreeGroup label="Por inquilino">
-              {tenantsComDocs.map((t) => (
-                <TreeRow
-                  key={t.id}
-                  icon={UserIcon}
-                  active={node.kind === "tenant" && node.tenantId === t.id}
-                  label={t.nomeCompleto}
-                  count={ativos.filter((d) => d.tenantId === t.id).length}
-                  onClick={() => setNode({ kind: "tenant", tenantId: t.id })}
-                />
-              ))}
-            </TreeGroup>
-          )}
-
-          {projsComDocs.length > 0 && (
-            <TreeGroup label="Projetos">
-              {projsComDocs.map((p) => (
-                <TreeRow
-                  key={p.id}
-                  icon={Network}
-                  active={node.kind === "projeto" && node.projectId === p.id}
-                  label={p.nome}
-                  count={ativos.filter((d) => d.projectId === p.id).length}
-                  onClick={() => setNode({ kind: "projeto", projectId: p.id })}
-                />
-              ))}
-            </TreeGroup>
-          )}
-
-          <TreeGroup
-            label="Pastas"
-            action={
-              <button onClick={novaPasta} title="Nova pasta" className="text-muted hover:text-primary">
-                <FolderPlus size={14} />
-              </button>
-            }
-          >
-            {customFolders.length === 0 ? (
-              <p className="px-3 py-1 text-[11px] text-muted">Sem pastas personalizadas.</p>
-            ) : (
-              customFolders.map((f) => (
-                <TreeRow
-                  key={f}
-                  icon={FolderOpen}
-                  active={node.kind === "folder" && node.nome === f}
-                  label={f}
-                  count={ativos.filter((d) => d.pasta === f).length}
-                  onClick={() => setNode({ kind: "folder", nome: f })}
-                />
-              ))
-            )}
-          </TreeGroup>
-
-          <div className="mt-1 border-t border-line pt-1">
-            <TreeRow
-              active={node.kind === "lixo"}
-              icon={Trash2}
-              label="Lixo"
-              count={naLixeira.length}
-              onClick={() => setNode({ kind: "lixo" })}
+      {/* Barra superior: navegação + breadcrumb + ações */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-0.5">
+          <NavBtn icon={ArrowLeft} title="Voltar" disabled={hi === 0} onClick={back} />
+          <NavBtn icon={ArrowRight} title="Avançar" disabled={hi >= hist.length - 1} onClick={forward} />
+          <NavBtn icon={ArrowUp} title="Subir um nível" disabled={loc.kind === "root"} onClick={up} />
+        </div>
+        <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-lg border border-line bg-card px-3 py-2 text-sm">
+          {breadcrumb.map((s, i) => (
+            <span key={i} className="flex shrink-0 items-center gap-1">
+              {i > 0 && <ChevronRight size={13} className="text-muted/60" />}
+              <button onClick={() => navigate(s.loc)} className={cn("truncate rounded px-1 hover:bg-accent", i === breadcrumb.length - 1 ? "font-semibold text-ink" : "text-muted")}>{s.label}</button>
+            </span>
+          ))}
+        </nav>
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-card px-3">
+          <Search size={15} className="text-muted" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pesquisar…" className="h-9 w-32 bg-transparent text-sm outline-none sm:w-44" />
+        </div>
+        <div className="relative">
+          <Button variant={fTipo !== "todos" || fExpira ? "gold" : "outline"} size="sm" onClick={() => setFiltOpen((v) => !v)}>
+            <SlidersHorizontal size={14} /> Filtros
+          </Button>
+          {filtOpen && (
+            <FilterPopover
+              fTipo={fTipo} setFTipo={setFTipo} fExpira={fExpira} setFExpira={setFExpira}
+              onClose={() => setFiltOpen(false)} onLimpar={() => { setFTipo("todos"); setFExpira(false); }}
             />
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={novaPasta} disabled={!podeCriarPasta} title={podeCriarPasta ? "Nova pasta" : "Entre num imóvel/projeto"}>
+          <FolderPlus size={14} /> Nova pasta
+        </Button>
+        <Button size="sm" onClick={() => setUploadOpen(true)}>
+          <Upload size={14} /> Carregar documento
+        </Button>
+        <div className="flex overflow-hidden rounded-lg border border-line">
+          <button onClick={() => setView("lista")} className={cn("flex h-9 w-9 items-center justify-center", view === "lista" ? "bg-primary text-white" : "bg-card text-muted hover:bg-accent")} title="Lista"><ListIcon size={15} /></button>
+          <button onClick={() => setView("grid")} className={cn("flex h-9 w-9 items-center justify-center", view === "grid" ? "bg-primary text-white" : "bg-card text-muted hover:bg-accent")} title="Grelha"><LayoutGrid size={15} /></button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+        {/* ───────── Árvore ───────── */}
+        <aside className="h-fit rounded-xl border border-line bg-card p-2 lg:sticky lg:top-2">
+          <TreeRow depth={0} icon={FolderOpen} label="Pasta Digital" active={loc.kind === "root"} onClick={() => navigate({ kind: "root" })} />
+          {/* Os meus imóveis */}
+          <TreeRow depth={1} icon={Building2} label="Os meus imóveis" active={loc.kind === "imoveis"} expandable open={expanded.has("imoveis")} onToggle={() => toggleExpand("imoveis")} onClick={() => navigate({ kind: "imoveis" })} />
+          {expanded.has("imoveis") && imoveis.map((p) => (
+            <TreeBranch key={p.id} depth={2} label={p.name} loc={{ kind: "property", propertyId: p.id }} propertyId={p.id} projectId={null}
+              loc0={loc} navigate={navigate} folders={folders} expanded={expanded} toggleExpand={toggleExpand} />
+          ))}
+          {/* Gestão Colaborativa */}
+          <TreeRow depth={1} icon={Users} label="Gestão Colaborativa" active={loc.kind === "colaborativa"} expandable open={expanded.has("colaborativa")} onToggle={() => toggleExpand("colaborativa")} onClick={() => navigate({ kind: "colaborativa" })} />
+          {expanded.has("colaborativa") && projetos.map((p) => (
+            <TreeBranch key={p.id} depth={2} label={p.title} loc={{ kind: "project", projectId: p.id }} propertyId={null} projectId={p.id}
+              loc0={loc} navigate={navigate} folders={folders} expanded={expanded} toggleExpand={toggleExpand} />
+          ))}
+          {/* Sem associação */}
+          <TreeRow depth={1} icon={FolderIcon} label="Sem associação" active={loc.kind === "sem"} onClick={() => navigate({ kind: "sem" })} />
+          <div className="mt-1 border-t border-line pt-1">
+            <TreeRow depth={1} icon={Trash2} label="Lixo" active={loc.kind === "lixo"} onClick={() => navigate({ kind: "lixo" })} />
           </div>
         </aside>
 
-        {/* ───────── Vista da pasta ───────── */}
-        <section className="min-w-0">
-          {/* Toolbar */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <p className="mr-auto text-sm text-muted">{breadcrumb}</p>
-            <div className="flex items-center gap-2 rounded-xl border border-line bg-card px-3">
-              <Search size={15} className="text-muted" />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Pesquisar…"
-                className="h-9 w-40 bg-transparent text-sm outline-none placeholder:text-muted sm:w-56"
-              />
-            </div>
-            <Button variant="outline" size="sm" onClick={novaPasta}>
-              <FolderPlus size={14} /> Nova pasta
-            </Button>
-            <div className="flex overflow-hidden rounded-lg border border-line">
-              <button
-                onClick={() => setView("grid")}
-                className={cn("flex h-9 w-9 items-center justify-center", view === "grid" ? "bg-primary text-white" : "bg-card text-muted hover:bg-accent")}
-                title="Grelha"
-              >
-                <LayoutGrid size={15} />
-              </button>
-              <button
-                onClick={() => setView("lista")}
-                className={cn("flex h-9 w-9 items-center justify-center", view === "lista" ? "bg-primary text-white" : "bg-card text-muted hover:bg-accent")}
-                title="Lista"
-              >
-                <ListIcon size={15} />
-              </button>
-            </div>
-          </div>
-
-          {/* Filtros */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <select value={fTipo} onChange={(e) => setFTipo(e.target.value as typeof fTipo)} className={selCls}>
-              <option value="todos">Todos os tipos</option>
-              <option value="pdf">PDF</option>
-              <option value="imagem">Imagem</option>
-              <option value="doc">Documento</option>
-              <option value="sheet">Folha de cálculo</option>
-            </select>
-            <select value={fPeriodo} onChange={(e) => setFPeriodo(e.target.value as typeof fPeriodo)} className={selCls}>
-              <option value="todos">Qualquer período</option>
-              <option value="30">Últimos 30 dias</option>
-              <option value="90">Últimos 90 dias</option>
-              <option value="365">Último ano</option>
-            </select>
-            <select value={fAssoc} onChange={(e) => setFAssoc(e.target.value as typeof fAssoc)} className={selCls}>
-              <option value="todos">Com/sem associação</option>
-              <option value="com">Associados</option>
-              <option value="sem">Sem associação</option>
-            </select>
-            <button
-              onClick={() => setFExpira((v) => !v)}
-              className={cn(
-                "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium",
-                fExpira ? "border-danger/40 bg-danger/10 text-danger" : "border-line bg-card text-muted hover:bg-accent"
-              )}
-            >
-              <AlertTriangle size={13} /> Expira em breve
-            </button>
-          </div>
-
-          {/* Barra de seleção múltipla */}
-          {sel.size > 0 && (
-            <BulkBar
-              count={sel.size}
-              ids={[...sel]}
-              onDone={clearSel}
-              lixo={node.kind === "lixo"}
-            />
-          )}
-
-          {/* Conteúdo */}
-          {lista.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-line bg-card py-16 text-center">
+        {/* ───────── Conteúdo ───────── */}
+        <section
+          className="min-w-0"
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files?.length) { setUploadOpen(true); } }}
+        >
+          {itens.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-line bg-card py-20 text-center">
               <FolderOpen size={30} className="mx-auto mb-2 text-muted" />
-              <p className="text-sm text-muted">Sem documentos nesta vista.</p>
+              <p className="text-sm text-muted">{loc.kind === "lixo" ? "Lixo vazio." : "Pasta vazia. Carregue um documento ou arraste ficheiros para aqui."}</p>
             </div>
-          ) : view === "grid" ? (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {lista.map((d) => (
-                <DocCard
-                  key={d.id}
-                  d={d}
-                  selected={sel.has(d.id)}
-                  onToggle={() => toggleSel(d.id)}
-                  onOpen={() => setPanelId(d.id)}
-                  propName={propName}
-                  tenantName={tenantName}
-                  projName={projName}
-                />
-              ))}
-            </div>
+          ) : view === "lista" ? (
+            <ListaView itens={itens} sort={sort} setSort={setSort} sel={sel} onFolder={navigate} onDoc={abrirDoc} onSelect={clicarDoc} onCtx={(x, y, doc) => setCtx({ x, y, doc })} propName={propName} projName={projName} />
           ) : (
-            <DocTable
-              docs={lista}
-              sel={sel}
-              onToggle={toggleSel}
-              onOpen={(id) => setPanelId(id)}
-              propName={propName}
-              tenantName={tenantName}
-            />
+            <GridView itens={itens} sel={sel} onFolder={navigate} onDoc={abrirDoc} onSelect={clicarDoc} onCtx={(x, y, doc) => setCtx({ x, y, doc })} />
           )}
+
+          {/* Rodapé */}
+          <div className="mt-2 flex items-center justify-between rounded-lg border border-line bg-card px-3 py-1.5 text-xs text-muted">
+            <span>{itens.length} {itens.length === 1 ? "item" : "itens"}{sel.size > 0 && ` · ${sel.size} selecionado${sel.size === 1 ? "" : "s"}`}</span>
+            <span className="num">{formatBytes(totalBytes)}</span>
+          </div>
         </section>
       </div>
 
-      {panelDoc && (
-        <DocPanel
-          doc={panelDoc}
-          onClose={() => setPanelId(null)}
-          propName={propName}
-          tenantName={tenantName}
-          projName={projName}
-        />
-      )}
-      {uploadOpen && <UploadModal onClose={() => setUploadOpen(false)} initialNode={node} />}
+      {/* Menu de contexto */}
+      {ctx && <ContextMenu ctx={ctx} onClose={() => setCtx(null)} onOpen={abrirDoc} onPanel={(id) => setPanelId(id)} sel={sel} />}
+
+      {panelDoc && <DocPanel doc={panelDoc} onClose={() => setPanelId(null)} propName={propName} projName={projName} />}
+      {uploadOpen && <UploadModal onClose={() => setUploadOpen(false)} contexto={contextoAtual} addDoc={addDoc} />}
     </div>
   );
 }
 
-const selCls =
-  "h-9 rounded-lg border border-line bg-card px-2.5 text-xs text-ink outline-none focus:border-secondary";
+// ───────────────────────── Barra superior: botão de navegação ─────────────────────────
 
-// ───────────────────────── Árvore: componentes ─────────────────────────
-
-function TreeGroup({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
+function NavBtn({ icon: Icon, title, disabled, onClick }: { icon: LucideIcon; title: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <div className="mt-2">
-      <div className="flex items-center justify-between px-3 py-1">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">{label}</p>
-        {action}
-      </div>
-      <div className="space-y-0.5">{children}</div>
-    </div>
+    <button onClick={onClick} disabled={disabled} title={title}
+      className={cn("flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-card transition-colors", disabled ? "text-muted/40" : "text-secondary hover:bg-accent")}>
+      <Icon size={16} />
+    </button>
   );
 }
 
-function TreeRow({
-  active,
-  icon: Icon,
-  label,
-  count,
-  indent,
-  chevron,
-  onChevron,
-  onClick,
-}: {
-  active?: boolean;
-  icon?: LucideIcon;
-  label: string;
-  count?: number;
-  indent?: boolean;
-  chevron?: "right" | "down";
-  onChevron?: () => void;
-  onClick: () => void;
+// ───────────────────────── Árvore ─────────────────────────
+
+function TreeRow({ depth, icon: Icon, label, active, count, expandable, open, onToggle, onClick }: {
+  depth: number; icon?: LucideIcon; label: string; active?: boolean; count?: number;
+  expandable?: boolean; open?: boolean; onToggle?: () => void; onClick: () => void;
 }) {
   return (
-    <div
-      className={cn(
-        "flex items-center gap-1.5 rounded-lg pr-2 text-sm transition-colors",
-        active ? "bg-accent font-medium text-primary" : "text-ink hover:bg-accent/60",
-        indent ? "pl-7" : "pl-2"
-      )}
-    >
-      {chevron ? (
-        <button onClick={onChevron} className="text-muted hover:text-ink">
-          {chevron === "down" ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+    <div className={cn("flex h-8 items-center rounded-lg pr-2 text-sm transition-colors", active ? "bg-accent font-medium text-primary" : "text-ink hover:bg-accent/60")} style={{ paddingLeft: depth * 16 }}>
+      {expandable ? (
+        <button onClick={(e) => { e.stopPropagation(); onToggle?.(); }} className="flex h-8 w-5 items-center justify-center text-muted hover:text-ink">
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
       ) : (
-        !indent && <span className="w-3.5" />
+        <span className="w-5" />
       )}
-      <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left">
+      <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-2 text-left">
         {Icon && <Icon size={15} className="shrink-0 text-muted" />}
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        {count !== undefined && <span className="shrink-0 text-[11px] text-muted">{count}</span>}
+        {count !== undefined && count > 0 && <span className="num shrink-0 text-[11px] text-muted">{count}</span>}
       </button>
     </div>
   );
 }
 
-function nodeBreadcrumb(
-  node: TreeNode,
-  r: { propName: (id?: string) => string; tenantName: (id?: string) => string; projName: (id?: string) => string }
-): string {
-  const base = "Pasta Digital";
-  switch (node.kind) {
-    case "todas":
-      return `${base} / Todas`;
-    case "property":
-      return `${base} / Por imóvel / ${r.propName(node.propertyId)}${node.categoria ? ` / ${node.categoria}` : ""}`;
-    case "categoria":
-      return `${base} / Por categoria / ${node.categoria}`;
-    case "tenant":
-      return `${base} / Por inquilino / ${r.tenantName(node.tenantId)}`;
-    case "projeto":
-      return `${base} / Projetos / ${r.projName(node.projectId)}`;
-    case "folder":
-      return `${base} / Pastas / ${node.nome}`;
-    case "lixo":
-      return `${base} / Lixo`;
-  }
-}
-
-// ───────────────────────── Cartão / Tabela ─────────────────────────
-
-function AssocBadges({
-  d,
-  propName,
-  tenantName,
-  projName,
-}: {
-  d: PropertyDocument;
-  propName: (id?: string) => string;
-  tenantName: (id?: string) => string;
-  projName?: (id?: string) => string;
+// Ramo da árvore com subpastas manuais recursivas.
+function TreeBranch({ depth, label, loc, propertyId, projectId, loc0, navigate, folders, expanded, toggleExpand, parentId = null }: {
+  depth: number; label: string; loc: Loc; propertyId: string | null; projectId: string | null; parentId?: string | null;
+  loc0: Loc; navigate: (l: Loc) => void; folders: Folder[]; expanded: Set<string>; toggleExpand: (k: string) => void;
 }) {
+  const subs = folders.filter((f) => f.propertyId === propertyId && f.projectId === projectId && f.parentId === parentId);
+  const key = locKey(loc);
+  const open = expanded.has(key);
   return (
-    <div className="flex flex-wrap gap-1">
-      {d.propertyId && <Badge tone="info">{propName(d.propertyId)}</Badge>}
-      {d.tenantId && <Badge tone="neutral">{tenantName(d.tenantId)}</Badge>}
-      {d.projectId && projName && <Badge tone="gold">{projName(d.projectId)}</Badge>}
-    </div>
+    <>
+      <TreeRow depth={depth} icon={FolderIcon} label={label} active={sameLoc(loc0, loc)} expandable={subs.length > 0} open={open} onToggle={() => toggleExpand(key)} onClick={() => navigate(loc)} />
+      {open && subs.map((f) => (
+        <TreeBranch key={f.id} depth={depth + 1} label={f.nome} loc={{ kind: "folder", folderId: f.id }} propertyId={propertyId} projectId={projectId} parentId={f.id}
+          loc0={loc0} navigate={navigate} folders={folders} expanded={expanded} toggleExpand={toggleExpand} />
+      ))}
+    </>
   );
 }
 
-function ExpiraSelo({ d }: { d: PropertyDocument }) {
-  if (!d.expiraEm) return null;
-  const dias = diasAteExpiracao(d.expiraEm);
-  if (dias === null) return null;
-  const tone = dias <= 30 ? "danger" : dias <= 90 ? "warning" : "neutral";
-  return <Badge tone={tone as "danger" | "warning" | "neutral"}>expira em {dias}d</Badge>;
-}
+// ───────────────────────── Vista LISTA ─────────────────────────
 
-function DocCard({
-  d,
-  selected,
-  onToggle,
-  onOpen,
-  propName,
-  tenantName,
-  projName,
-}: {
-  d: PropertyDocument;
-  selected: boolean;
-  onToggle: () => void;
-  onOpen: () => void;
-  propName: (id?: string) => string;
-  tenantName: (id?: string) => string;
-  projName: (id?: string) => string;
-}) {
-  const Icon = iconForDoc(d);
-  return (
-    <div
-      className={cn(
-        "group relative cursor-pointer rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md",
-        selected ? "border-primary ring-1 ring-primary/30" : "border-line"
-      )}
-      onClick={onOpen}
-    >
-      <input
-        type="checkbox"
-        checked={selected}
-        onClick={(e) => e.stopPropagation()}
-        onChange={onToggle}
-        className="absolute right-3 top-3 h-4 w-4 accent-primary"
-      />
-      <div className="flex items-start gap-3">
-        {isDataImage(d) ? (
-          <img src={d.ficheiroUrl} alt="" className="h-11 w-11 shrink-0 rounded-lg border border-line object-cover" />
-        ) : (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
-            <Icon size={20} />
-          </div>
-        )}
-        <div className="min-w-0 flex-1 pr-5">
-          <p className="truncate text-sm font-medium text-ink" title={d.nome}>
-            {d.nome}
-          </p>
-          <p className="mt-0.5 text-xs text-muted">
-            {d.categoria} · {formatBytes(d.tamanho)} · {dataPT(d.uploadedAt)}
-          </p>
-        </div>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-1">
-        <AssocBadges d={d} propName={propName} tenantName={tenantName} projName={projName} />
-        <ExpiraSelo d={d} />
-      </div>
-    </div>
-  );
-}
-
-function DocTable({
-  docs,
-  sel,
-  onToggle,
-  onOpen,
-  propName,
-  tenantName,
-}: {
-  docs: PropertyDocument[];
+function ListaView({ itens, sort, setSort, sel, onFolder, onDoc, onSelect, onCtx, propName, projName }: {
+  itens: Item[];
+  sort: { campo: "nome" | "tipo" | "tamanho" | "data" | "validade"; asc: boolean };
+  setSort: (s: { campo: "nome" | "tipo" | "tamanho" | "data" | "validade"; asc: boolean }) => void;
   sel: Set<string>;
-  onToggle: (id: string) => void;
-  onOpen: (id: string) => void;
-  propName: (id?: string) => string;
-  tenantName: (id?: string) => string;
+  onFolder: (l: Loc) => void;
+  onDoc: (d: PropertyDocument) => void;
+  onSelect: (id: string, e: React.MouseEvent) => void;
+  onCtx: (x: number, y: number, doc: PropertyDocument) => void;
+  propName: (id?: string) => string; projName: (id?: string) => string;
 }) {
+  const th = (campo: typeof sort.campo, label: string, extra?: string) => (
+    <th className={cn("cursor-pointer select-none px-3 py-2 font-medium", extra)} onClick={() => setSort({ campo, asc: sort.campo === campo ? !sort.asc : true })}>
+      <span className="inline-flex items-center gap-1">{label}{sort.campo === campo && (sort.asc ? <ChevronUp /> : <ChevronDownMini />)}</span>
+    </th>
+  );
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-card">
       <table className="w-full text-sm">
         <thead className="border-b border-line bg-accent/40 text-left text-xs uppercase tracking-wide text-muted">
           <tr>
-            <th className="w-8 px-3 py-2.5" />
-            <th className="px-3 py-2.5">Nome</th>
-            <th className="px-3 py-2.5">Categoria</th>
-            <th className="hidden px-3 py-2.5 md:table-cell">Associação</th>
-            <th className="hidden px-3 py-2.5 sm:table-cell">Tamanho</th>
-            <th className="px-3 py-2.5">Data</th>
+            {th("nome", "Nome")}
+            {th("tipo", "Tipo", "hidden sm:table-cell")}
+            {th("tamanho", "Tamanho", "hidden md:table-cell")}
+            {th("data", "Data", "hidden sm:table-cell")}
+            {th("validade", "Validade", "hidden lg:table-cell")}
           </tr>
         </thead>
         <tbody>
-          {docs.map((d) => {
-            const Icon = iconForDoc(d);
-            return (
-              <tr key={d.id} className="cursor-pointer border-b border-line/60 last:border-0 hover:bg-accent/30" onClick={() => onOpen(d.id)}>
-                <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                  <input type="checkbox" checked={sel.has(d.id)} onChange={() => onToggle(d.id)} className="h-4 w-4 accent-primary" />
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <Icon size={15} className="shrink-0 text-secondary" />
-                    <span className="truncate text-ink">{d.nome}</span>
-                    <ExpiraSelo d={d} />
-                  </div>
-                </td>
-                <td className="px-3 py-2.5 text-muted">{d.categoria}</td>
-                <td className="hidden px-3 py-2.5 md:table-cell">
-                  {d.propertyId ? propName(d.propertyId) : d.tenantId ? tenantName(d.tenantId) : <span className="text-muted">—</span>}
-                </td>
-                <td className="hidden px-3 py-2.5 text-muted sm:table-cell">{formatBytes(d.tamanho)}</td>
-                <td className="px-3 py-2.5 text-muted">{dataPT(d.uploadedAt)}</td>
-              </tr>
-            );
-          })}
+          {itens.map((it) => it.type === "folder" ? (
+            <tr key={`f-${it.id}`} className="cursor-pointer border-b border-line/50 last:border-0 hover:bg-accent/60" onDoubleClick={() => onFolder(it.loc)} onClick={() => onFolder(it.loc)}>
+              <td className="px-3 py-2.5"><span className="flex items-center gap-2"><it.icon size={16} className="shrink-0 text-gold-dark" /><span className="font-medium text-ink">{it.nome}</span></span></td>
+              <td className="hidden px-3 py-2.5 text-muted sm:table-cell">Pasta</td>
+              <td className="hidden px-3 py-2.5 text-muted md:table-cell">{it.count > 0 ? `${it.count} item${it.count === 1 ? "" : "s"}` : "—"}</td>
+              <td className="hidden px-3 py-2.5 text-muted sm:table-cell">—</td>
+              <td className="hidden px-3 py-2.5 text-muted lg:table-cell">—</td>
+            </tr>
+          ) : (
+            <DocRow key={it.doc.id} d={it.doc} selected={sel.has(it.doc.id)} onOpen={() => onDoc(it.doc)} onSelect={onSelect} onCtx={onCtx} propName={propName} projName={projName} />
+          ))}
         </tbody>
       </table>
     </div>
   );
 }
 
-// ───────────────────────── Barra de lote ─────────────────────────
+function ChevronUp() { return <ChevronDown size={11} className="rotate-180" />; }
+function ChevronDownMini() { return <ChevronDown size={11} />; }
 
-function BulkBar({ count, ids, onDone, lixo }: { count: number; ids: string[]; onDone: () => void; lixo: boolean }) {
-  const trash = useDocumentsStore((s) => s.trash);
-  const restore = useDocumentsStore((s) => s.restore);
-  const remove = useDocumentsStore((s) => s.remove);
-  const setCategoria = useDocumentsStore((s) => s.setCategoria);
-  const update = useDocumentsStore((s) => s.update);
-
-  const aplicarCategoria = () => {
-    const c = window.prompt(`Nova categoria (${DOC_CATEGORIAS.join(", ")}):`);
-    if (c && (DOC_CATEGORIAS as string[]).includes(c)) {
-      ids.forEach((id) => setCategoria(id, c as DocCategoria));
-      toastSuccess(`Categoria alterada para ${c}`);
-      onDone();
-    }
-  };
-  const etiquetar = () => {
-    const t = window.prompt("Etiqueta a adicionar:");
-    if (t && t.trim()) {
-      ids.forEach((id) => {
-        const doc = useDocumentsStore.getState().documents.find((d) => d.id === id);
-        update(id, { tags: [...new Set([...(doc?.tags ?? []), t.trim()])] });
-      });
-      toastSuccess("Etiqueta adicionada");
-      onDone();
-    }
-  };
-
+function DocRow({ d, selected, onOpen, onSelect, onCtx, propName, projName }: {
+  d: PropertyDocument; selected: boolean; onOpen: () => void; onSelect: (id: string, e: React.MouseEvent) => void;
+  onCtx: (x: number, y: number, doc: PropertyDocument) => void; propName: (id?: string) => string; projName: (id?: string) => string;
+}) {
+  const Icon = iconForDoc(d);
+  const dias = diasAteExpiracao(d.expiraEm);
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-accent p-2.5">
-      <span className="px-1 text-sm font-medium text-primary">{count} selecionado(s)</span>
-      <span className="flex-1" />
-      <Button size="sm" variant="ghost" onClick={() => { toastSuccess("Download iniciado (ZIP)"); onDone(); }}>
-        <Download size={14} /> Descarregar
-      </Button>
-      {!lixo && (
+    <tr
+      className={cn("group cursor-pointer border-b border-line/50 last:border-0", selected ? "bg-accent" : "hover:bg-accent/60")}
+      onClick={(e) => onSelect(d.id, e)}
+      onDoubleClick={onOpen}
+      onContextMenu={(e) => { e.preventDefault(); onSelect(d.id, e); onCtx(e.clientX, e.clientY, d); }}
+    >
+      <td className="px-3 py-2.5">
+        <span className="flex items-center gap-2">
+          <Icon size={16} className="shrink-0 text-secondary" />
+          <span className="truncate text-ink" title={d.nome}>{d.nome}</span>
+        </span>
+      </td>
+      <td className="hidden px-3 py-2.5 text-muted sm:table-cell">{d.categoria}</td>
+      <td className="hidden px-3 py-2.5 text-muted md:table-cell">{formatBytes(d.tamanho)}</td>
+      <td className="hidden px-3 py-2.5 text-muted sm:table-cell">{dataPT(d.uploadedAt)}</td>
+      <td className="hidden px-3 py-2.5 lg:table-cell">
+        {dias === null ? <span className="text-muted">—</span> : <span className={cn(dias <= 30 ? "text-danger" : dias <= 90 ? "text-warning" : "text-muted")}>{dataPT(d.expiraEm!)}</span>}
+      </td>
+    </tr>
+  );
+}
+
+// ───────────────────────── Vista GRELHA ─────────────────────────
+
+function GridView({ itens, sel, onFolder, onDoc, onSelect, onCtx }: {
+  itens: Item[]; sel: Set<string>; onFolder: (l: Loc) => void; onDoc: (d: PropertyDocument) => void;
+  onSelect: (id: string, e: React.MouseEvent) => void; onCtx: (x: number, y: number, doc: PropertyDocument) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+      {itens.map((it) => it.type === "folder" ? (
+        <button key={`f-${it.id}`} onDoubleClick={() => onFolder(it.loc)} onClick={() => onFolder(it.loc)}
+          className="flex flex-col items-center gap-1.5 rounded-xl border border-transparent p-3 text-center hover:border-line hover:bg-accent/60">
+          <it.icon size={44} className="text-gold-dark" strokeWidth={1.4} />
+          <span className="line-clamp-2 text-xs font-medium text-ink">{it.nome}</span>
+        </button>
+      ) : (
+        <button key={it.doc.id} onClick={(e) => onSelect(it.doc.id, e)} onDoubleClick={() => onDoc(it.doc)}
+          onContextMenu={(e) => { e.preventDefault(); onSelect(it.doc.id, e); onCtx(e.clientX, e.clientY, it.doc); }}
+          className={cn("flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors", sel.has(it.doc.id) ? "border-primary bg-accent" : "border-transparent hover:border-line hover:bg-accent/60")}>
+          {isDataImage(it.doc) ? (
+            <img src={it.doc.ficheiroUrl} alt="" className="h-14 w-14 rounded-lg border border-line object-cover" />
+          ) : (
+            (() => { const I = iconForDoc(it.doc); return <I size={44} className="text-secondary" strokeWidth={1.4} />; })()
+          )}
+          <span className="line-clamp-2 text-xs text-ink" title={it.doc.nome}>{it.doc.nome}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ───────────────────────── Menu de contexto ─────────────────────────
+
+function ContextMenu({ ctx, onClose, onOpen, onPanel, sel }: {
+  ctx: { x: number; y: number; doc: PropertyDocument }; onClose: () => void; onOpen: (d: PropertyDocument) => void; onPanel: (id: string) => void; sel: Set<string>;
+}) {
+  const trash = useDocumentsStore((s) => s.trash);
+  const remove = useDocumentsStore((s) => s.remove);
+  const restore = useDocumentsStore((s) => s.restore);
+  const rename = useDocumentsStore((s) => s.rename);
+  const d = ctx.doc;
+  const naLixeira = !!d.deletedAt;
+  const alvo = sel.size > 1 && sel.has(d.id) ? [...sel] : [d.id];
+
+  const baixar = () => { if (d.ficheiroUrl === "#" || d.ficheiroUrl === "") { toastInfo("Documento de exemplo — sem ficheiro real."); return; } const a = document.createElement("a"); a.href = d.ficheiroUrl; a.download = d.nome; a.click(); };
+  const item = (icon: LucideIcon, label: string, fn: () => void, danger?: boolean) => {
+    const Icon = icon;
+    return (
+      <button onClick={() => { fn(); onClose(); }} className={cn("flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-accent", danger ? "text-danger" : "text-ink")}>
+        <Icon size={15} className={danger ? "text-danger" : "text-muted"} /> {label}
+      </button>
+    );
+  };
+  const x = Math.min(ctx.x, window.innerWidth - 200);
+  const y = Math.min(ctx.y, window.innerHeight - 250);
+  return (
+    <div className="fixed z-[60] w-48 overflow-hidden rounded-xl border border-line bg-card py-1 shadow-2xl" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
+      {naLixeira ? (
         <>
-          <Button size="sm" variant="ghost" onClick={aplicarCategoria}>
-            <FolderInput size={14} /> Categoria
-          </Button>
-          <Button size="sm" variant="ghost" onClick={etiquetar}>
-            <TagIcon size={14} /> Etiquetar
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard?.writeText(`${count} documentos`); toastSuccess("Link de partilha copiado"); onDone(); }}>
-            <Share2 size={14} /> Partilhar
-          </Button>
-        </>
-      )}
-      {lixo ? (
-        <>
-          <Button size="sm" variant="ghost" onClick={() => { ids.forEach(restore); toastSuccess("Restaurado(s)"); onDone(); }}>
-            <RotateCcw size={14} /> Restaurar
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => { ids.forEach(remove); toastSuccess("Eliminado(s) definitivamente"); onDone(); }}>
-            <Trash2 size={14} /> Eliminar
-          </Button>
+          {item(RotateCcw, "Restaurar", () => { alvo.forEach(restore); toastSuccess(alvo.length > 1 ? `${alvo.length} restaurados` : "Restaurado"); })}
+          {item(Trash2, "Eliminar definitivamente", () => { alvo.forEach(remove); toastSuccess("Eliminado(s) definitivamente"); }, true)}
         </>
       ) : (
-        <Button size="sm" variant="danger" onClick={() => { ids.forEach(trash); toastSuccess("Movido(s) para o Lixo"); onDone(); }}>
-          <Trash2 size={14} /> Eliminar
-        </Button>
+        <>
+          {item(ExternalLink, "Abrir", () => onOpen(d))}
+          {item(Download, "Descarregar", baixar)}
+          {item(Pencil, "Renomear", () => { const n = window.prompt("Novo nome:", d.nome); if (n?.trim()) { rename(d.id, n.trim()); toastSuccess("Renomeado"); } })}
+          {item(FolderInput, "Mover para…", () => onPanel(d.id))}
+          <div className="my-1 border-t border-line" />
+          {item(Trash2, alvo.length > 1 ? `Eliminar (${alvo.length})` : "Eliminar", () => { alvo.forEach(trash); toastSuccess(alvo.length > 1 ? `${alvo.length} movidos para o Lixo` : "Movido para o Lixo"); }, true)}
+        </>
       )}
     </div>
   );
 }
 
-// ───────────────────────── Painel lateral ─────────────────────────
+// ───────────────────────── Popover de filtros ─────────────────────────
 
-function DocPanel({
-  doc,
-  onClose,
-  propName,
-  tenantName,
-  projName,
-}: {
-  doc: PropertyDocument;
-  onClose: () => void;
-  propName: (id?: string) => string;
-  tenantName: (id?: string) => string;
-  projName: (id?: string) => string;
+function FilterPopover({ fTipo, setFTipo, fExpira, setFExpira, onClose, onLimpar }: {
+  fTipo: "todos" | TipoGrupo; setFTipo: (t: "todos" | TipoGrupo) => void; fExpira: boolean; setFExpira: (b: boolean) => void; onClose: () => void; onLimpar: () => void;
+}) {
+  useEffect(() => { const h = () => onClose(); const t = setTimeout(() => window.addEventListener("click", h), 0); return () => { clearTimeout(t); window.removeEventListener("click", h); }; }, [onClose]);
+  return (
+    <div className="absolute right-0 top-11 z-50 w-60 rounded-xl border border-line bg-card p-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <p className="mb-1 text-xs font-medium text-muted">Tipo de ficheiro</p>
+      <select value={fTipo} onChange={(e) => setFTipo(e.target.value as "todos" | TipoGrupo)} className="mb-3 h-9 w-full rounded-lg border border-line bg-card px-2.5 text-sm outline-none">
+        <option value="todos">Todos os tipos</option>
+        <option value="pdf">PDF</option>
+        <option value="imagem">Imagem</option>
+        <option value="doc">Documento</option>
+        <option value="sheet">Folha de cálculo</option>
+      </select>
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+        <input type="checkbox" checked={fExpira} onChange={(e) => setFExpira(e.target.checked)} className="h-4 w-4 accent-primary" />
+        Só os que expiram em breve
+      </label>
+      <div className="mt-3 flex justify-between">
+        <button onClick={onLimpar} className="text-xs text-muted hover:text-ink">Limpar</button>
+        <button onClick={onClose} className="text-xs font-medium text-primary">Fechar</button>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────── Painel do documento ─────────────────────────
+
+function DocPanel({ doc, onClose, propName, projName }: {
+  doc: PropertyDocument; onClose: () => void; propName: (id?: string) => string; projName: (id?: string) => string;
 }) {
   const rename = useDocumentsStore((s) => s.rename);
   const setCategoria = useDocumentsStore((s) => s.setCategoria);
   const associate = useDocumentsStore((s) => s.associate);
   const update = useDocumentsStore((s) => s.update);
-  const move = useDocumentsStore((s) => s.move);
+  const moveToFolder = useDocumentsStore((s) => s.moveToFolder);
   const trash = useDocumentsStore((s) => s.trash);
   const restore = useDocumentsStore((s) => s.restore);
   const remove = useDocumentsStore((s) => s.remove);
-
   const properties = usePropertiesStore((s) => s.properties);
-  const tenants = useTenantsStore((s) => s.tenants);
-  const projects = useProjectStagesStore((s) => s.projects);
-  const customFolders = useDocumentsStore((s) => s.customFolders);
+  const projects = useCollabStore((s) => s.projects);
+  const folders = useFoldersStore((s) => s.folders);
 
   const [lightbox, setLightbox] = useState(false);
   const Icon = iconForDoc(doc);
   const g = tipoGrupo(doc.mimeType);
   const semFicheiro = doc.ficheiroUrl === "#" || doc.ficheiroUrl === "";
+  // Subpastas disponíveis para mover (as do imóvel/projeto do documento)
+  const pastasDisponiveis = folders.filter((f) => (doc.propertyId && f.propertyId === doc.propertyId) || (doc.projectId && f.projectId === doc.projectId));
 
-  const baixar = () => {
-    if (semFicheiro) {
-      toastInfo("Documento de exemplo — sem ficheiro real para descarregar.");
-      return;
-    }
-    const a = document.createElement("a");
-    a.href = doc.ficheiroUrl;
-    a.download = doc.nome;
-    a.click();
-  };
-  const partilhar = () => {
-    navigator.clipboard?.writeText(`https://redegest-app.vercel.app/d/${doc.id}`);
-    toastSuccess("Link de partilha copiado");
-  };
+  const baixar = () => { if (semFicheiro) { toastInfo("Documento de exemplo — sem ficheiro real para descarregar."); return; } const a = document.createElement("a"); a.href = doc.ficheiroUrl; a.download = doc.nome; a.click(); };
 
   return (
     <>
@@ -848,142 +690,81 @@ function DocPanel({
       <aside className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-line bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <p className="font-display text-base font-semibold text-ink">Documento</p>
-          <button onClick={onClose} className="text-muted hover:text-ink">
-            <X size={18} />
-          </button>
+          <button onClick={onClose} className="text-muted hover:text-ink"><X size={18} /></button>
         </div>
-
         <div className="flex-1 overflow-y-auto p-4">
-          {/* Preview */}
           <div className="mb-4 overflow-hidden rounded-xl border border-line bg-bg">
             {isDataImage(doc) ? (
               <button onClick={() => setLightbox(true)} className="group relative block w-full">
                 <img src={doc.ficheiroUrl} alt="" className="max-h-64 w-full object-cover" />
-                <span className="absolute right-2 top-2 rounded-full bg-ink/60 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                  <Maximize2 size={14} />
-                </span>
+                <span className="absolute right-2 top-2 rounded-full bg-ink/60 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100"><Maximize2 size={14} /></span>
               </button>
             ) : g === "pdf" && !semFicheiro ? (
               <iframe title={doc.nome} src={doc.ficheiroUrl} className="h-64 w-full" />
             ) : (
-              <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted">
-                <Icon size={34} />
-                <p className="text-xs">{semFicheiro ? "Pré-visualização indisponível (exemplo)" : "Sem pré-visualização"}</p>
-              </div>
+              <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted"><Icon size={34} /><p className="text-xs">{semFicheiro ? "Pré-visualização indisponível (exemplo)" : "Sem pré-visualização"}</p></div>
             )}
           </div>
-
-          {/* Nome (rename) */}
           <label className="mb-3 block">
             <span className="mb-1 block text-xs font-medium text-muted">Nome</span>
-            <input
-              defaultValue={doc.nome}
-              onBlur={(e) => e.target.value.trim() && rename(doc.id, e.target.value.trim())}
-              className="h-9 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary"
-            />
+            <input defaultValue={doc.nome} onBlur={(e) => e.target.value.trim() && rename(doc.id, e.target.value.trim())} className={panelSel} />
           </label>
-
-          {/* Categoria */}
           <label className="mb-3 block">
             <span className="mb-1 block text-xs font-medium text-muted">Categoria</span>
             <select value={doc.categoria} onChange={(e) => setCategoria(doc.id, e.target.value as DocCategoria)} className={panelSel}>
-              {DOC_CATEGORIAS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {DOC_CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </label>
-
-          {/* Pasta (mover) */}
-          <label className="mb-3 block">
-            <span className="mb-1 block text-xs font-medium text-muted">Pasta personalizada</span>
-            <select value={doc.pasta ?? ""} onChange={(e) => move(doc.id, e.target.value || undefined)} className={panelSel}>
-              <option value="">— Nenhuma —</option>
-              {customFolders.map((f) => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </label>
-
-          {/* Associações */}
           <div className="mb-3 grid grid-cols-1 gap-2">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-muted">Imóvel</span>
               <select value={doc.propertyId ?? ""} onChange={(e) => associate(doc.id, { propertyId: e.target.value || undefined })} className={panelSel}>
                 <option value="">— Sem imóvel —</option>
-                {properties.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-muted">Inquilino</span>
-              <select value={doc.tenantId ?? ""} onChange={(e) => associate(doc.id, { tenantId: e.target.value || undefined })} className={panelSel}>
-                <option value="">— Sem inquilino —</option>
-                {tenants.map((t) => (
-                  <option key={t.id} value={t.id}>{t.nomeCompleto}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-muted">Projeto</span>
+              <span className="mb-1 block text-xs font-medium text-muted">Projeto colaborativo</span>
               <select value={doc.projectId ?? ""} onChange={(e) => associate(doc.id, { projectId: e.target.value || undefined })} className={panelSel}>
                 <option value="">— Sem projeto —</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.nome}</option>
-                ))}
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
             </label>
+            {pastasDisponiveis.length > 0 && (
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted">Subpasta</span>
+                <select value={doc.pastaId ?? ""} onChange={(e) => moveToFolder(doc.id, e.target.value || undefined)} className={panelSel}>
+                  <option value="">— Raiz —</option>
+                  {pastasDisponiveis.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
+              </label>
+            )}
           </div>
-
-          {/* Expiração */}
           <label className="mb-3 block">
-            <span className="mb-1 block text-xs font-medium text-muted">Expira em (opcional)</span>
+            <span className="mb-1 block text-xs font-medium text-muted">Validade (opcional)</span>
             <input type="date" defaultValue={doc.expiraEm ?? ""} onChange={(e) => update(doc.id, { expiraEm: e.target.value || undefined })} className={panelSel} />
           </label>
-
-          {/* Notas */}
-          <label className="mb-3 block">
-            <span className="mb-1 block text-xs font-medium text-muted">Notas</span>
-            <textarea
-              defaultValue={doc.notas ?? ""}
-              onBlur={(e) => update(doc.id, { notas: e.target.value })}
-              rows={3}
-              className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm outline-none focus:border-secondary"
-            />
-          </label>
-
-          {/* Metadados */}
           <div className="rounded-lg border border-line bg-bg/50 p-3 text-xs text-muted">
             <p>Tamanho: <span className="text-ink">{formatBytes(doc.tamanho)}</span></p>
-            <p>Tipo: <span className="text-ink">{doc.mimeType}</span></p>
             <p>Carregado: <span className="text-ink">{dataPT(doc.uploadedAt)}</span></p>
-            <div className="mt-1 flex flex-wrap gap-1">
-              <AssocBadges d={doc} propName={propName} tenantName={tenantName} projName={projName} />
-            </div>
+            {doc.propertyId && <p>Imóvel: <span className="text-ink">{propName(doc.propertyId)}</span></p>}
+            {doc.projectId && <p>Projeto: <span className="text-ink">{projName(doc.projectId)}</span></p>}
           </div>
         </div>
-
-        {/* Ações */}
         <div className="grid grid-cols-2 gap-2 border-t border-line p-3">
-          <Button variant="outline" size="sm" onClick={baixar}><Download size={14} /> Download</Button>
-          <Button variant="outline" size="sm" onClick={partilhar}><Share2 size={14} /> Partilhar</Button>
+          <Button variant="outline" size="sm" onClick={baixar}><Download size={14} /> Descarregar</Button>
+          <Button variant="outline" size="sm" onClick={() => { const n = window.prompt("Novo nome:", doc.nome); if (n?.trim()) rename(doc.id, n.trim()); }}><Pencil size={14} /> Renomear</Button>
           {doc.deletedAt ? (
             <>
               <Button variant="outline" size="sm" onClick={() => { restore(doc.id); toastSuccess("Restaurado"); onClose(); }}><RotateCcw size={14} /> Restaurar</Button>
               <Button variant="danger" size="sm" onClick={() => { remove(doc.id); toastSuccess("Eliminado"); onClose(); }}><Trash2 size={14} /> Eliminar</Button>
             </>
           ) : (
-            <>
-              <Button variant="outline" size="sm" onClick={() => { const n = window.prompt("Novo nome:", doc.nome); if (n?.trim()) rename(doc.id, n.trim()); }}><Pencil size={14} /> Renomear</Button>
-              <Button variant="danger" size="sm" onClick={() => { trash(doc.id); toastSuccess("Movido para o Lixo"); onClose(); }}><Trash2 size={14} /> Eliminar</Button>
-            </>
+            <Button variant="danger" size="sm" className="col-span-2" onClick={() => { trash(doc.id); toastSuccess("Movido para o Lixo"); onClose(); }}><Trash2 size={14} /> Eliminar</Button>
           )}
         </div>
       </aside>
-
-      {lightbox && isDataImage(doc) && (
-        <Lightbox fotos={[{ url: doc.ficheiroUrl, legenda: doc.nome }]} onClose={() => setLightbox(false)} />
-      )}
+      {lightbox && isDataImage(doc) && <Lightbox fotos={[{ url: doc.ficheiroUrl, legenda: doc.nome }]} onClose={() => setLightbox(false)} />}
     </>
   );
 }
@@ -992,174 +773,122 @@ const panelSel = "h-9 w-full rounded-lg border border-line bg-card px-3 text-sm 
 
 // ───────────────────────── Upload ─────────────────────────
 
-interface PendingFile {
-  key: string;
-  nome: string;
-  categoria: DocCategoria;
-  mimeType: string;
-  tamanho: number;
-  ficheiroUrl: string;
-}
-
+interface PendingFile { key: string; nome: string; categoria: DocCategoria; mimeType: string; tamanho: number; ficheiroUrl: string; }
 const MAX_BYTES = 25 * 1024 * 1024;
 const ACEITES = ".pdf,.jpg,.jpeg,.png,.doc,.docx,.xlsx";
 
-function UploadModal({ onClose, initialNode }: { onClose: () => void; initialNode: TreeNode }) {
-  const add = useDocumentsStore((s) => s.add);
-  const customFolders = useDocumentsStore((s) => s.customFolders);
+function UploadModal({ onClose, contexto, addDoc }: {
+  onClose: () => void;
+  contexto: { propertyId: string | null; projectId: string | null; parentId: string | null };
+  addDoc: (input: Omit<PropertyDocument, "id">) => string;
+}) {
   const properties = usePropertiesStore((s) => s.properties);
-  const tenants = useTenantsStore((s) => s.tenants);
-  const contracts = useContractsStore((s) => s.contracts);
-  const projects = useProjectStagesStore((s) => s.projects);
+  const projects = useCollabStore((s) => s.projects);
 
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [drag, setDrag] = useState(false);
-  // associações comuns — pré-preenche pelo nó atual
-  const [propertyId, setPropertyId] = useState(initialNode.kind === "property" ? initialNode.propertyId : "");
-  const [tenantId, setTenantId] = useState(initialNode.kind === "tenant" ? initialNode.tenantId : "");
-  const [contractId, setContractId] = useState("");
-  const [projectId, setProjectId] = useState(initialNode.kind === "projeto" ? initialNode.projectId : "");
-  const [pasta, setPasta] = useState(initialNode.kind === "folder" ? initialNode.nome : "");
-  const [expiraEm, setExpiraEm] = useState("");
-  const [notas, setNotas] = useState("");
+  const [propertyId, setPropertyId] = useState(contexto.propertyId ?? "");
+  const [projectId, setProjectId] = useState(contexto.projectId ?? "");
+  const [validade, setValidade] = useState("");
+  // Na raiz não há pasta atual → deixa escolher; dentro de uma pasta, vem pré-preenchido e bloqueado.
+  const dentroDePasta = !!(contexto.propertyId || contexto.projectId);
 
   const onFiles = (list: FileList) => {
-    const novos: PendingFile[] = [];
     Array.from(list).forEach((f) => {
-      if (f.size > MAX_BYTES) {
-        toastError(`${f.name} excede 25 MB`);
-        return;
-      }
-      const r = new FileReader();
-      r.onload = () => {
-        setFiles((prev) =>
-          prev.map((p) => (p.key === key ? { ...p, ficheiroUrl: String(r.result) } : p))
-        );
-      };
+      if (f.size > MAX_BYTES) { toastError(`${f.name} excede 25 MB`); return; }
       const key = `${f.name}-${f.size}-${Math.random().toString(36).slice(2, 6)}`;
-      novos.push({
-        key,
-        nome: f.name,
-        categoria: sugerirCategoria(f.name),
-        mimeType: f.type || "application/octet-stream",
-        tamanho: f.size,
-        ficheiroUrl: "#",
-      });
+      setFiles((prev) => [...prev, { key, nome: f.name, categoria: sugerirCategoria(f.name), mimeType: f.type || "application/octet-stream", tamanho: f.size, ficheiroUrl: "#" }]);
+      const r = new FileReader();
+      r.onload = () => setFiles((prev) => prev.map((p) => (p.key === key ? { ...p, ficheiroUrl: String(r.result) } : p)));
       r.readAsDataURL(f);
     });
-    setFiles((prev) => [...prev, ...novos]);
   };
 
   const guardar = () => {
-    if (files.length === 0) {
-      toastError("Adicione pelo menos um ficheiro");
-      return;
-    }
+    if (files.length === 0) { toastError("Adicione pelo menos um ficheiro"); return; }
     files.forEach((f) => {
-      add({
-        nome: f.nome,
-        ficheiroUrl: f.ficheiroUrl,
-        mimeType: f.mimeType,
-        tamanho: f.tamanho,
-        categoria: f.categoria,
+      addDoc({
+        nome: f.nome, ficheiroUrl: f.ficheiroUrl, mimeType: f.mimeType, tamanho: f.tamanho, categoria: f.categoria,
         uploadedAt: new Date().toISOString().slice(0, 10),
         propertyId: propertyId || undefined,
-        tenantId: tenantId || undefined,
-        contractId: contractId || undefined,
         projectId: projectId || undefined,
-        pasta: pasta || undefined,
-        expiraEm: expiraEm || undefined,
-        notas: notas || undefined,
+        pastaId: contexto.parentId || undefined,
+        expiraEm: validade || undefined,
       });
     });
-    toastSuccess(`${files.length} documento(s) carregado(s)`);
+    toastSuccess(`${files.length} documento${files.length === 1 ? "" : "s"} carregado${files.length === 1 ? "" : "s"}`, dentroDePasta ? "Aparece nesta pasta e na secção do imóvel/projeto." : undefined);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-line bg-card shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h2 className="font-display text-lg font-semibold text-ink">Carregar documentos</h2>
+          <h2 className="font-display text-lg font-semibold text-ink">Carregar documento</h2>
           <button onClick={onClose} className="text-muted hover:text-ink"><X size={20} /></button>
         </div>
-
         <div className="flex-1 overflow-y-auto p-5">
-          {/* Dropzone */}
           <label
-            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-            onDragLeave={() => setDrag(false)}
+            onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
             onDrop={(e) => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files); }}
-            className={cn(
-              "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm transition-colors",
-              drag ? "border-primary bg-accent" : "border-line bg-bg text-muted hover:bg-accent"
-            )}
+            className={cn("flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-10 text-sm transition-colors", drag ? "border-primary bg-accent" : "border-line bg-bg text-muted hover:bg-accent")}
           >
             <Upload size={26} className="text-primary" />
-            <span>Arrastar ficheiros para aqui ou <span className="font-medium text-primary">escolher</span></span>
+            <span>Arrastar ficheiros ou <span className="font-medium text-primary">escolher</span></span>
             <span className="text-xs text-muted">PDF, JPG, PNG, DOC, DOCX, XLSX · máx. 25 MB</span>
             <input type="file" multiple accept={ACEITES} className="hidden" onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); e.target.value = ""; }} />
           </label>
 
-          {/* Ficheiros */}
           {files.length > 0 && (
             <div className="mt-4 space-y-2">
               {files.map((f) => (
                 <div key={f.key} className="flex items-center gap-2 rounded-lg border border-line bg-bg/40 p-2">
                   <FileText size={16} className="shrink-0 text-secondary" />
-                  <input
-                    value={f.nome}
-                    onChange={(e) => setFiles((prev) => prev.map((p) => (p.key === f.key ? { ...p, nome: e.target.value } : p)))}
-                    className="h-8 min-w-0 flex-1 rounded border border-line bg-card px-2 text-sm outline-none focus:border-secondary"
-                  />
-                  <select
-                    value={f.categoria}
-                    onChange={(e) => setFiles((prev) => prev.map((p) => (p.key === f.key ? { ...p, categoria: e.target.value as DocCategoria } : p)))}
-                    className="h-8 rounded border border-line bg-card px-1.5 text-xs outline-none"
-                  >
+                  <input value={f.nome} onChange={(e) => setFiles((prev) => prev.map((p) => (p.key === f.key ? { ...p, nome: e.target.value } : p)))} className="h-8 min-w-0 flex-1 rounded border border-line bg-card px-2 text-sm outline-none focus:border-secondary" />
+                  <select value={f.categoria} onChange={(e) => setFiles((prev) => prev.map((p) => (p.key === f.key ? { ...p, categoria: e.target.value as DocCategoria } : p)))} className="h-8 rounded border border-line bg-card px-1.5 text-xs outline-none">
                     {DOC_CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <span className="shrink-0 text-[11px] text-muted">{formatBytes(f.tamanho)}</span>
                   <button onClick={() => setFiles((prev) => prev.filter((p) => p.key !== f.key))} className="text-muted hover:text-danger"><X size={15} /></button>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Associações comuns */}
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <Sel label="Imóvel" value={propertyId} onChange={setPropertyId} options={[{ v: "", l: "— Nenhum —" }, ...properties.map((p) => ({ v: p.id, l: p.name }))]} />
-            <Sel label="Inquilino" value={tenantId} onChange={setTenantId} options={[{ v: "", l: "— Nenhum —" }, ...tenants.map((t) => ({ v: t.id, l: t.nomeCompleto }))]} />
-            <Sel label="Contrato" value={contractId} onChange={setContractId} options={[{ v: "", l: "— Nenhum —" }, ...contracts.map((c) => ({ v: c.id, l: c.id }))]} />
-            <Sel label="Projeto" value={projectId} onChange={setProjectId} options={[{ v: "", l: "— Nenhum —" }, ...projects.map((p) => ({ v: p.id, l: p.nome }))]} />
-            <Sel label="Pasta personalizada" value={pasta} onChange={setPasta} options={[{ v: "", l: "— Nenhuma —" }, ...customFolders.map((f) => ({ v: f, l: f }))]} />
+            {dentroDePasta ? (
+              <div className="sm:col-span-2 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-sm text-ink">
+                Vai para <strong>{contexto.propertyId ? properties.find((p) => p.id === contexto.propertyId)?.name : projects.find((p) => p.id === contexto.projectId)?.title}</strong>
+                {contexto.parentId ? " (subpasta selecionada)" : ""} — pré-preenchido pela pasta onde está.
+              </div>
+            ) : (
+              <>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-muted">Imóvel (opcional)</span>
+                  <select value={propertyId} onChange={(e) => { setPropertyId(e.target.value); if (e.target.value) setProjectId(""); }} className={panelSel}>
+                    <option value="">— Sem associação —</option>
+                    {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-muted">Projeto (opcional)</span>
+                  <select value={projectId} onChange={(e) => { setProjectId(e.target.value); if (e.target.value) setPropertyId(""); }} className={panelSel}>
+                    <option value="">— Sem associação —</option>
+                    {projects.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                  </select>
+                </label>
+              </>
+            )}
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-muted">Expira em (opcional)</span>
-              <input type="date" value={expiraEm} onChange={(e) => setExpiraEm(e.target.value)} className={panelSel} />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className="mb-1 block text-xs font-medium text-muted">Notas (opcional)</span>
-              <input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="Notas sobre os documentos…" className={panelSel} />
+              <span className="mb-1 block text-xs font-medium text-muted">Validade (opcional)</span>
+              <input type="date" value={validade} onChange={(e) => setValidade(e.target.value)} className={panelSel} />
             </label>
           </div>
         </div>
-
         <div className="flex items-center justify-between border-t border-line px-5 py-4">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button onClick={guardar}><Upload size={16} /> Carregar {files.length > 0 ? `(${files.length})` : ""}</Button>
         </div>
       </div>
     </div>
-  );
-}
-
-function Sel({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { v: string; l: string }[] }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={panelSel}>
-        {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-      </select>
-    </label>
   );
 }

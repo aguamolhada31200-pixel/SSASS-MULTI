@@ -72,7 +72,8 @@ export interface PropertyDocument {
   /** Pedido de manutenção associado (orçamentos, faturas, garantias). */
   maintenanceId?: string;
   // Organização / metadados
-  pasta?: string; // pasta personalizada (nome)
+  pasta?: string; // (legado) pasta personalizada por nome
+  pastaId?: string; // subpasta manual (useFoldersStore) — a que vale
   tamanho?: number; // bytes
   tags?: string[];
   notas?: string;
@@ -483,6 +484,8 @@ interface DocumentsState {
   restore: (id: string) => void;
   // Organização
   move: (id: string, pasta: string | undefined) => void;
+  /** Move o documento para uma subpasta manual (ou raiz do imóvel/projeto se undefined). */
+  moveToFolder: (id: string, pastaId: string | undefined) => void;
   setCategoria: (id: string, categoria: DocCategoria) => void;
   associate: (
     id: string,
@@ -531,6 +534,8 @@ export const useDocumentsStore = create<DocumentsState>()(
         })),
       move: (id, pasta) =>
         set((s) => ({ documents: s.documents.map((d) => (d.id === id ? { ...d, pasta } : d)) })),
+      moveToFolder: (id, pastaId) =>
+        set((s) => ({ documents: s.documents.map((d) => (d.id === id ? { ...d, pastaId } : d)) })),
       setCategoria: (id, categoria) =>
         set((s) => ({ documents: s.documents.map((d) => (d.id === id ? { ...d, categoria } : d)) })),
       associate: (id, assoc) =>

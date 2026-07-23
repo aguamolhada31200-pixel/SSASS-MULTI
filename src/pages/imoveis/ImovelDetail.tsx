@@ -973,7 +973,7 @@ export function ImovelContratosTab({ propertyId }: { propertyId: string }) {
 // ───────────────────────── Documentos ─────────────────────────
 
 export function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
-  const docs = useDocumentsStore((s) => s.documents.filter((d) => d.propertyId === propertyId));
+  const docs = useDocumentsStore((s) => s.documents.filter((d) => d.propertyId === propertyId && !d.deletedAt));
   const add = useDocumentsStore((s) => s.add);
   const remove = useDocumentsStore((s) => s.remove);
   const rename = useDocumentsStore((s) => s.rename);
