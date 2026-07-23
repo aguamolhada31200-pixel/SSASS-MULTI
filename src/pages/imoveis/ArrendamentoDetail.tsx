@@ -7,6 +7,7 @@ import {
   CalendarClock, BellRing, Info as InfoIcon, Sparkles, Receipt, Download, Eye, Landmark,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
@@ -44,6 +45,7 @@ export default function ArrendamentoDetail() {
   const property = usePropertiesStore((s) => (arrendamento ? s.properties.find((p) => p.id === arrendamento.propertyId) : undefined));
   const [tab, setTab] = useState<Tab>("Resumo");
   const [terminar, setTerminar] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   if (!arrendamento) {
     return (
@@ -56,8 +58,9 @@ export default function ArrendamentoDetail() {
     );
   }
 
-  const onDelete = () => {
-    if (!confirm(`Eliminar o arrendamento ${arrendamento.identificador}? Esta ação não pode ser anulada.`)) return;
+  const onDelete = () => setConfirmDel(true);
+  const doDelete = () => {
+    setConfirmDel(false);
     remove(arrendamento.id);
     toastSuccess("Arrendamento eliminado");
     navigate("/imoveis/arrendamentos");
@@ -139,6 +142,15 @@ export default function ArrendamentoDetail() {
       </div>
 
       {terminar && <TerminarModal arrendamento={arrendamento} onClose={() => setTerminar(false)} />}
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar arrendamento"
+          mensagem={`Eliminar o arrendamento ${arrendamento.identificador}? Esta ação não pode ser anulada.`}
+          cta="Eliminar"
+          onClose={() => setConfirmDel(false)}
+          onConfirm={doDelete}
+        />
+      )}
     </>
   );
 }

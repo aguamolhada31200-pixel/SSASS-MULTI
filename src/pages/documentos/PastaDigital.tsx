@@ -32,6 +32,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { NomeModal } from "@/components/ui/NomeModal";
 import { ExampleDataToggle } from "@/components/ExampleDataToggle";
 import { Lightbox } from "@/components/Lightbox";
 import {
@@ -749,59 +751,6 @@ function FolderContextMenu({ ctx, onClose, onOpen, onRename, onDelete }: {
       {item(Pencil, "Renomear", () => onRename(ctx.folderId, ctx.nome))}
       <div className="my-1 border-t border-line" />
       {item(Trash2, "Eliminar pasta", () => onDelete(ctx.folderId, ctx.nome), true)}
-    </div>
-  );
-}
-
-// ───────────────────────── Diálogo de nome (criar / renomear) ─────────────────────────
-
-function NomeModal({ titulo, valorInicial, cta, placeholder, onConfirm, onClose }: {
-  titulo: string; valorInicial: string; cta: string; placeholder?: string; onConfirm: (nome: string) => void; onClose: () => void;
-}) {
-  const [v, setV] = useState(valorInicial);
-  const submeter = () => { const n = v.trim(); if (!n) return; onConfirm(n); };
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
-      <div className="w-full max-w-sm rounded-t-2xl border border-line bg-card p-5 shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-display text-base font-semibold text-ink">{titulo}</h3>
-          <button onClick={onClose} className="text-muted hover:text-ink"><X size={18} /></button>
-        </div>
-        <input
-          autoFocus
-          value={v}
-          onChange={(e) => setV(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submeter(); } if (e.key === "Escape") onClose(); }}
-          placeholder={placeholder ?? "Nome"}
-          className="h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary"
-        />
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
-          <Button size="sm" onClick={submeter} disabled={!v.trim()}>{cta}</Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ───────────────────────── Diálogo de confirmação ─────────────────────────
-
-function ConfirmDialog({ titulo, mensagem, cta, onConfirm, onClose }: {
-  titulo: string; mensagem: string; cta: string; onConfirm: () => void; onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
-      <div className="w-full max-w-sm rounded-t-2xl border border-line bg-card p-5 shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="mb-2 flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger"><AlertTriangle size={18} /></span>
-          <h3 className="font-display text-base font-semibold text-ink">{titulo}</h3>
-        </div>
-        <p className="text-sm text-muted">{mensagem}</p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
-          <Button variant="danger" size="sm" onClick={() => { onConfirm(); }}><Trash2 size={14} /> {cta}</Button>
-        </div>
-      </div>
     </div>
   );
 }

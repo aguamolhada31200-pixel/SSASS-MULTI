@@ -22,6 +22,7 @@ import {
   Clock3,
   TrendingUp,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { BeforeAfterSlider } from "./BeforeAfterSlider";
 import { useGaleriaStore, DIVISAO_LABEL, duracaoLabel, type Comparacao, type Divisao } from "@/store/useGaleriaStore";
 import { useModalStore } from "@/store/useModalStore";
@@ -98,6 +99,7 @@ export function ComparacaoCard({
   const origem = useOrigemLabel(c);
   const Icon = DIVISAO_ICON[c.divisao];
   const [menu, setMenu] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const remove = useGaleriaStore((s) => s.remove);
   const toggleDestaque = useGaleriaStore((s) => s.toggleDestaque);
@@ -191,13 +193,7 @@ export function ComparacaoCard({
                       icon={Trash2}
                       label="Eliminar"
                       danger
-                      onClick={() => {
-                        setMenu(false);
-                        if (window.confirm(`Eliminar a comparação "${c.titulo}"? As fotos originais mantêm-se na obra.`)) {
-                          remove(c.id);
-                          toastSuccess("Comparação eliminada");
-                        }
-                      }}
+                      onClick={() => { setMenu(false); setConfirmDel(true); }}
                     />
                   </div>
                 )}
@@ -206,6 +202,16 @@ export function ComparacaoCard({
           </div>
         )}
       </div>
+
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar comparação"
+          mensagem={`Eliminar a comparação "${c.titulo}"? As fotos originais mantêm-se na obra.`}
+          cta="Eliminar"
+          onClose={() => setConfirmDel(false)}
+          onConfirm={() => { remove(c.id); toastSuccess("Comparação eliminada"); setConfirmDel(false); }}
+        />
+      )}
     </div>
   );
 }

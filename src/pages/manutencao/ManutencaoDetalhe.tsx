@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   useMaintenanceStore,
   CATEGORIA_PEDIDO_LABEL,
@@ -83,6 +84,7 @@ export default function ManutencaoDetalhe() {
   const [justResp, setJustResp] = useState("");
   const [avaliarOpen, setAvaliarOpen] = useState(false);
   const [tecnicoDropdown, setTecnicoDropdown] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   // Notas internas — autosave com debounce curto
   useEffect(() => {
@@ -112,8 +114,9 @@ export default function ManutencaoDetalhe() {
   const concluido = pedido.estado === "concluido";
   const sugestao = RESP_SUGERIDA[pedido.categoria];
 
-  const eliminar = () => {
-    if (!confirm(`Eliminar o pedido "${pedido.titulo}"?`)) return;
+  const eliminar = () => setConfirmDel(true);
+  const doEliminar = () => {
+    setConfirmDel(false);
     remove(pedido.id);
     toastSuccess("Pedido eliminado");
     navigate("/manutencao");
@@ -546,6 +549,16 @@ export default function ManutencaoDetalhe() {
             }
             setAvaliarOpen(false);
           }}
+        />
+      )}
+
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar pedido"
+          mensagem={`Eliminar o pedido "${pedido.titulo}"?`}
+          cta="Eliminar"
+          onClose={() => setConfirmDel(false)}
+          onConfirm={doEliminar}
         />
       )}
     </>

@@ -33,6 +33,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ChartCard } from "@/components/ui/chart-card";
 import { Badge } from "@/components/ui/Badge";
@@ -108,6 +109,7 @@ export default function Contabilidade() {
   const [busca, setBusca] = useState("");
   const [page, setPage] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [txAEliminar, setTxAEliminar] = useState<Transaction | null>(null);
 
   const transactions = enabled ? allTransactions : [];
   const propMap = useMemo(() => new Map(properties.map((p) => [p.id, p])), [properties]);
@@ -224,10 +226,12 @@ export default function Contabilidade() {
     setPage(0);
   };
 
-  const onDelete = (t: Transaction) => {
-    if (!confirm(`Eliminar este movimento de ${eur(t.valor)}?`)) return;
-    removeTx(t.id);
+  const onDelete = (t: Transaction) => setTxAEliminar(t);
+  const doDelete = () => {
+    if (!txAEliminar) return;
+    removeTx(txAEliminar.id);
     toastSuccess("Movimento eliminado");
+    setTxAEliminar(null);
   };
 
   return (
@@ -514,6 +518,16 @@ export default function Contabilidade() {
             </CardContent>
           </Card>
         </>
+      )}
+
+      {txAEliminar && (
+        <ConfirmDialog
+          titulo="Eliminar movimento"
+          mensagem={`Eliminar este movimento de ${eur(txAEliminar.valor)}?`}
+          cta="Eliminar"
+          onClose={() => setTxAEliminar(null)}
+          onConfirm={doDelete}
+        />
       )}
     </>
   );

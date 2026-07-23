@@ -3,6 +3,7 @@ import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from 
 import { Phone, Mail, Pencil, Plus, Star, MapPin, X, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   useTechniciansStore,
   ESPECIALIDADE_LABEL,
@@ -144,6 +145,7 @@ function EmpreiteiroForm({ inicial, onClose }: { inicial: Technician | null; onC
   const [esp, setEsp] = useState<Especialidade[]>(inicial?.especialidades ?? []);
   const [notas, setNotas] = useState(inicial?.notas ?? "");
   const [erros, setErros] = useState<Record<string, string>>({});
+  const [confirmRemover, setConfirmRemover] = useState(false);
 
   const toggleEsp = (e: Especialidade) =>
     setEsp((p) => (p.includes(e) ? p.filter((x) => x !== e) : [...p, e]));
@@ -233,13 +235,7 @@ function EmpreiteiroForm({ inicial, onClose }: { inicial: Technician | null; onC
         <div className="flex items-center justify-between border-t border-line bg-bg/40 px-5 py-4">
           {inicial ? (
             <button
-              onClick={() => {
-                if (confirm(`Remover "${inicial.nome}" do diretório?`)) {
-                  remove(inicial.id);
-                  toastSuccess("Empreiteiro removido");
-                  onClose();
-                }
-              }}
+              onClick={() => setConfirmRemover(true)}
               className="text-xs text-muted underline hover:text-danger"
             >
               Remover do diretório
@@ -250,6 +246,16 @@ function EmpreiteiroForm({ inicial, onClose }: { inicial: Technician | null; onC
           <Button variant="gold" onClick={guardar}><Check size={15} /> Guardar</Button>
         </div>
       </div>
+
+      {confirmRemover && inicial && (
+        <ConfirmDialog
+          titulo="Remover empreiteiro"
+          mensagem={`Remover "${inicial.nome}" do diretório?`}
+          cta="Remover"
+          onClose={() => setConfirmRemover(false)}
+          onConfirm={() => { remove(inicial.id); toastSuccess("Empreiteiro removido"); setConfirmRemover(false); onClose(); }}
+        />
+      )}
     </div>
   );
 }

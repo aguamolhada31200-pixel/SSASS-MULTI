@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ChartCard } from "@/components/ui/chart-card";
 import {
@@ -52,6 +53,8 @@ export function SociosTab({ project: p }: { project: CollabProject }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [redeOpen, setRedeOpen] = useState(false);
   const [editing, setEditing] = useState<Partner | null>(null);
+  const [aRemover, setARemover] = useState<Partner | null>(null);
+  const [conviteACancelar, setConviteACancelar] = useState<Partner | null>(null);
 
   const ativos = p.partners.filter((s) => (s.status ?? "ativo") === "ativo");
   const pendentes = p.partners.filter((s) => s.status === "pendente");
@@ -82,8 +85,12 @@ export function SociosTab({ project: p }: { project: CollabProject }) {
   // ── Remover com reequilíbrio proporcional ──
   const remover = (socio: Partner) => {
     if (socio.role === "gestor") { toastError("O gestor não pode ser removido."); return; }
-    if (!confirm(`Remover ${socio.name} do projeto?`)) return;
-    if (!confirm(`Confirma? A percentagem de ${socio.pct}% será redistribuída pelos restantes sócios.`)) return;
+    setARemover(socio);
+  };
+  const doRemover = () => {
+    if (!aRemover) return;
+    const socio = aRemover;
+    setARemover(null);
     const restantes = p.partners.filter((s) => s.id !== socio.id);
     const somaAtiva = restantes.filter((s) => (s.status ?? "ativo") === "ativo").reduce((a, s) => a + s.pct, 0);
     let rebalanced = restantes.map((s) =>
@@ -107,10 +114,12 @@ export function SociosTab({ project: p }: { project: CollabProject }) {
     toastSuccess(`Convite reenviado a ${nomeProprio(socio.name)}`);
   };
 
-  const cancelar = (socio: Partner) => {
-    if (!confirm(`Cancelar o convite a ${socio.name}?`)) return;
-    setPartners(p.partners.filter((s) => s.id !== socio.id));
+  const cancelar = (socio: Partner) => setConviteACancelar(socio);
+  const doCancelar = () => {
+    if (!conviteACancelar) return;
+    setPartners(p.partners.filter((s) => s.id !== conviteACancelar.id));
     toastSuccess("Convite cancelado");
+    setConviteACancelar(null);
   };
 
   const donut = ativos.map((s, i) => ({ name: s.name, value: s.pct, color: s.color || SOCIO_COLORS[i % SOCIO_COLORS.length] }));
@@ -247,6 +256,25 @@ export function SociosTab({ project: p }: { project: CollabProject }) {
       {inviteOpen && <InviteModal project={p} onClose={() => setInviteOpen(false)} />}
       {redeOpen && <RedeSelectorModal project={p} onClose={() => setRedeOpen(false)} onPick={(prof) => { setRedeOpen(false); setInviteOpen(false); }} />}
       {editing && <EditSocioModal project={p} socio={editing} onClose={() => setEditing(null)} />}
+
+      {aRemover && (
+        <ConfirmDialog
+          titulo="Remover sócio"
+          mensagem={`Remover ${aRemover.name} do projeto? A percentagem de ${aRemover.pct}% será redistribuída pelos restantes sócios.`}
+          cta="Remover"
+          onClose={() => setARemover(null)}
+          onConfirm={doRemover}
+        />
+      )}
+      {conviteACancelar && (
+        <ConfirmDialog
+          titulo="Cancelar convite"
+          mensagem={`Cancelar o convite a ${conviteACancelar.name}?`}
+          cta="Cancelar convite"
+          onClose={() => setConviteACancelar(null)}
+          onConfirm={doCancelar}
+        />
+      )}
     </div>
   );
 }

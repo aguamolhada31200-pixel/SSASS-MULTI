@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Plus, X, CalendarClock, CheckCircle2, Pencil, Trash2, History, ShieldCheck, Sparkles, FileText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Card, CardContent } from "@/components/ui/Card";
 import {
   useMaintenancePlanStore,
@@ -62,6 +63,7 @@ export function PrevencaoSection({ propertyId }: { propertyId?: string }) {
   const [formTask, setFormTask] = useState<PlanTask | "nova" | null>(null);
   const [feitaTask, setFeitaTask] = useState<PlanTask | null>(null);
   const [histTask, setHistTask] = useState<PlanTask | null>(null);
+  const [delTask, setDelTask] = useState<PlanTask | null>(null);
 
   const minhas = useMemo(
     () => (propertyId ? tasks.filter((t) => t.propertyId === propertyId) : tasks),
@@ -161,12 +163,7 @@ export function PrevencaoSection({ propertyId }: { propertyId?: string }) {
                   onFeita={() => setFeitaTask(t)}
                   onEditar={() => setFormTask(t)}
                   onHistorico={() => setHistTask(t)}
-                  onEliminar={() => {
-                    if (confirm(`Eliminar a tarefa "${t.titulo}"?`)) {
-                      removeTask(t.id);
-                      toastSuccess("Tarefa eliminada");
-                    }
-                  }}
+                  onEliminar={() => setDelTask(t)}
                 />
               ))}
             </div>
@@ -183,6 +180,15 @@ export function PrevencaoSection({ propertyId }: { propertyId?: string }) {
       )}
       {feitaTask && <MarcarFeitaDialog tarefa={feitaTask} onClose={() => setFeitaTask(null)} />}
       {histTask && <HistoricoDialog tarefa={histTask} onClose={() => setHistTask(null)} />}
+      {delTask && (
+        <ConfirmDialog
+          titulo="Eliminar tarefa"
+          mensagem={`Eliminar a tarefa "${delTask.titulo}"?`}
+          cta="Eliminar"
+          onClose={() => setDelTask(null)}
+          onConfirm={() => { removeTask(delTask.id); toastSuccess("Tarefa eliminada"); setDelTask(null); }}
+        />
+      )}
     </div>
   );
 }

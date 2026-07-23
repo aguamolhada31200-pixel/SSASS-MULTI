@@ -18,6 +18,8 @@ import {
   Legend,
 } from "recharts";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { NomeModal } from "@/components/ui/NomeModal";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ChartCard } from "@/components/ui/chart-card";
@@ -79,6 +81,7 @@ export default function ImovelDetail() {
   const openPropertyForm = useModalStore((s) => s.openPropertyForm);
   const navigate = useNavigate();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Visão geral");
+  const [confirmDel, setConfirmDel] = useState(false);
 
   if (!property)
     return (
@@ -94,8 +97,9 @@ export default function ImovelDetail() {
   const alertas = gerarAlertas(property, k);
   const s = situacaoImovel(property);
 
-  const onDelete = () => {
-    if (!confirm(`Eliminar "${property.name}"? Esta ação não pode ser anulada.`)) return;
+  const onDelete = () => setConfirmDel(true);
+  const doDelete = () => {
+    setConfirmDel(false);
     remove(property.id);
     toastSuccess("Imóvel eliminado", { description: property.name });
     navigate("/imoveis");
@@ -171,6 +175,16 @@ export default function ImovelDetail() {
         {tab === "Manutenção" && <ImovelManutencaoTab propertyId={property.id} />}
         {tab === "Histórico" && <ImovelHistoricoTab property={property} />}
       </div>
+
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar imóvel"
+          mensagem={`Eliminar "${property.name}"? Esta ação não pode ser anulada.`}
+          cta="Eliminar"
+          onClose={() => setConfirmDel(false)}
+          onConfirm={doDelete}
+        />
+      )}
     </>
   );
 }
@@ -983,6 +997,8 @@ export function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
   const [nome, setNome] = useState("");
   const [categoria, setCategoria] = useState<DocCategoria>("Contratos");
   const [url, setUrl] = useState("");
+  const [renomear, setRenomear] = useState<{ id: string; nome: string } | null>(null);
+  const [eliminar, setEliminar] = useState<{ id: string; nome: string } | null>(null);
 
   const filtrados = docs.filter((d) => !q || d.nome.toLowerCase().includes(q.toLowerCase()));
   const porCategoria = DOC_CATEGORIAS.map((cat) => ({ cat, items: filtrados.filter((d) => d.categoria === cat) })).filter((g) => g.items.length > 0);
@@ -1079,8 +1095,8 @@ export function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
                     <div className="flex shrink-0 items-center gap-1">
                       <a href={d.ficheiroUrl} target="_blank" rel="noreferrer" className="rounded p-1 text-muted hover:text-ink" title="Ver"><Eye size={14} /></a>
                       <a href={d.ficheiroUrl} download={d.nome} className="rounded p-1 text-muted hover:text-ink" title="Download"><Download size={14} /></a>
-                      <button onClick={() => { const n = prompt("Novo nome:", d.nome); if (n?.trim()) rename(d.id, n.trim()); }} className="rounded p-1 text-muted hover:text-ink" title="Renomear"><Pencil size={14} /></button>
-                      <button onClick={() => { if (confirm(`Eliminar "${d.nome}"?`)) remove(d.id); }} className="rounded p-1 text-muted hover:text-danger" title="Eliminar"><Trash2 size={14} /></button>
+                      <button onClick={() => setRenomear({ id: d.id, nome: d.nome })} className="rounded p-1 text-muted hover:text-ink" title="Renomear"><Pencil size={14} /></button>
+                      <button onClick={() => setEliminar({ id: d.id, nome: d.nome })} className="rounded p-1 text-muted hover:text-danger" title="Eliminar"><Trash2 size={14} /></button>
                     </div>
                   </li>
                 ))}
@@ -1088,6 +1104,26 @@ export function ImovelDocumentosTab({ propertyId }: { propertyId: string }) {
             </CardContent>
           </Card>
         ))
+      )}
+
+      {renomear && (
+        <NomeModal
+          titulo="Renomear documento"
+          valorInicial={renomear.nome}
+          cta="Guardar"
+          placeholder="Nome do documento"
+          onClose={() => setRenomear(null)}
+          onConfirm={(n) => { rename(renomear.id, n); toastSuccess("Documento renomeado", n); setRenomear(null); }}
+        />
+      )}
+      {eliminar && (
+        <ConfirmDialog
+          titulo="Eliminar documento"
+          mensagem={`Eliminar "${eliminar.nome}"?`}
+          cta="Eliminar"
+          onClose={() => setEliminar(null)}
+          onConfirm={() => { remove(eliminar.id); toastSuccess("Documento eliminado"); setEliminar(null); }}
+        />
       )}
     </div>
   );

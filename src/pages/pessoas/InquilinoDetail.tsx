@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { useTenantsStore, STATUS_LABEL, TIPO_LABEL, urgenciaContrato, diasAteFim, type StatusInquilino, type TipoInquilino } from "@/store/useTenantsStore";
@@ -44,6 +45,7 @@ export default function InquilinoDetail() {
   const remove = useTenantsStore((s) => s.remove);
   const openTenantForm = useModalStore((s) => s.openTenantForm);
   const [tab, setTab] = useState<Tab>("Perfil");
+  const [confirmDel, setConfirmDel] = useState(false);
 
   if (!tenant) {
     return (
@@ -56,8 +58,9 @@ export default function InquilinoDetail() {
     );
   }
 
-  const onDelete = () => {
-    if (!confirm(`Eliminar "${tenant.nomeCompleto}"? Esta ação não pode ser anulada.`)) return;
+  const onDelete = () => setConfirmDel(true);
+  const doDelete = () => {
+    setConfirmDel(false);
     remove(tenant.id);
     toastSuccess("Inquilino eliminado");
     navigate("/pessoas/inquilinos");
@@ -119,6 +122,16 @@ export default function InquilinoDetail() {
         {tab === "Documentos" && <DocumentosTab tenantId={tenant.id} />}
         {tab === "Histórico" && <HistoricoTab tenantId={tenant.id} />}
       </div>
+
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar inquilino"
+          mensagem={`Eliminar "${tenant.nomeCompleto}"? Esta ação não pode ser anulada.`}
+          cta="Eliminar"
+          onClose={() => setConfirmDel(false)}
+          onConfirm={doDelete}
+        />
+      )}
     </>
   );
 }

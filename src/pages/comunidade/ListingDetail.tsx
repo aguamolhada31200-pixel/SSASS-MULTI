@@ -22,6 +22,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Lightbox } from "@/components/Lightbox";
 import { Stars } from "@/components/rede/Stars";
@@ -934,13 +935,16 @@ function AcoesAutor({ listing }: { listing: L }) {
   const remove = useListingsStore((s) => s.remove);
   const openForm = useModalStore((s) => s.openListingForm);
 
+  const [confirmDel, setConfirmDel] = useState(false);
+
   const pausar = () => {
     const next = listing.status === "paused" ? "active" : "paused";
     setStatus(listing.id, next);
     toastSuccess(next === "paused" ? "Anúncio pausado" : "Anúncio reativado");
   };
-  const eliminar = () => {
-    if (!confirm(`Eliminar "${listing.title}"?`)) return;
+  const eliminar = () => setConfirmDel(true);
+  const doEliminar = () => {
+    setConfirmDel(false);
     remove(listing.id);
     toastSuccess("Anúncio eliminado");
     navigate("/comunidade/rede");
@@ -961,6 +965,16 @@ function AcoesAutor({ listing }: { listing: L }) {
         </CardContent>
       </Card>
       <AtividadeAnuncio listing={listing} />
+
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar anúncio"
+          mensagem={`Eliminar "${listing.title}"?`}
+          cta="Eliminar"
+          onClose={() => setConfirmDel(false)}
+          onConfirm={doEliminar}
+        />
+      )}
     </div>
   );
 }

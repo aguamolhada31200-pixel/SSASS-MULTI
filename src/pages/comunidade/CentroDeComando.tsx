@@ -21,6 +21,7 @@ import {
 import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ExampleDataToggle } from "@/components/ExampleDataToggle";
 import { useExampleData } from "@/store/useExampleData";
 import { useModalStore } from "@/store/useModalStore";
@@ -1002,6 +1003,7 @@ function CronogramaPanel({
   const [zoom, setZoom] = useState<Zoom>("mes");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [drag, setDrag] = useState<{ id: string; dx: number } | null>(null);
+  const [moverObra, setMoverObra] = useState<{ obra: Obra; delta: number } | null>(null);
   const dragStart = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -1082,10 +1084,14 @@ function CronogramaPanel({
     const delta = Math.round(drag.dx / dayPx);
     setDrag(null);
     if (delta === 0) return;
-    if (confirm(`Mover "${o.titulo}" ${delta > 0 ? "+" : ""}${delta} dias?`)) {
-      updateObra(o.id, { dataInicio: addDiasISO(o.dataInicio, delta), dataFimPrevista: addDiasISO(o.dataFimPrevista, delta) });
-      toastSuccess(`Datas atualizadas (${delta > 0 ? "+" : ""}${delta} dias) · sócios notificados`);
-    }
+    setMoverObra({ obra: o, delta });
+  };
+  const doMover = () => {
+    if (!moverObra) return;
+    const { obra: o, delta } = moverObra;
+    updateObra(o.id, { dataInicio: addDiasISO(o.dataInicio, delta), dataFimPrevista: addDiasISO(o.dataFimPrevista, delta) });
+    toastSuccess(`Datas atualizadas (${delta > 0 ? "+" : ""}${delta} dias) · sócios notificados`);
+    setMoverObra(null);
   };
 
   return (
@@ -1239,6 +1245,17 @@ function CronogramaPanel({
           </div>
         </CardContent>
       </Card>
+
+      {moverObra && (
+        <ConfirmDialog
+          titulo="Mover obra"
+          mensagem={`Mover "${moverObra.obra.titulo}" ${moverObra.delta > 0 ? "+" : ""}${moverObra.delta} dias?`}
+          cta="Mover"
+          variant="primary"
+          onClose={() => setMoverObra(null)}
+          onConfirm={doMover}
+        />
+      )}
     </div>
   );
 }

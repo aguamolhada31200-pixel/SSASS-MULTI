@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   Maximize2,
   Clock,
+  X,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -60,6 +61,7 @@ export default function ContratoDetalhe() {
   const updateDoc = useDocumentsStore((s) => s.update);
 
   const [lightbox, setLightbox] = useState(false);
+  const [terminarOpen, setTerminarOpen] = useState(false);
 
   if (!contract) {
     return (
@@ -128,11 +130,10 @@ export default function ContratoDetalhe() {
     a.click();
   };
 
-  const terminar = () => {
-    const motivo = window.prompt("Motivo da cessação do contrato:");
-    if (!motivo?.trim()) return;
-    const data = window.prompt("Data da cessação (AAAA-MM-DD):", new Date().toISOString().slice(0, 10));
-    terminate(contract.id, motivo.trim(), data?.trim() || undefined);
+  const terminar = () => setTerminarOpen(true);
+  const doTerminar = (motivo: string, data: string) => {
+    setTerminarOpen(false);
+    terminate(contract.id, motivo, data || undefined);
     toastSuccess("Contrato terminado");
   };
 
@@ -286,6 +287,56 @@ export default function ContratoDetalhe() {
       </div>
 
       {lightbox && ehImagem && <Lightbox fotos={[{ url: contract.pdfUrl!, legenda: contract.fileName }]} onClose={() => setLightbox(false)} />}
+      {terminarOpen && <TerminarContratoModal onClose={() => setTerminarOpen(false)} onConfirm={doTerminar} />}
+    </div>
+  );
+}
+
+// ───────────────────────── Terminar contrato (motivo + data) ─────────────────────────
+
+function TerminarContratoModal({ onConfirm, onClose }: {
+  onConfirm: (motivo: string, data: string) => void;
+  onClose: () => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
+  const valido = motivo.trim().length > 0;
+  const submeter = () => { if (valido) onConfirm(motivo.trim(), data); };
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
+      <div className="w-full max-w-sm rounded-t-2xl border border-line bg-card p-5 shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-display text-base font-semibold text-ink">Terminar contrato</h3>
+          <button onClick={onClose} className="text-muted hover:text-ink"><X size={18} /></button>
+        </div>
+        <div className="space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted">Motivo da cessação</span>
+            <input
+              autoFocus
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submeter(); } if (e.key === "Escape") onClose(); }}
+              placeholder="Ex.: Acordo entre as partes"
+              className={inp}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted">Data da cessação</span>
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+              className={inp}
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button variant="danger" size="sm" onClick={submeter} disabled={!valido}><XCircle size={14} /> Terminar contrato</Button>
+        </div>
+      </div>
     </div>
   );
 }

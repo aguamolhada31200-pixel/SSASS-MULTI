@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { X, AlertTriangle, ShieldCheck, Trash2, ChevronRight, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useModalStore } from "@/store/useModalStore";
 import {
   useObrasStore,
@@ -59,6 +60,7 @@ export function PorComprovarDrawer() {
   const [filtroImovel, setFiltroImovel] = useState<string>("todos");
   const [ordenar, setOrdenar] = useState<Ordenar>("antiguidade");
   const [tab, setTab] = useState<TabProva>("sem_fatura");
+  const [aEliminar, setAEliminar] = useState<Linha | null>(null);
 
   // Contagens por separador (respeitam o filtro da obra do deep-link)
   const noEscopo = (d: Despesa) => (obraId ? d.obraId === obraId : true);
@@ -119,10 +121,12 @@ export function PorComprovarDrawer() {
   const total = filtradas.reduce((s, l) => s + l.despesa.valor, 0);
   const nObras = new Set(filtradas.map((l) => l.obra.id)).size;
 
-  const eliminar = (l: Linha) => {
-    if (!confirm(`Eliminar a despesa "${l.despesa.descricao}" (${eur(l.despesa.valor)})?`)) return;
-    removeDespesa(l.despesa.id);
+  const eliminar = (l: Linha) => setAEliminar(l);
+  const doEliminar = () => {
+    if (!aEliminar) return;
+    removeDespesa(aEliminar.despesa.id);
     toastSuccess("Despesa eliminada");
+    setAEliminar(null);
   };
 
   return (
@@ -312,6 +316,16 @@ export function PorComprovarDrawer() {
           )}
         </div>
       </div>
+
+      {aEliminar && (
+        <ConfirmDialog
+          titulo="Eliminar despesa"
+          mensagem={`Eliminar a despesa "${aEliminar.despesa.descricao}" (${eur(aEliminar.despesa.valor)})?`}
+          cta="Eliminar"
+          onClose={() => setAEliminar(null)}
+          onConfirm={doEliminar}
+        />
+      )}
     </div>
   );
 }

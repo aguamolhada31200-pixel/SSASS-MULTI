@@ -22,6 +22,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { NomeModal } from "@/components/ui/NomeModal";
 import { useAiConversationsStore, type AiMessage } from "@/store/useAiConversationsStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { useTransactionsStore } from "@/store/useTransactionsStore";
@@ -53,6 +54,7 @@ export default function AssistenteIA() {
   const [thinking, setThinking] = useState(false);
   const [q, setQ] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
+  const [renomearOpen, setRenomearOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -180,7 +182,7 @@ export default function AssistenteIA() {
           </p>
           {active && (
             <div className="flex items-center gap-1">
-              <button onClick={() => { const t = window.prompt("Novo título:", active.title); if (t?.trim()) renameConv(active.id, t.trim()); }} className="rounded-lg p-1.5 text-muted hover:bg-accent hover:text-ink" title="Renomear"><Pencil size={15} /></button>
+              <button onClick={() => setRenomearOpen(true)} className="rounded-lg p-1.5 text-muted hover:bg-accent hover:text-ink" title="Renomear"><Pencil size={15} /></button>
               <button onClick={exportar} className="rounded-lg p-1.5 text-muted hover:bg-accent hover:text-ink" title="Exportar (.md)"><Download size={15} /></button>
               <button onClick={() => { removeConv(active.id); setActiveId(null); }} className="rounded-lg p-1.5 text-muted hover:bg-accent hover:text-danger" title="Eliminar"><Trash2 size={15} /></button>
             </div>
@@ -242,6 +244,17 @@ export default function AssistenteIA() {
           <p className="mt-1.5 text-center text-[10px] text-muted">Respostas geradas localmente a partir dos seus dados — confirme decisões com um profissional.</p>
         </div>
       </section>
+
+      {renomearOpen && active && (
+        <NomeModal
+          titulo="Renomear conversa"
+          valorInicial={active.title}
+          cta="Guardar"
+          placeholder="Título da conversa"
+          onClose={() => setRenomearOpen(false)}
+          onConfirm={(t) => { renameConv(active.id, t); toastSuccess("Conversa renomeada", t); setRenomearOpen(false); }}
+        />
+      )}
     </div>
   );
 }

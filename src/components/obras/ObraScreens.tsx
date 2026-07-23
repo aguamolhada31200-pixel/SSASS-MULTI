@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   Carousel,
   CarouselContent,
@@ -917,6 +918,7 @@ export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: bo
   const [criarOpen, setCriarOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [cartaoId, setCartaoId] = useState<string | null>(null);
+  const [aEliminar, setAEliminar] = useState<Technician | null>(null);
 
   const fecharAdd = () => { setAddOpen(false); setCriarOpen(false); };
 
@@ -948,8 +950,10 @@ export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: bo
     toastSuccess("Contacto atualizado");
   };
 
-  const eliminarContacto = (t: Technician) => {
-    if (!confirm(`Eliminar o contacto "${t.nome}"? Sai desta obra e do diretório de empreiteiros.`)) return;
+  const eliminarContacto = (t: Technician) => setAEliminar(t);
+  const doEliminarContacto = () => {
+    if (!aEliminar) return;
+    const t = aEliminar;
     removeContactoObra(obra.id, t.id);
     const patch: Partial<Obra> = {};
     if (t.id === obra.empreiteiroId) patch.empreiteiroId = undefined;
@@ -957,6 +961,7 @@ export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: bo
     if (Object.keys(patch).length > 0) updateObra(obra.id, patch);
     removeTecnico(t.id);
     setEditId(null);
+    setAEliminar(null);
     toastSuccess(`${t.nome} eliminado`);
   };
 
@@ -1145,6 +1150,16 @@ export function ContactosScreen({ obra, souGestor }: { obra: Obra; souGestor: bo
       )}
 
       {cartaoId && <EmpreiteiroDialog technicianId={cartaoId} onClose={() => setCartaoId(null)} />}
+
+      {aEliminar && (
+        <ConfirmDialog
+          titulo="Eliminar contacto"
+          mensagem={`Eliminar o contacto "${aEliminar.nome}"? Sai desta obra e do diretório de empreiteiros.`}
+          cta="Eliminar"
+          onClose={() => setAEliminar(null)}
+          onConfirm={doEliminarContacto}
+        />
+      )}
     </div>
   );
 }

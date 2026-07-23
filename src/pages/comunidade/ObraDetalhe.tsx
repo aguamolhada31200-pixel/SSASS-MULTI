@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Badge } from "@/components/ui/Badge";
 import {
   useObrasStore,
@@ -106,6 +107,7 @@ export default function ObraDetalhe() {
   const [avaliarOpen, setAvaliarOpen] = useState(false);
   const [editandoRegras, setEditandoRegras] = useState(false);
   const [thVal, setThVal] = useState(0);
+  const [confirmDel, setConfirmDel] = useState(false);
   const [regraVal, setRegraVal] = useState<"maioria_simples" | "unanimidade">("maioria_simples");
 
   const obrasAll = useObrasStore((s) => s.obras);
@@ -226,8 +228,9 @@ export default function ObraDetalhe() {
   const arr = project && project.type === "arrendamento" ? project : undefined;
   const cashflowAnualProj = arr ? ((arr.rendaMensal ?? 0) - (arr.despesasMensais ?? 0)) * 12 : 0;
 
-  const onDelete = () => {
-    if (!confirm(`Eliminar a obra "${obra.titulo}"?`)) return;
+  const onDelete = () => setConfirmDel(true);
+  const doDelete = () => {
+    setConfirmDel(false);
     removeObra(obra.id);
     toastSuccess("Obra eliminada");
     navigate("/comunidade/colaborativa/obras");
@@ -634,6 +637,16 @@ export default function ObraDetalhe() {
           })}
         </div>
       </div>
+
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar obra"
+          mensagem={`Eliminar a obra "${obra.titulo}"?`}
+          cta="Eliminar"
+          onClose={() => setConfirmDel(false)}
+          onConfirm={doDelete}
+        />
+      )}
     </div>
   );
 }

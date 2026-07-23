@@ -37,6 +37,7 @@ import {
   Line,
 } from "recharts";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ChartCard } from "@/components/ui/chart-card";
@@ -159,8 +160,10 @@ function HeroProject({ project: p }: { project: CollabProject }) {
     ? (() => { const v = (p.valorVendaPrevisto ?? 0) - inv; return v - v * ((p.taxaImpostos ?? 0) / 100); })()
     : ((p.rendaMensal ?? 0) - (p.despesasMensais ?? 0)) * 12;
 
-  const eliminar = () => {
-    if (!confirm(`Eliminar o projeto "${p.title}"? Esta ação não pode ser anulada.`)) return;
+  const [confirmDel, setConfirmDel] = useState(false);
+  const eliminar = () => setConfirmDel(true);
+  const doEliminar = () => {
+    setConfirmDel(false);
     removeProject(p.id);
     toastSuccess("Projeto eliminado");
     navigate("/comunidade/colaborativa");
@@ -216,6 +219,16 @@ function HeroProject({ project: p }: { project: CollabProject }) {
           </div>
         </div>
       </div>
+
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar projeto"
+          mensagem={`Eliminar o projeto "${p.title}"? Esta ação não pode ser anulada.`}
+          cta="Eliminar"
+          onClose={() => setConfirmDel(false)}
+          onConfirm={doEliminar}
+        />
+      )}
     </>
   );
 }

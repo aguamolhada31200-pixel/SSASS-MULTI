@@ -23,6 +23,7 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { NomeModal } from "@/components/ui/NomeModal";
 import { Field, Toggle, SectionCard, inputCls } from "@/components/conta/ContaUI";
 import {
   useAccountStore,
@@ -364,6 +365,7 @@ function TabApi() {
   const addApiKey = useAccountStore((s) => s.addApiKey);
   const revokeApiKey = useAccountStore((s) => s.revokeApiKey);
   const navigate = useNavigate();
+  const [novaChave, setNovaChave] = useState(false);
 
   if (plano !== "business") {
     return (
@@ -381,7 +383,7 @@ function TabApi() {
   return (
     <>
       <SectionCard title="Chaves de API" icon={KeyRound} desc="Máximo 5 chaves ativas.">
-        <Button variant="outline" size="sm" disabled={apiKeys.length >= 5} onClick={() => { const n = window.prompt("Nome da chave:"); if (n?.trim()) addApiKey(n.trim(), ["read"]); }}>
+        <Button variant="outline" size="sm" disabled={apiKeys.length >= 5} onClick={() => setNovaChave(true)}>
           <Plus size={14} /> Gerar API key
         </Button>
         {apiKeys.length === 0 ? (
@@ -404,6 +406,17 @@ function TabApi() {
         <Field label="URL do endpoint"><input placeholder="https://o-seu-servidor.pt/webhooks" className={inputCls} /></Field>
         <p className="mt-2 text-xs text-muted">Documentação: docs.redegest.pt</p>
       </SectionCard>
+
+      {novaChave && (
+        <NomeModal
+          titulo="Gerar API key"
+          valorInicial=""
+          cta="Gerar chave"
+          placeholder="Nome da chave"
+          onClose={() => setNovaChave(false)}
+          onConfirm={(n) => { addApiKey(n, ["read"]); toastSuccess("API key criada", n); setNovaChave(false); }}
+        />
+      )}
     </>
   );
 }

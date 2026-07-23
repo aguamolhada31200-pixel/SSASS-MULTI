@@ -31,6 +31,7 @@ import {
   Legend,
 } from "recharts";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { ChartCard } from "@/components/ui/chart-card";
@@ -83,6 +84,7 @@ export function FinancasTab({
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
   const [sortKey, setSortKey] = useState<SortKey>("data");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [txAEliminar, setTxAEliminar] = useState<Transaction | null>(null);
 
   // Período aplicado a KPIs/gráficos
   const txsPeriodo = useMemo(() => txs.filter((t) => dentroPeriodo(t.data, periodo)), [txs, periodo]);
@@ -238,10 +240,12 @@ export function FinancasTab({
     }
   };
 
-  const onDelete = (t: Transaction) => {
-    if (!confirm(`Eliminar este movimento de ${eur(t.valor)}?`)) return;
-    removeTx(t.id);
+  const onDelete = (t: Transaction) => setTxAEliminar(t);
+  const doDelete = () => {
+    if (!txAEliminar) return;
+    removeTx(txAEliminar.id);
     toastSuccess("Movimento eliminado");
+    setTxAEliminar(null);
   };
 
   const previewRecibo = (url: string) => {
@@ -658,6 +662,16 @@ export function FinancasTab({
           )}
         </CardContent>
       </Card>
+
+      {txAEliminar && (
+        <ConfirmDialog
+          titulo="Eliminar movimento"
+          mensagem={`Eliminar este movimento de ${eur(txAEliminar.valor)}?`}
+          cta="Eliminar"
+          onClose={() => setTxAEliminar(null)}
+          onConfirm={doDelete}
+        />
+      )}
     </div>
   );
 }
