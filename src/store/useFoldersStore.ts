@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+// Secção de topo onde vive uma pasta manual que NÃO pertence a um imóvel/projeto.
+export type SecaoTopo = "imoveis" | "colaborativa" | "sem";
+
 // Subpastas MANUAIS da Pasta Digital (as únicas guardadas). As pastas dos
 // imóveis e projetos NÃO vivem aqui — são derivadas em runtime.
 export interface Folder {
@@ -9,6 +12,10 @@ export interface Folder {
   propertyId: string | null;
   projectId: string | null;
   parentId: string | null; // subpasta de outra subpasta manual
+  // Pastas de topo criadas pelo utilizador (sem imóvel/projeto) guardam aqui
+  // a secção onde aparecem. Subpastas (parentId != null) e pastas dentro de
+  // um imóvel/projeto não usam este campo.
+  secao?: SecaoTopo;
 }
 
 export type FolderInput = Omit<Folder, "id">;

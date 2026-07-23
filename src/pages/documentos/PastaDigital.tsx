@@ -44,7 +44,7 @@ import {
   type DocCategoria,
   type PropertyDocument,
 } from "@/store/useDocumentsStore";
-import { useFoldersStore, type Folder } from "@/store/useFoldersStore";
+import { useFoldersStore, type Folder, type SecaoTopo } from "@/store/useFoldersStore";
 import { usePropertiesStore } from "@/store/usePropertiesStore";
 import { useCollabStore } from "@/store/useCollabStore";
 import { useExampleData } from "@/store/useExampleData";
@@ -107,8 +107,11 @@ type Item =
 export default function PastaDigital() {
   const documents = useDocumentsStore((s) => s.documents);
   const addDoc = useDocumentsStore((s) => s.add);
+  const moveDocToFolder = useDocumentsStore((s) => s.moveToFolder);
   const folders = useFoldersStore((s) => s.folders);
   const addFolder = useFoldersStore((s) => s.add);
+  const renameFolder = useFoldersStore((s) => s.rename);
+  const removeFolder = useFoldersStore((s) => s.remove);
   const enabled = useExampleData((s) => s.enabled);
 
   const properties = usePropertiesStore((s) => s.properties);
@@ -148,7 +151,8 @@ export default function PastaDigital() {
         if (f?.parentId) return { kind: "folder", folderId: f.parentId };
         if (f?.propertyId) return { kind: "property", propertyId: f.propertyId };
         if (f?.projectId) return { kind: "project", projectId: f.projectId };
-        return { kind: "root" };
+        if (f?.secao) return { kind: f.secao } as Loc;
+        return { kind: "sem" };
       }
       case "imoveis": case "colaborativa": case "sem": case "lixo": return { kind: "root" };
       default: return { kind: "root" };
@@ -161,10 +165,11 @@ export default function PastaDigital() {
   const [sort, setSort] = useState<{ campo: "nome" | "tipo" | "tamanho" | "data" | "validade"; asc: boolean }>({ campo: "nome", asc: true });
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [lastClick, setLastClick] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(["imoveis", "colaborativa"]));
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(["imoveis", "colaborativa", "sem"]));
   const [uploadOpen, setUploadOpen] = useState(false);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; doc: PropertyDocument } | null>(null);
+  const [folderCtx, setFolderCtx] = useState<{ x: number; y: number; folderId: string; nome: string } | null>(null);
   const [filtOpen, setFiltOpen] = useState(false);
   const [fTipo, setFTipo] = useState<"todos" | TipoGrupo>("todos");
   const [fExpira, setFExpira] = useState(false);
@@ -176,21 +181,30 @@ export default function PastaDigital() {
   const subFoldersDe = (propertyId: string | null, projectId: string | null, parentId: string | null): Folder[] =>
     folders.filter((f) => f.propertyId === propertyId && f.projectId === projectId && f.parentId === parentId);
 
+  // Pastas manuais de topo (sem imóvel/projeto/parent) de uma secção.
+  const pastasTopo = (secao: SecaoTopo): Folder[] =>
+    folders.filter((f) => !f.propertyId && !f.projectId && !f.parentId && f.secao === secao);
+
   const docCountFolder = (fid: string) => ativos.filter((d) => d.pastaId === fid).length;
+  const docsSemAssoc = ativos.filter((d) => !d.propertyId && !d.projectId && !d.pastaId);
 
   const conteudo: Item[] = useMemo(() => {
     const folderItem = (f: Folder): Item => ({ type: "folder", id: f.id, nome: f.nome, loc: { kind: "folder", folderId: f.id }, icon: FolderIcon, count: docCountFolder(f.id) });
     switch (loc.kind) {
       case "root":
         return [
-          { type: "folder", id: "g-imoveis", nome: "Os meus imóveis", loc: { kind: "imoveis" }, icon: Building2, count: imoveis.length },
-          { type: "folder", id: "g-colab", nome: "Gestão Colaborativa", loc: { kind: "colaborativa" }, icon: Users, count: projetos.length },
-          { type: "folder", id: "g-sem", nome: "Sem associação", loc: { kind: "sem" }, icon: FolderIcon, count: ativos.filter((d) => !d.propertyId && !d.projectId && !d.pastaId).length },
+          { type: "folder", id: "g-imoveis", nome: "Os meus imóveis", loc: { kind: "imoveis" }, icon: Building2, count: imoveis.length + pastasTopo("imoveis").length },
+          { type: "folder", id: "g-colab", nome: "Gestão Colaborativa", loc: { kind: "colaborativa" }, icon: Users, count: projetos.length + pastasTopo("colaborativa").length },
+          { type: "folder", id: "g-sem", nome: "Sem associação", loc: { kind: "sem" }, icon: FolderIcon, count: docsSemAssoc.length + pastasTopo("sem").length },
         ];
-      case "imoveis":
-        return imoveis.map((p) => ({ type: "folder", id: p.id, nome: p.name, loc: { kind: "property", propertyId: p.id }, icon: FolderIcon, count: ativos.filter((d) => d.propertyId === p.id).length } as Item));
-      case "colaborativa":
-        return projetos.map((p) => ({ type: "folder", id: p.id, nome: p.title, loc: { kind: "project", projectId: p.id }, icon: FolderIcon, count: ativos.filter((d) => d.projectId === p.id).length } as Item));
+      case "imoveis": {
+        const props = imoveis.map((p) => ({ type: "folder", id: p.id, nome: p.name, loc: { kind: "property", propertyId: p.id }, icon: FolderIcon, count: ativos.filter((d) => d.propertyId === p.id).length } as Item));
+        return [...props, ...pastasTopo("imoveis").map(folderItem)];
+      }
+      case "colaborativa": {
+        const projs = projetos.map((p) => ({ type: "folder", id: p.id, nome: p.title, loc: { kind: "project", projectId: p.id }, icon: FolderIcon, count: ativos.filter((d) => d.projectId === p.id).length } as Item));
+        return [...projs, ...pastasTopo("colaborativa").map(folderItem)];
+      }
       case "property": {
         const subs = subFoldersDe(loc.propertyId, null, null).map(folderItem);
         const ds = ativos.filter((d) => d.propertyId === loc.propertyId && !d.pastaId).map((d) => ({ type: "doc", doc: d } as Item));
@@ -207,7 +221,7 @@ export default function PastaDigital() {
         return [...subs, ...ds];
       }
       case "sem":
-        return ativos.filter((d) => !d.propertyId && !d.projectId && !d.pastaId).map((d) => ({ type: "doc", doc: d } as Item));
+        return [...pastasTopo("sem").map(folderItem), ...docsSemAssoc.map((d) => ({ type: "doc", doc: d } as Item))];
       case "lixo":
         return naLixeira.map((d) => ({ type: "doc", doc: d } as Item));
     }
@@ -266,22 +280,47 @@ export default function PastaDigital() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loc, folders, imoveis, projetos]);
 
-  // Contexto para criar subpasta / pré-preencher upload a partir da localização
-  const contextoAtual = useMemo(() => {
-    if (loc.kind === "property") return { propertyId: loc.propertyId as string | null, projectId: null as string | null, parentId: null as string | null };
-    if (loc.kind === "project") return { propertyId: null, projectId: loc.projectId, parentId: null };
-    if (loc.kind === "folder") { const f = folderById(loc.folderId); return { propertyId: f?.propertyId ?? null, projectId: f?.projectId ?? null, parentId: loc.folderId }; }
-    return { propertyId: null, projectId: null, parentId: null };
+  // Contexto para criar subpasta / pré-preencher upload a partir da localização.
+  // `secao` só é usado ao criar pastas manuais de topo; `label` é o destino a mostrar no upload.
+  type Ctx = { propertyId: string | null; projectId: string | null; parentId: string | null; secao?: SecaoTopo; label: string | null };
+  const contextoAtual: Ctx = useMemo(() => {
+    if (loc.kind === "property") return { propertyId: loc.propertyId, projectId: null, parentId: null, label: propName(loc.propertyId) };
+    if (loc.kind === "project") return { propertyId: null, projectId: loc.projectId, parentId: null, label: projName(loc.projectId) };
+    if (loc.kind === "folder") { const f = folderById(loc.folderId); return { propertyId: f?.propertyId ?? null, projectId: f?.projectId ?? null, parentId: loc.folderId, secao: f?.secao, label: f?.nome ?? "Pasta" }; }
+    if (loc.kind === "imoveis") return { propertyId: null, projectId: null, parentId: null, secao: "imoveis", label: null };
+    if (loc.kind === "colaborativa") return { propertyId: null, projectId: null, parentId: null, secao: "colaborativa", label: null };
+    if (loc.kind === "sem") return { propertyId: null, projectId: null, parentId: null, secao: "sem", label: null };
+    return { propertyId: null, projectId: null, parentId: null, label: null };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loc, folders]);
 
-  const podeCriarPasta = loc.kind === "property" || loc.kind === "project" || loc.kind === "folder";
+  // Pode criar pasta em qualquer secção (imóveis / colaborativa / sem), dentro de um
+  // imóvel/projeto ou dentro de uma subpasta — só não na raiz nem no Lixo.
+  const podeCriarPasta = loc.kind !== "root" && loc.kind !== "lixo";
 
   const novaPasta = () => {
-    if (!podeCriarPasta) { toastInfo("Entre num imóvel ou projeto para criar uma subpasta."); return; }
+    if (!podeCriarPasta) { toastInfo("Abra uma secção, imóvel ou projeto para criar a pasta."); return; }
     const nome = window.prompt("Nome da nova pasta:");
     if (!nome || !nome.trim()) return;
-    addFolder({ nome: nome.trim(), propertyId: contextoAtual.propertyId, projectId: contextoAtual.projectId, parentId: contextoAtual.parentId });
+    addFolder({ nome: nome.trim(), propertyId: contextoAtual.propertyId, projectId: contextoAtual.projectId, parentId: contextoAtual.parentId, secao: contextoAtual.secao });
     toastSuccess("Pasta criada", nome.trim());
+  };
+
+  const renomearPasta = (folderId: string, nomeAtual: string) => {
+    const novo = window.prompt("Novo nome da pasta:", nomeAtual);
+    if (!novo || !novo.trim()) return;
+    renameFolder(folderId, novo.trim());
+    toastSuccess("Pasta renomeada", novo.trim());
+  };
+
+  const eliminarPasta = (folderId: string, nome: string) => {
+    const ok = window.confirm(`Eliminar a pasta "${nome}"?\nOs documentos que estejam lá dentro NÃO são apagados — ficam guardados na secção.`);
+    if (!ok) return;
+    const alvo = parentLoc({ kind: "folder", folderId });
+    const removidos = removeFolder(folderId);
+    documents.forEach((d) => { if (d.pastaId && removidos.includes(d.pastaId)) moveDocToFolder(d.id, undefined); });
+    if (loc.kind === "folder" && removidos.includes(loc.folderId)) navigate(alvo);
+    toastSuccess("Pasta eliminada", "Os documentos foram mantidos na secção.");
   };
 
   // Seleção com click / Ctrl / Shift
@@ -296,6 +335,7 @@ export default function PastaDigital() {
   };
 
   useEffect(() => { const close = () => setCtx(null); if (ctx) { window.addEventListener("click", close); window.addEventListener("scroll", close, true); return () => { window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); }; } }, [ctx]);
+  useEffect(() => { const close = () => setFolderCtx(null); if (folderCtx) { window.addEventListener("click", close); window.addEventListener("scroll", close, true); return () => { window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); }; } }, [folderCtx]);
 
   const abrirDoc = (d: PropertyDocument) => setPanelId(d.id);
   const panelDoc = panelId ? documents.find((d) => d.id === panelId) ?? null : null;
@@ -352,7 +392,7 @@ export default function PastaDigital() {
             />
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={novaPasta} disabled={!podeCriarPasta} title={podeCriarPasta ? "Nova pasta" : "Entre num imóvel/projeto"}>
+        <Button variant="outline" size="sm" onClick={novaPasta} disabled={!podeCriarPasta} title={podeCriarPasta ? "Nova pasta" : "Abra uma secção para criar"}>
           <FolderPlus size={14} /> Nova pasta
         </Button>
         <Button size="sm" onClick={() => setUploadOpen(true)}>
@@ -374,14 +414,26 @@ export default function PastaDigital() {
             <TreeBranch key={p.id} depth={2} label={p.name} loc={{ kind: "property", propertyId: p.id }} propertyId={p.id} projectId={null}
               loc0={loc} navigate={navigate} folders={folders} expanded={expanded} toggleExpand={toggleExpand} />
           ))}
+          {expanded.has("imoveis") && pastasTopo("imoveis").map((f) => (
+            <TreeBranch key={f.id} depth={2} label={f.nome} loc={{ kind: "folder", folderId: f.id }} propertyId={null} projectId={null} parentId={f.id}
+              loc0={loc} navigate={navigate} folders={folders} expanded={expanded} toggleExpand={toggleExpand} />
+          ))}
           {/* Gestão Colaborativa */}
           <TreeRow depth={1} icon={Users} label="Gestão Colaborativa" active={loc.kind === "colaborativa"} expandable open={expanded.has("colaborativa")} onToggle={() => toggleExpand("colaborativa")} onClick={() => navigate({ kind: "colaborativa" })} />
           {expanded.has("colaborativa") && projetos.map((p) => (
             <TreeBranch key={p.id} depth={2} label={p.title} loc={{ kind: "project", projectId: p.id }} propertyId={null} projectId={p.id}
               loc0={loc} navigate={navigate} folders={folders} expanded={expanded} toggleExpand={toggleExpand} />
           ))}
+          {expanded.has("colaborativa") && pastasTopo("colaborativa").map((f) => (
+            <TreeBranch key={f.id} depth={2} label={f.nome} loc={{ kind: "folder", folderId: f.id }} propertyId={null} projectId={null} parentId={f.id}
+              loc0={loc} navigate={navigate} folders={folders} expanded={expanded} toggleExpand={toggleExpand} />
+          ))}
           {/* Sem associação */}
-          <TreeRow depth={1} icon={FolderIcon} label="Sem associação" active={loc.kind === "sem"} onClick={() => navigate({ kind: "sem" })} />
+          <TreeRow depth={1} icon={FolderIcon} label="Sem associação" active={loc.kind === "sem"} expandable={pastasTopo("sem").length > 0} open={expanded.has("sem")} onToggle={() => toggleExpand("sem")} onClick={() => navigate({ kind: "sem" })} />
+          {expanded.has("sem") && pastasTopo("sem").map((f) => (
+            <TreeBranch key={f.id} depth={2} label={f.nome} loc={{ kind: "folder", folderId: f.id }} propertyId={null} projectId={null} parentId={f.id}
+              loc0={loc} navigate={navigate} folders={folders} expanded={expanded} toggleExpand={toggleExpand} />
+          ))}
           <div className="mt-1 border-t border-line pt-1">
             <TreeRow depth={1} icon={Trash2} label="Lixo" active={loc.kind === "lixo"} onClick={() => navigate({ kind: "lixo" })} />
           </div>
@@ -399,9 +451,9 @@ export default function PastaDigital() {
               <p className="text-sm text-muted">{loc.kind === "lixo" ? "Lixo vazio." : "Pasta vazia. Carregue um documento ou arraste ficheiros para aqui."}</p>
             </div>
           ) : view === "lista" ? (
-            <ListaView itens={itens} sort={sort} setSort={setSort} sel={sel} onFolder={navigate} onDoc={abrirDoc} onSelect={clicarDoc} onCtx={(x, y, doc) => setCtx({ x, y, doc })} propName={propName} projName={projName} />
+            <ListaView itens={itens} sort={sort} setSort={setSort} sel={sel} onFolder={navigate} onDoc={abrirDoc} onSelect={clicarDoc} onCtx={(x, y, doc) => setCtx({ x, y, doc })} onFolderCtx={(x, y, folderId, nome) => setFolderCtx({ x, y, folderId, nome })} propName={propName} projName={projName} />
           ) : (
-            <GridView itens={itens} sel={sel} onFolder={navigate} onDoc={abrirDoc} onSelect={clicarDoc} onCtx={(x, y, doc) => setCtx({ x, y, doc })} />
+            <GridView itens={itens} sel={sel} onFolder={navigate} onDoc={abrirDoc} onSelect={clicarDoc} onCtx={(x, y, doc) => setCtx({ x, y, doc })} onFolderCtx={(x, y, folderId, nome) => setFolderCtx({ x, y, folderId, nome })} />
           )}
 
           {/* Rodapé */}
@@ -414,6 +466,7 @@ export default function PastaDigital() {
 
       {/* Menu de contexto */}
       {ctx && <ContextMenu ctx={ctx} onClose={() => setCtx(null)} onOpen={abrirDoc} onPanel={(id) => setPanelId(id)} sel={sel} />}
+      {folderCtx && <FolderContextMenu ctx={folderCtx} onClose={() => setFolderCtx(null)} onOpen={(id) => navigate({ kind: "folder", folderId: id })} onRename={renomearPasta} onDelete={eliminarPasta} />}
 
       {panelDoc && <DocPanel doc={panelDoc} onClose={() => setPanelId(null)} propName={propName} projName={projName} />}
       {uploadOpen && <UploadModal onClose={() => setUploadOpen(false)} contexto={contextoAtual} addDoc={addDoc} />}
@@ -477,7 +530,7 @@ function TreeBranch({ depth, label, loc, propertyId, projectId, loc0, navigate, 
 
 // ───────────────────────── Vista LISTA ─────────────────────────
 
-function ListaView({ itens, sort, setSort, sel, onFolder, onDoc, onSelect, onCtx, propName, projName }: {
+function ListaView({ itens, sort, setSort, sel, onFolder, onDoc, onSelect, onCtx, onFolderCtx, propName, projName }: {
   itens: Item[];
   sort: { campo: "nome" | "tipo" | "tamanho" | "data" | "validade"; asc: boolean };
   setSort: (s: { campo: "nome" | "tipo" | "tamanho" | "data" | "validade"; asc: boolean }) => void;
@@ -486,6 +539,7 @@ function ListaView({ itens, sort, setSort, sel, onFolder, onDoc, onSelect, onCtx
   onDoc: (d: PropertyDocument) => void;
   onSelect: (id: string, e: React.MouseEvent) => void;
   onCtx: (x: number, y: number, doc: PropertyDocument) => void;
+  onFolderCtx: (x: number, y: number, folderId: string, nome: string) => void;
   propName: (id?: string) => string; projName: (id?: string) => string;
 }) {
   const th = (campo: typeof sort.campo, label: string, extra?: string) => (
@@ -507,7 +561,8 @@ function ListaView({ itens, sort, setSort, sel, onFolder, onDoc, onSelect, onCtx
         </thead>
         <tbody>
           {itens.map((it) => it.type === "folder" ? (
-            <tr key={`f-${it.id}`} className="cursor-pointer border-b border-line/50 last:border-0 hover:bg-accent/60" onDoubleClick={() => onFolder(it.loc)} onClick={() => onFolder(it.loc)}>
+            <tr key={`f-${it.id}`} className="cursor-pointer border-b border-line/50 last:border-0 hover:bg-accent/60" onDoubleClick={() => onFolder(it.loc)} onClick={() => onFolder(it.loc)}
+              onContextMenu={(e) => { if (it.loc.kind === "folder") { e.preventDefault(); onFolderCtx(e.clientX, e.clientY, it.id, it.nome); } }}>
               <td className="px-3 py-2.5"><span className="flex items-center gap-2"><it.icon size={16} className="shrink-0 text-gold-dark" /><span className="font-medium text-ink">{it.nome}</span></span></td>
               <td className="hidden px-3 py-2.5 text-muted sm:table-cell">Pasta</td>
               <td className="hidden px-3 py-2.5 text-muted md:table-cell">{it.count > 0 ? `${it.count} item${it.count === 1 ? "" : "s"}` : "—"}</td>
@@ -557,14 +612,16 @@ function DocRow({ d, selected, onOpen, onSelect, onCtx, propName, projName }: {
 
 // ───────────────────────── Vista GRELHA ─────────────────────────
 
-function GridView({ itens, sel, onFolder, onDoc, onSelect, onCtx }: {
+function GridView({ itens, sel, onFolder, onDoc, onSelect, onCtx, onFolderCtx }: {
   itens: Item[]; sel: Set<string>; onFolder: (l: Loc) => void; onDoc: (d: PropertyDocument) => void;
   onSelect: (id: string, e: React.MouseEvent) => void; onCtx: (x: number, y: number, doc: PropertyDocument) => void;
+  onFolderCtx: (x: number, y: number, folderId: string, nome: string) => void;
 }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
       {itens.map((it) => it.type === "folder" ? (
         <button key={`f-${it.id}`} onDoubleClick={() => onFolder(it.loc)} onClick={() => onFolder(it.loc)}
+          onContextMenu={(e) => { if (it.loc.kind === "folder") { e.preventDefault(); onFolderCtx(e.clientX, e.clientY, it.id, it.nome); } }}
           className="flex flex-col items-center gap-1.5 rounded-xl border border-transparent p-3 text-center hover:border-line hover:bg-accent/60">
           <it.icon size={44} className="text-gold-dark" strokeWidth={1.4} />
           <span className="line-clamp-2 text-xs font-medium text-ink">{it.nome}</span>
@@ -626,6 +683,35 @@ function ContextMenu({ ctx, onClose, onOpen, onPanel, sel }: {
           {item(Trash2, alvo.length > 1 ? `Eliminar (${alvo.length})` : "Eliminar", () => { alvo.forEach(trash); toastSuccess(alvo.length > 1 ? `${alvo.length} movidos para o Lixo` : "Movido para o Lixo"); }, true)}
         </>
       )}
+    </div>
+  );
+}
+
+// ───────────────────────── Menu de contexto de pastas ─────────────────────────
+
+function FolderContextMenu({ ctx, onClose, onOpen, onRename, onDelete }: {
+  ctx: { x: number; y: number; folderId: string; nome: string };
+  onClose: () => void;
+  onOpen: (id: string) => void;
+  onRename: (id: string, nome: string) => void;
+  onDelete: (id: string, nome: string) => void;
+}) {
+  const item = (icon: LucideIcon, label: string, fn: () => void, danger?: boolean) => {
+    const Icon = icon;
+    return (
+      <button onClick={() => { fn(); onClose(); }} className={cn("flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-accent", danger ? "text-danger" : "text-ink")}>
+        <Icon size={15} className={danger ? "text-danger" : "text-muted"} /> {label}
+      </button>
+    );
+  };
+  const x = Math.min(ctx.x, window.innerWidth - 200);
+  const y = Math.min(ctx.y, window.innerHeight - 160);
+  return (
+    <div className="fixed z-[60] w-48 overflow-hidden rounded-xl border border-line bg-card py-1 shadow-2xl" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
+      {item(FolderOpen, "Abrir", () => onOpen(ctx.folderId))}
+      {item(Pencil, "Renomear", () => onRename(ctx.folderId, ctx.nome))}
+      <div className="my-1 border-t border-line" />
+      {item(Trash2, "Eliminar pasta", () => onDelete(ctx.folderId, ctx.nome), true)}
     </div>
   );
 }
@@ -779,7 +865,7 @@ const ACEITES = ".pdf,.jpg,.jpeg,.png,.doc,.docx,.xlsx";
 
 function UploadModal({ onClose, contexto, addDoc }: {
   onClose: () => void;
-  contexto: { propertyId: string | null; projectId: string | null; parentId: string | null };
+  contexto: { propertyId: string | null; projectId: string | null; parentId: string | null; label: string | null };
   addDoc: (input: Omit<PropertyDocument, "id">) => string;
 }) {
   const properties = usePropertiesStore((s) => s.properties);
@@ -790,8 +876,9 @@ function UploadModal({ onClose, contexto, addDoc }: {
   const [propertyId, setPropertyId] = useState(contexto.propertyId ?? "");
   const [projectId, setProjectId] = useState(contexto.projectId ?? "");
   const [validade, setValidade] = useState("");
-  // Na raiz não há pasta atual → deixa escolher; dentro de uma pasta, vem pré-preenchido e bloqueado.
-  const dentroDePasta = !!(contexto.propertyId || contexto.projectId);
+  // Numa secção/raiz sem pasta atual → deixa escolher; dentro de um imóvel/projeto
+  // ou de uma pasta manual, vem pré-preenchido pelo destino.
+  const dentroDePasta = !!(contexto.propertyId || contexto.projectId || contexto.parentId);
 
   const onFiles = (list: FileList) => {
     Array.from(list).forEach((f) => {
@@ -816,7 +903,7 @@ function UploadModal({ onClose, contexto, addDoc }: {
         expiraEm: validade || undefined,
       });
     });
-    toastSuccess(`${files.length} documento${files.length === 1 ? "" : "s"} carregado${files.length === 1 ? "" : "s"}`, dentroDePasta ? "Aparece nesta pasta e na secção do imóvel/projeto." : undefined);
+    toastSuccess(`${files.length} documento${files.length === 1 ? "" : "s"} carregado${files.length === 1 ? "" : "s"}`, dentroDePasta && contexto.label ? `Guardado em ${contexto.label}.` : undefined);
     onClose();
   };
 
@@ -857,8 +944,7 @@ function UploadModal({ onClose, contexto, addDoc }: {
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {dentroDePasta ? (
               <div className="sm:col-span-2 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-sm text-ink">
-                Vai para <strong>{contexto.propertyId ? properties.find((p) => p.id === contexto.propertyId)?.name : projects.find((p) => p.id === contexto.projectId)?.title}</strong>
-                {contexto.parentId ? " (subpasta selecionada)" : ""} — pré-preenchido pela pasta onde está.
+                Vai para <strong>{contexto.label}</strong> — pré-preenchido pela pasta onde está.
               </div>
             ) : (
               <>
