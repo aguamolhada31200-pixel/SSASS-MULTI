@@ -702,7 +702,10 @@ function CamposReab({
   const segUi = SEG_UI[nivelSeg];
 
   const calcularImpostosAuto = () => {
-    if (precoAcordado <= 0) return;
+    if (precoAcordado <= 0) {
+      toastError("Indique primeiro o valor do imóvel (CPCV)");
+      return;
+    }
     const imt = calcularIMT(precoAcordado, "HS");
     const is = calcularIS(precoAcordado);
     setValue("impostos", Math.round(imt + is + 250), { shouldValidate: true });
@@ -851,7 +854,10 @@ function CamposCedencia({
   const cta = valorCedencia + restante + impostos;
 
   const calcularImpostosAuto = () => {
-    if (precoAcordado <= 0) return;
+    if (precoAcordado <= 0) {
+      toastError("Indique primeiro o valor do imóvel (CPCV)");
+      return;
+    }
     const imt = calcularIMT(precoAcordado, "HS");
     const is = calcularIS(precoAcordado);
     // IMT + IS + Registo (Registo ≈ 250€ standard Casa Pronta)

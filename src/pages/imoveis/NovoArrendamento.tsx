@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
+import { toastSuccess, toastError, toastInfo } from "@/lib/toast";
 import {
   ArrowLeft, Check, Save, Plus, Trash2, X, Upload, UserPlus, Info, Calculator,
   KeyRound, Users2, ShieldCheck, FileText, BellRing,
@@ -361,10 +361,13 @@ export default function NovoArrendamento() {
       setTab("gerais");
       return;
     }
+    // Contrato assinado é OBRIGATÓRIO para criar (rascunho pode ficar sem ele).
     if (!rascunho && anexos.length === 0) {
-      toastWarning("Sem contrato assinado anexado", {
-        description: "Pode criar na mesma — anexe o contrato na tab Documentos assim que o tiver.",
+      toastError("Anexe o contrato de arrendamento", {
+        description: "Carregue o contrato assinado na tab Documentos — ou use «Guardar rascunho» para terminar mais tarde.",
       });
+      setTab("documentos");
+      return;
     }
 
     const input = construirInput(rascunho);

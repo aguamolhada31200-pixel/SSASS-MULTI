@@ -197,7 +197,10 @@ export function GaleriaFormModal() {
   };
 
   const submeter = () => {
-    if (!obra || !antes || !depois) return;
+    if (!obra || !antes || !depois) {
+      toastError(!obra ? "Selecione a obra" : "Selecione a foto ANTES e a foto DEPOIS");
+      return;
+    }
     const payload = {
       obraId: obra.id,
       projectId: obra.projectId,

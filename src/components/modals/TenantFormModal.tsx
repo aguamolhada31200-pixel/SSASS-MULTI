@@ -134,7 +134,20 @@ export function TenantFormModal() {
 
   const next = async () => {
     const ok = await trigger(STEP_FIELDS[step]);
-    if (ok) setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    if (!ok) {
+      toastError("Faltam campos obrigatórios", { description: "Reveja os campos assinalados a vermelho." });
+      return;
+    }
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  };
+
+  // Submeteu mas há campos inválidos (podem estar num passo anterior) — avisa e
+  // leva ao primeiro passo com erro, para nunca "não acontecer nada".
+  const onInvalid = (errs: Record<string, unknown>) => {
+    const comErro = Object.keys(errs);
+    const passo = STEP_FIELDS.findIndex((fields) => fields.some((f) => comErro.includes(f as string)));
+    if (passo >= 0 && passo !== step) setStep(passo);
+    toastError("Faltam campos obrigatórios", { description: "Reveja os campos assinalados a vermelho." });
   };
 
   const onValid = (values: FormValues) => {
@@ -217,7 +230,7 @@ export function TenantFormModal() {
           ))}
         </div>
 
-        <form onSubmit={handleSubmit(onValid)} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={handleSubmit(onValid, onInvalid)} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto p-5">
             {/* 1 — Tipo */}
             {step === 0 && (

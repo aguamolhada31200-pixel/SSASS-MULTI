@@ -492,7 +492,10 @@ export function TarefasScreen({ obra, souGestor }: { obra: Obra; souGestor: bool
   const nomeGestor = nomeProprio(profiles.find((p) => p.id === gestorId)?.fullName) || "o gestor";
 
   const criar = (t: string) => {
-    if (!t.trim()) return;
+    if (!t.trim()) {
+      toastError("Escreva o título da tarefa");
+      return;
+    }
     addTarefa(obra.id, t.trim());
     setTitulo("");
     toastSuccess("Tarefa adicionada");
