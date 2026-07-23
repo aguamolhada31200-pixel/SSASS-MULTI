@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
-import { useForm, type Resolver, type UseFormRegisterReturn } from "react-hook-form";
+import { useForm, type Resolver, type UseFormRegisterReturn, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toastSuccess, toastError, toastWarning, toastInfo, toastDismiss } from "@/lib/toast";
 import { useNavigate } from "react-router-dom";
-import { X, ChevronLeft, ChevronRight, Check, ImagePlus, Trash2, Plus, Hammer } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Check, Trash2, Plus, Hammer, Upload, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Lightbox } from "@/components/Lightbox";
 import { MoneyInput, MoneyBox } from "@/components/ui/MoneyField";
 import { useModalStore } from "@/store/useModalStore";
 import { retomarObraPendente } from "@/components/modals/NewObraModal";
 import {
   usePropertiesStore,
   CLASSE_ENERGETICA,
-  TIPO_IMOVEL_LABEL,
   TIPO_RENDA_LABEL,
   FREQ_PAGAMENTO_LABEL,
   type PropType,
@@ -174,6 +174,13 @@ const TYPES_EXPLORACAO: { value: PropType; label: string }[] = [
   { value: "comercial", label: "Comercial" },
 ];
 
+// Tipos físicos que também são um TipoImovel válido — usados para derivar
+// `tipoImovel` a partir do `type` da Aquisição (evita pedir o mesmo duas vezes).
+const TIPOS_FISICOS_SET = new Set<PropType>(["apartamento", "moradia", "predio", "quinta", "loja", "casa", "casa_ferias"]);
+function tipoImovelDeType(type: PropType, atual?: TipoImovel): TipoImovel | undefined {
+  return TIPOS_FISICOS_SET.has(type) ? (type as TipoImovel) : atual;
+}
+
 const STEPS = ["Aquisição", "Morada", "Descrição", "Rendimentos", "Encargos", "Fotos", "Obras"];
 
 const STEP_FIELDS: (keyof FormValues)[][] = [
@@ -181,8 +188,8 @@ const STEP_FIELDS: (keyof FormValues)[][] = [
   ["name", "type", "dataCompra", "valorCompra", "entrada", "financiado", "prazoAnos", "taxaJuro", "prestacaoMensal"],
   // 1 · Morada — cidade obrigatória
   ["address", "morada2", "codigoPostal", "freguesia", "concelho", "city", "distrito", "pais"],
-  // 2 · Descrição física + notas
-  ["tipoImovel", "areaUtil", "numDivisoes", "numQuartos", "numCasasBanho", "classeEnergetica", "descricao", "notaPrivada"],
+  // 2 · Descrição física + notas (o tipo físico já vem da Aquisição)
+  ["anoConstrucao", "areaUtil", "numDivisoes", "numQuartos", "numCasasBanho", "classeEnergetica", "descricao", "notaPrivada"],
   // 3 · Rendimentos
   ["rendaMensal", "dataInicioArrendamento", "caucao", "tipoRendaProposto", "frequenciaPagamento", "estadiaMinimaMeses", "estadiaMaximaMeses"],
   // 4 · Encargos (IRS + despesas fixas)
@@ -281,13 +288,16 @@ export function PropertyFormModal() {
   };
 
   const onValid = (values: FormValues) => {
+    // O tipo físico é escolhido na Aquisição (`type`); replicamo-lo em `tipoImovel`
+    // para o plano de manutenção e o publish de anúncios continuarem a lê-lo.
+    const dados = { ...values, tipoImovel: tipoImovelDeType(values.type, values.tipoImovel) };
     if (editingId) {
-      update(editingId, values);
-      toastSuccess("Imóvel atualizado", { description: values.name });
+      update(editingId, dados);
+      toastSuccess("Imóvel atualizado", { description: dados.name });
       closePropertyForm();
     } else {
       const status = obraData.enabled ? "em_obras" as const : undefined;
-      const id = add({ ...values, status });
+      const id = add({ ...dados, status });
       if (obraData.enabled && obraData.titulo.trim()) {
         addObra({
           propertyId: id,
@@ -325,15 +335,33 @@ export function PropertyFormModal() {
     }
   };
 
+  // Submeteu mas há campos inválidos (podem estar num passo anterior) — avisa e
+  // leva o utilizador ao primeiro passo com erro, para nunca "não acontecer nada".
+  const onInvalid = (errs: FieldErrors<FormValues>) => {
+    const comErro = Object.keys(errs) as (keyof FormValues)[];
+    const passo = STEP_FIELDS.findIndex((fields) => fields.some((f) => comErro.includes(f)));
+    if (passo >= 0 && passo !== step) setStep(passo);
+    toastError("Faltam dados obrigatórios", { description: "Reveja os campos assinalados a vermelho." });
+  };
+
   const addPhotoUrl = (url: string) => {
     if (!url.trim()) return;
     setValue("photos", [...photos, { url: url.trim(), legenda: undefined }], { shouldDirty: true });
   };
 
-  const onFile = (file: File) => {
-    const r = new FileReader();
-    r.onload = () => setValue("photos", [...photos, { url: String(r.result), legenda: undefined }], { shouldDirty: true });
-    r.readAsDataURL(file);
+  const onFiles = (files: File[]) => {
+    const imagens = files.filter((f) => f.type.startsWith("image/"));
+    if (imagens.length === 0) return;
+    Promise.all(
+      imagens.map(
+        (f) =>
+          new Promise<PropertyPhoto>((res) => {
+            const r = new FileReader();
+            r.onload = () => res({ url: String(r.result), legenda: undefined });
+            r.readAsDataURL(f);
+          })
+      )
+    ).then((novas) => setValue("photos", [...(getValues("photos") ?? []), ...novas], { shouldDirty: true }));
   };
 
   const setLegenda = (i: number, legenda: string) =>
@@ -387,7 +415,7 @@ export function PropertyFormModal() {
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit(onValid)} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={handleSubmit(onValid, onInvalid)} className="flex min-h-0 flex-1 flex-col">
           <div className="grid flex-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2">
             {/* ───────── 0 · Aquisição ───────── */}
             {step === 0 && (
@@ -468,14 +496,6 @@ export function PropertyFormModal() {
             {step === 2 && (
               <>
                 <SectionTitle>Características físicas</SectionTitle>
-                <Field label="Tipo de imóvel (opcional)" className="sm:col-span-2">
-                  <select {...register("tipoImovel")} className={inputCls}>
-                    <option value="">— Selecionar —</option>
-                    {(Object.keys(TIPO_IMOVEL_LABEL) as TipoImovel[]).map((k) => (
-                      <option key={k} value={k}>{TIPO_IMOVEL_LABEL[k]}</option>
-                    ))}
-                  </select>
-                </Field>
                 {/* Ano de construção — dado importante, em destaque no topo da caracterização */}
                 <Field label="Ano de construção" error={errors.anoConstrucao?.message} className="sm:col-span-2">
                   <div className="flex items-center rounded-lg border border-line bg-card focus-within:border-secondary">
@@ -532,7 +552,7 @@ export function PropertyFormModal() {
                     className={cn(inputCls, "h-auto min-h-[80px] py-2 leading-relaxed")}
                   />
                 </Field>
-                <Field label="Nota privada (opcional · só visível para si)" className="sm:col-span-2">
+                <Field label="Nota privada (opcional)" className="sm:col-span-2">
                   <textarea
                     {...register("notaPrivada")}
                     rows={2}
@@ -616,7 +636,7 @@ export function PropertyFormModal() {
                 <PhotoStep
                   photos={photos}
                   onAddUrl={addPhotoUrl}
-                  onFile={onFile}
+                  onFiles={onFiles}
                   onRemove={(i) => setValue("photos", photos.filter((_, idx) => idx !== i), { shouldDirty: true })}
                   onLegenda={setLegenda}
                   onMove={movePhoto}
@@ -810,11 +830,11 @@ function Num({
   );
 }
 
-/** Gestor de fotografias (URL + upload + legenda + ordenação + capa) — partilhado com o wizard colaborativo. */
+/** Gestor de fotografias (URL + upload múltiplo + legenda + preview + ordenação + capa) — partilhado com o wizard colaborativo. */
 export function PhotoStep({
   photos,
   onAddUrl,
-  onFile,
+  onFiles,
   onRemove,
   onLegenda,
   onMove,
@@ -822,13 +842,16 @@ export function PhotoStep({
 }: {
   photos: PropertyPhoto[];
   onAddUrl: (url: string) => void;
-  onFile: (f: File) => void;
+  onFiles: (files: File[]) => void;
   onRemove: (i: number) => void;
   onLegenda: (i: number, legenda: string) => void;
   onMove: (from: number, to: number) => void;
   onCapa: (i: number) => void;
 }) {
   const [url, setUrl] = useState("");
+  const [drag, setDrag] = useState(false);
+  const [preview, setPreview] = useState<number | null>(null);
+
   return (
     <div>
       <p className="mb-1 text-xs font-medium text-muted">Fotografias</p>
@@ -858,16 +881,32 @@ export function PhotoStep({
         </Button>
       </div>
 
-      <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line bg-bg py-6 text-sm text-muted hover:bg-accent">
-        <ImagePlus size={18} />
-        Carregar do dispositivo
+      {/* Zona de upload — arrastar OU escolher várias fotos de uma vez */}
+      <label
+        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDrag(false);
+          const fs = Array.from(e.dataTransfer.files ?? []);
+          if (fs.length) onFiles(fs);
+        }}
+        className={cn(
+          "mt-3 flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed py-6 text-sm transition-colors",
+          drag ? "border-primary bg-accent text-primary" : "border-line bg-bg text-muted hover:bg-accent"
+        )}
+      >
+        <Upload size={20} className={drag ? "text-primary" : "text-secondary"} />
+        <span>Arrastar fotos para aqui ou <span className="font-medium text-primary">escolher do dispositivo</span></span>
+        <span className="text-[11px] text-muted">Pode selecionar várias ao mesmo tempo · JPG, PNG…</span>
         <input
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) onFile(f);
+            const fs = Array.from(e.target.files ?? []);
+            if (fs.length) onFiles(fs);
             e.target.value = "";
           }}
         />
@@ -877,12 +916,20 @@ export function PhotoStep({
         <div className="mt-3 space-y-2">
           {photos.map((p, i) => (
             <div key={i} className="flex items-start gap-3 rounded-xl border border-line bg-card p-2">
-              <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line">
+              <button
+                type="button"
+                onClick={() => setPreview(i)}
+                className="group relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line"
+                title="Ver em grande"
+              >
                 <img src={p.url} alt="" className="h-full w-full object-cover" />
                 {i === 0 && (
                   <span className="absolute left-1 top-1 rounded bg-gold px-1 text-[9px] font-bold text-sidebar">Capa</span>
                 )}
-              </div>
+                <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 transition-opacity group-hover:bg-ink/40 group-hover:opacity-100">
+                  <Maximize2 size={16} />
+                </span>
+              </button>
               <div className="min-w-0 flex-1">
                 <input
                   value={p.legenda ?? ""}
@@ -910,6 +957,14 @@ export function PhotoStep({
             </div>
           ))}
         </div>
+      )}
+
+      {preview !== null && (
+        <Lightbox
+          fotos={photos.map((p) => ({ url: p.url, legenda: p.legenda }))}
+          startIndex={preview}
+          onClose={() => setPreview(null)}
+        />
       )}
     </div>
   );

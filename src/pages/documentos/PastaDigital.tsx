@@ -108,6 +108,7 @@ export default function PastaDigital() {
   const documents = useDocumentsStore((s) => s.documents);
   const addDoc = useDocumentsStore((s) => s.add);
   const moveDocToFolder = useDocumentsStore((s) => s.moveToFolder);
+  const renameDoc = useDocumentsStore((s) => s.rename);
   const folders = useFoldersStore((s) => s.folders);
   const addFolder = useFoldersStore((s) => s.add);
   const renameFolder = useFoldersStore((s) => s.rename);
@@ -170,6 +171,9 @@ export default function PastaDigital() {
   const [panelId, setPanelId] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; doc: PropertyDocument } | null>(null);
   const [folderCtx, setFolderCtx] = useState<{ x: number; y: number; folderId: string; nome: string } | null>(null);
+  // Diálogos estilizados (substituem window.prompt / window.confirm)
+  const [nomeModal, setNomeModal] = useState<{ titulo: string; valor: string; cta: string; placeholder?: string; onOk: (nome: string) => void } | null>(null);
+  const [confirmDel, setConfirmDel] = useState<{ folderId: string; nome: string } | null>(null);
   const [filtOpen, setFiltOpen] = useState(false);
   const [fTipo, setFTipo] = useState<"todos" | TipoGrupo>("todos");
   const [fExpira, setFExpira] = useState(false);
@@ -300,27 +304,40 @@ export default function PastaDigital() {
 
   const novaPasta = () => {
     if (!podeCriarPasta) { toastInfo("Abra uma secção, imóvel ou projeto para criar a pasta."); return; }
-    const nome = window.prompt("Nome da nova pasta:");
-    if (!nome || !nome.trim()) return;
-    addFolder({ nome: nome.trim(), propertyId: contextoAtual.propertyId, projectId: contextoAtual.projectId, parentId: contextoAtual.parentId, secao: contextoAtual.secao });
-    toastSuccess("Pasta criada", nome.trim());
+    setNomeModal({
+      titulo: "Nova pasta", valor: "", cta: "Criar pasta", placeholder: "Ex.: Documentos essenciais",
+      onOk: (nome) => {
+        addFolder({ nome, propertyId: contextoAtual.propertyId, projectId: contextoAtual.projectId, parentId: contextoAtual.parentId, secao: contextoAtual.secao });
+        toastSuccess("Pasta criada", nome);
+      },
+    });
   };
 
   const renomearPasta = (folderId: string, nomeAtual: string) => {
-    const novo = window.prompt("Novo nome da pasta:", nomeAtual);
-    if (!novo || !novo.trim()) return;
-    renameFolder(folderId, novo.trim());
-    toastSuccess("Pasta renomeada", novo.trim());
+    setNomeModal({
+      titulo: "Renomear pasta", valor: nomeAtual, cta: "Guardar", placeholder: "Nome da pasta",
+      onOk: (nome) => { renameFolder(folderId, nome); toastSuccess("Pasta renomeada", nome); },
+    });
   };
 
-  const eliminarPasta = (folderId: string, nome: string) => {
-    const ok = window.confirm(`Eliminar a pasta "${nome}"?\nOs documentos que estejam lá dentro NÃO são apagados — ficam guardados na secção.`);
-    if (!ok) return;
+  const renomearDoc = (d: PropertyDocument) => {
+    setNomeModal({
+      titulo: "Renomear documento", valor: d.nome, cta: "Guardar", placeholder: "Nome do documento",
+      onOk: (nome) => { renameDoc(d.id, nome); toastSuccess("Documento renomeado", nome); },
+    });
+  };
+
+  const eliminarPasta = (folderId: string, nome: string) => setConfirmDel({ folderId, nome });
+
+  const confirmarEliminarPasta = () => {
+    if (!confirmDel) return;
+    const { folderId } = confirmDel;
     const alvo = parentLoc({ kind: "folder", folderId });
     const removidos = removeFolder(folderId);
     documents.forEach((d) => { if (d.pastaId && removidos.includes(d.pastaId)) moveDocToFolder(d.id, undefined); });
     if (loc.kind === "folder" && removidos.includes(loc.folderId)) navigate(alvo);
     toastSuccess("Pasta eliminada", "Os documentos foram mantidos na secção.");
+    setConfirmDel(null);
   };
 
   // Seleção com click / Ctrl / Shift
@@ -465,11 +482,32 @@ export default function PastaDigital() {
       </div>
 
       {/* Menu de contexto */}
-      {ctx && <ContextMenu ctx={ctx} onClose={() => setCtx(null)} onOpen={abrirDoc} onPanel={(id) => setPanelId(id)} sel={sel} />}
+      {ctx && <ContextMenu ctx={ctx} onClose={() => setCtx(null)} onOpen={abrirDoc} onPanel={(id) => setPanelId(id)} onRename={renomearDoc} sel={sel} />}
       {folderCtx && <FolderContextMenu ctx={folderCtx} onClose={() => setFolderCtx(null)} onOpen={(id) => navigate({ kind: "folder", folderId: id })} onRename={renomearPasta} onDelete={eliminarPasta} />}
 
-      {panelDoc && <DocPanel doc={panelDoc} onClose={() => setPanelId(null)} propName={propName} projName={projName} />}
+      {panelDoc && <DocPanel doc={panelDoc} onClose={() => setPanelId(null)} onRename={renomearDoc} propName={propName} projName={projName} />}
       {uploadOpen && <UploadModal onClose={() => setUploadOpen(false)} contexto={contextoAtual} addDoc={addDoc} />}
+
+      {/* Diálogos estilizados */}
+      {nomeModal && (
+        <NomeModal
+          titulo={nomeModal.titulo}
+          valorInicial={nomeModal.valor}
+          cta={nomeModal.cta}
+          placeholder={nomeModal.placeholder}
+          onClose={() => setNomeModal(null)}
+          onConfirm={(nome) => { nomeModal.onOk(nome); setNomeModal(null); }}
+        />
+      )}
+      {confirmDel && (
+        <ConfirmDialog
+          titulo="Eliminar pasta"
+          mensagem={`Eliminar a pasta "${confirmDel.nome}"? Os documentos lá dentro não são apagados — ficam guardados na secção.`}
+          cta="Eliminar pasta"
+          onClose={() => setConfirmDel(null)}
+          onConfirm={confirmarEliminarPasta}
+        />
+      )}
     </div>
   );
 }
@@ -644,13 +682,12 @@ function GridView({ itens, sel, onFolder, onDoc, onSelect, onCtx, onFolderCtx }:
 
 // ───────────────────────── Menu de contexto ─────────────────────────
 
-function ContextMenu({ ctx, onClose, onOpen, onPanel, sel }: {
-  ctx: { x: number; y: number; doc: PropertyDocument }; onClose: () => void; onOpen: (d: PropertyDocument) => void; onPanel: (id: string) => void; sel: Set<string>;
+function ContextMenu({ ctx, onClose, onOpen, onPanel, onRename, sel }: {
+  ctx: { x: number; y: number; doc: PropertyDocument }; onClose: () => void; onOpen: (d: PropertyDocument) => void; onPanel: (id: string) => void; onRename: (d: PropertyDocument) => void; sel: Set<string>;
 }) {
   const trash = useDocumentsStore((s) => s.trash);
   const remove = useDocumentsStore((s) => s.remove);
   const restore = useDocumentsStore((s) => s.restore);
-  const rename = useDocumentsStore((s) => s.rename);
   const d = ctx.doc;
   const naLixeira = !!d.deletedAt;
   const alvo = sel.size > 1 && sel.has(d.id) ? [...sel] : [d.id];
@@ -677,7 +714,7 @@ function ContextMenu({ ctx, onClose, onOpen, onPanel, sel }: {
         <>
           {item(ExternalLink, "Abrir", () => onOpen(d))}
           {item(Download, "Descarregar", baixar)}
-          {item(Pencil, "Renomear", () => { const n = window.prompt("Novo nome:", d.nome); if (n?.trim()) { rename(d.id, n.trim()); toastSuccess("Renomeado"); } })}
+          {item(Pencil, "Renomear", () => onRename(d))}
           {item(FolderInput, "Mover para…", () => onPanel(d.id))}
           <div className="my-1 border-t border-line" />
           {item(Trash2, alvo.length > 1 ? `Eliminar (${alvo.length})` : "Eliminar", () => { alvo.forEach(trash); toastSuccess(alvo.length > 1 ? `${alvo.length} movidos para o Lixo` : "Movido para o Lixo"); }, true)}
@@ -716,6 +753,59 @@ function FolderContextMenu({ ctx, onClose, onOpen, onRename, onDelete }: {
   );
 }
 
+// ───────────────────────── Diálogo de nome (criar / renomear) ─────────────────────────
+
+function NomeModal({ titulo, valorInicial, cta, placeholder, onConfirm, onClose }: {
+  titulo: string; valorInicial: string; cta: string; placeholder?: string; onConfirm: (nome: string) => void; onClose: () => void;
+}) {
+  const [v, setV] = useState(valorInicial);
+  const submeter = () => { const n = v.trim(); if (!n) return; onConfirm(n); };
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
+      <div className="w-full max-w-sm rounded-t-2xl border border-line bg-card p-5 shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-display text-base font-semibold text-ink">{titulo}</h3>
+          <button onClick={onClose} className="text-muted hover:text-ink"><X size={18} /></button>
+        </div>
+        <input
+          autoFocus
+          value={v}
+          onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submeter(); } if (e.key === "Escape") onClose(); }}
+          placeholder={placeholder ?? "Nome"}
+          className="h-10 w-full rounded-lg border border-line bg-card px-3 text-sm outline-none focus:border-secondary"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button size="sm" onClick={submeter} disabled={!v.trim()}>{cta}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────── Diálogo de confirmação ─────────────────────────
+
+function ConfirmDialog({ titulo, mensagem, cta, onConfirm, onClose }: {
+  titulo: string; mensagem: string; cta: string; onConfirm: () => void; onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/40 backdrop-blur-sm sm:items-center" onMouseDown={onClose}>
+      <div className="w-full max-w-sm rounded-t-2xl border border-line bg-card p-5 shadow-2xl sm:rounded-2xl" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="mb-2 flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger"><AlertTriangle size={18} /></span>
+          <h3 className="font-display text-base font-semibold text-ink">{titulo}</h3>
+        </div>
+        <p className="text-sm text-muted">{mensagem}</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button variant="danger" size="sm" onClick={() => { onConfirm(); }}><Trash2 size={14} /> {cta}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ───────────────────────── Popover de filtros ─────────────────────────
 
 function FilterPopover({ fTipo, setFTipo, fExpira, setFExpira, onClose, onLimpar }: {
@@ -746,8 +836,8 @@ function FilterPopover({ fTipo, setFTipo, fExpira, setFExpira, onClose, onLimpar
 
 // ───────────────────────── Painel do documento ─────────────────────────
 
-function DocPanel({ doc, onClose, propName, projName }: {
-  doc: PropertyDocument; onClose: () => void; propName: (id?: string) => string; projName: (id?: string) => string;
+function DocPanel({ doc, onClose, onRename, propName, projName }: {
+  doc: PropertyDocument; onClose: () => void; onRename: (d: PropertyDocument) => void; propName: (id?: string) => string; projName: (id?: string) => string;
 }) {
   const rename = useDocumentsStore((s) => s.rename);
   const setCategoria = useDocumentsStore((s) => s.setCategoria);
@@ -839,7 +929,7 @@ function DocPanel({ doc, onClose, propName, projName }: {
         </div>
         <div className="grid grid-cols-2 gap-2 border-t border-line p-3">
           <Button variant="outline" size="sm" onClick={baixar}><Download size={14} /> Descarregar</Button>
-          <Button variant="outline" size="sm" onClick={() => { const n = window.prompt("Novo nome:", doc.nome); if (n?.trim()) rename(doc.id, n.trim()); }}><Pencil size={14} /> Renomear</Button>
+          <Button variant="outline" size="sm" onClick={() => onRename(doc)}><Pencil size={14} /> Renomear</Button>
           {doc.deletedAt ? (
             <>
               <Button variant="outline" size="sm" onClick={() => { restore(doc.id); toastSuccess("Restaurado"); onClose(); }}><RotateCcw size={14} /> Restaurar</Button>

@@ -522,10 +522,19 @@ function StepImovel({
                 if (!url.trim()) return;
                 set("photos", [...form.photos, { url: url.trim(), legenda: undefined }]);
               }}
-              onFile={(f) => {
-                const r = new FileReader();
-                r.onload = () => set("photos", [...form.photos, { url: String(r.result), legenda: undefined }]);
-                r.readAsDataURL(f);
+              onFiles={(files) => {
+                Promise.all(
+                  files
+                    .filter((f) => f.type.startsWith("image/"))
+                    .map(
+                      (f) =>
+                        new Promise<{ url: string; legenda?: string }>((res) => {
+                          const r = new FileReader();
+                          r.onload = () => res({ url: String(r.result), legenda: undefined });
+                          r.readAsDataURL(f);
+                        })
+                    )
+                ).then((novas) => set("photos", [...form.photos, ...novas]));
               }}
               onRemove={(i) => set("photos", form.photos.filter((_, idx) => idx !== i))}
               onLegenda={(i, legenda) => set("photos", form.photos.map((p, idx) => (idx === i ? { ...p, legenda } : p)))}
